@@ -22,6 +22,14 @@
 #endif
 
 #ifdef _ADIOS2
+char *strdup(const char *name) {
+    char *dup = malloc(strlen(name) + 1);
+
+    if (dup != NULL)
+        strcpy(dup, name);
+
+    return dup;
+}
 int adios2_type_size(adios2_type type, const void *var)
 {
     switch (type)
@@ -2579,6 +2587,7 @@ int PIOc_def_var(int ncid, const char *name, nc_type xtype, int ndims,
             if (file->adios_iomaster == MPI_ROOT)
             {
                 char att_name[PIO_MAX_NAME];
+                printf("%s",av->name);
                 snprintf(att_name, PIO_MAX_NAME, "%s/__pio__/ndims", av->name);
                 adios2_attribute *attributeH = adios2_inquire_attribute(file->ioH, att_name);
                 if (attributeH == NULL)

@@ -508,9 +508,9 @@ int PIOc_closefile(int ncid)
 
         /* Track attributes */
         for (int i = 0; i < file->num_attrs; i++)
-        {
+        {   /*TODO
             free(file->adios_attrs[i].att_name);
-            file->adios_attrs[i].att_name = NULL;
+            file->adios_attrs[i].att_name = NULL;*/
         }
 
         file->num_attrs = 0;
