@@ -2045,6 +2045,7 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
 #ifdef _ADIOS2
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
+        int errio = adios2_get(file->engineH, file->adios_vars[varid].adios_varid, array, adios2_mode_deferred);
         return pio_err(ios, file, PIO_EADIOSREAD, __FILE__, __LINE__,
                         "Reading variable (%s, varid=%d) from file (%s, ncid=%d)failed . ADIOS currently does not support reading variables", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
     }

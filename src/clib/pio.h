@@ -982,6 +982,7 @@ typedef struct file_desc_t
     /** True if this task should participate in IO (only true for one
      * task with netcdf serial files. */
     int do_io;
+
 } file_desc_t;
 
 /**

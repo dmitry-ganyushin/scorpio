@@ -15,6 +15,7 @@
 
 #ifdef _ADIOS2
 #include <dirent.h>
+#include <adios2_c.h>
 #endif
 
 #define VERSNO 2001
@@ -2917,8 +2918,9 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
 
     /* Fill in some file values. */
     file->fh = -1;
-    strncpy(file->fname, filename, PIO_MAX_NAME);
     file->iotype = *iotype;
+    //TODODG set up cases
+#if 0
 #ifdef _ADIOS2
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
@@ -2934,6 +2936,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
 #endif
 #endif
     }
+#endif
 #endif
     file->iosystem = ios;
     file->mode = mode;
@@ -3027,6 +3030,41 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             }
             LOG((2, "ncmpi_open(%s) : fd = %d", filename, file->fh));
             break;
+#endif
+#ifdef _ADIOS2
+            case PIO_IOTYPE_ADIOS: {
+                char declare_name[PIO_MAX_NAME];
+                char bpname [PIO_MAX_NAME];
+                strcat(bpname, filename);
+                strcat(bpname, ".bp");
+                strncpy(file->fname, bpname, PIO_MAX_NAME);
+                snprintf(declare_name, PIO_MAX_NAME, "%s%lu", file->fname, get_adios2_io_cnt());
+
+                file->ioH = adios2_declare_io(ios->adiosH, (const char *) declare_name);
+                if (file->ioH == NULL) {
+                    return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Declaring (ADIOS) IO (name=%s) failed for file (%s)",
+                                   declare_name, pio_get_fname_from_file(file));
+                }
+
+                adios2_error adiosErr = adios2_set_engine(file->ioH, "FileStream");
+                if (adiosErr != adios2_error_none) {
+                    return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Setting (ADIOS) engine (type=FileStream) failed (adios2_error=%s) for file (%s)",
+                                   adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
+                }
+
+
+                file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
+                if (file->engineH == NULL) {
+                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Opening (ADIOS) file (%s) failed",
+                                   pio_get_fname_from_file(file));
+                }
+
+                LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+            }
+                break;
 #endif
 
         default:
