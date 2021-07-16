@@ -1349,26 +1349,27 @@ int PIOc_inq_varid(int ncid, const char *name, int *varidp)
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
         ierr = PIO_ENOTVAR;
-        //we should call adios_available_varibles() by openning a file and count
+        //we should call adios_available_varibles() by openning a file
         for (int i = 0; i < file->num_vars; i++)
         {
             if (strcmp(name, file->adios_vars[i].name) == 0)
             {
                 /* variable exists */
+                /* variable defined already */
+                //TODODG error handling
+                file->adios_vars[i].adios_varid = adios2_inquire_variable(file->ioH, name);
+                /*variable shape-> can read from the adios file */
+                size_t shape[1];
+                adios2_variable_shape(shape, file->adios_vars[i].adios_varid);
+                /*set variable type */
+                adios2_type type[1];
+                adios2_variable_type( type, file->adios_vars[i].adios_varid);
                 *varidp = i;
                 ierr = PIO_NOERR;
                 break;
             }
         }
-        /* define adios2 variable */
-        /* how to pass shape, start, count here? */
-        file->adios_vars[file->num_vars].adios_varid =
-                adios2_define_variable(file->ioH, name, adios2_type_float, 1, shape,
-                                       start, count, adios2_constant_dims_true);
 
-        *varidp = file->num_vars;
-        ierr = PIO_NOERR;
-        file->num_vars++;
 
         return ierr;
     }

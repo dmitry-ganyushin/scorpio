@@ -11,14 +11,18 @@
 #include <pio_config.h>
 #include <pio.h>
 #include <pio_internal.h>
+
 #ifdef PIO_MICRO_TIMING
 #include "pio_timer.h"
 #endif
+
 #include "pio_sdecomps_regex.h"
 
 /* uint64_t definition */
 #ifdef _ADIOS2
+
 #include <stdint.h>
+
 #endif
 
 /* 10MB default limit. */
@@ -41,8 +45,7 @@ PIO_Offset maxusage = 0;
  * @param limit the size of the buffer on the IO nodes
  * @return The previous limit setting.
  */
-PIO_Offset PIOc_set_buffer_size_limit(PIO_Offset limit)
-{
+PIO_Offset PIOc_set_buffer_size_limit(PIO_Offset limit) {
     PIO_Offset oldsize = pio_buffer_size_limit;
 
     /* If the user passed a valid size, use it. */
@@ -108,8 +111,7 @@ PIO_Offset PIOc_set_buffer_size_limit(PIO_Offset limit)
  */
 int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
                             PIO_Offset arraylen, void *array, const int *frame,
-                            void **fillvalue, bool flushtodisk)
-{
+                            void **fillvalue, bool flushtodisk) {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
     io_desc_t *iodesc;     /* Pointer to IO description information. */
@@ -123,42 +125,42 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
     GPTLstart("PIO:PIOc_write_darray_multi");
 #endif
     /* Get the file info. */
-    if ((ierr = pio_get_file(ncid, &file)))
-    {
+    if ((ierr = pio_get_file(ncid, &file))) {
         return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__,
-                        "Writing multiple variables to file (ncid=%d) failed. Unable to query the internal file structure associated with the file. Invalid file id", ncid);
+                       "Writing multiple variables to file (ncid=%d) failed. Unable to query the internal file structure associated with the file. Invalid file id",
+                       ncid);
     }
     ios = file->iosystem;
 
     /* Check inputs. */
-    if (nvars <= 0 || !varids)
-    {
+    if (nvars <= 0 || !varids) {
         return pio_err(ios, file, PIO_EINVAL, __FILE__, __LINE__,
-                        "Writing multiple variables to file (%s, ncid=%d) failed. Internal error, invalid arguments, nvars = %d (expected > 0), varids is %s (expected not NULL)", pio_get_fname_from_file(file), ncid, nvars, PIO_IS_NULL(varids));
+                       "Writing multiple variables to file (%s, ncid=%d) failed. Internal error, invalid arguments, nvars = %d (expected > 0), varids is %s (expected not NULL)",
+                       pio_get_fname_from_file(file), ncid, nvars, PIO_IS_NULL(varids));
     }
     for (int v = 0; v < nvars; v++)
-        if (varids[v] < 0 || varids[v] > PIO_MAX_VARS)
-        {
+        if (varids[v] < 0 || varids[v] > PIO_MAX_VARS) {
             return pio_err(ios, file, PIO_EINVAL, __FILE__, __LINE__,
-                            "Writing multiple variables to file (%s, ncid=%d) failed. Internal error, invalid arguments, nvars = %d, varids[%d] = %d (expected >= 0 && <= PIO_MAX_VARS=%d)", pio_get_fname_from_file(file), ncid, nvars, v, varids[v], PIO_MAX_VARS);
+                           "Writing multiple variables to file (%s, ncid=%d) failed. Internal error, invalid arguments, nvars = %d, varids[%d] = %d (expected >= 0 && <= PIO_MAX_VARS=%d)",
+                           pio_get_fname_from_file(file), ncid, nvars, v, varids[v], PIO_MAX_VARS);
         }
 
     LOG((1, "PIOc_write_darray_multi ncid = %d ioid = %d nvars = %d arraylen = %ld "
-         "flushtodisk = %d",
-         ncid, ioid, nvars, arraylen, flushtodisk));
+            "flushtodisk = %d",
+            ncid, ioid, nvars, arraylen, flushtodisk));
 
     /* Check that we can write to this file. */
-    if (!(file->mode & PIO_WRITE))
-    {
+    if (!(file->mode & PIO_WRITE)) {
         return pio_err(ios, file, PIO_EPERM, __FILE__, __LINE__,
-                        "Writing multiple variables to file (%s, ncid=%d) failed. Trying to write to a read only file, try reopening the file in write mode (use the PIO_WRITE flag)", pio_get_fname_from_file(file), ncid);
+                       "Writing multiple variables to file (%s, ncid=%d) failed. Trying to write to a read only file, try reopening the file in write mode (use the PIO_WRITE flag)",
+                       pio_get_fname_from_file(file), ncid);
     }
 
     /* Get iodesc. */
-    if (!(iodesc = pio_get_iodesc_from_id(ioid)))
-    {
+    if (!(iodesc = pio_get_iodesc_from_id(ioid))) {
         return pio_err(ios, file, PIO_EBADID, __FILE__, __LINE__,
-                        "Writing multiple variables to file (%s, ncid=%d) failed. Invalid arguments, invalid PIO decomposition id (%d) provided", pio_get_fname_from_file(file), ncid, ioid);
+                       "Writing multiple variables to file (%s, ncid=%d) failed. Invalid arguments, invalid PIO decomposition id (%d) provided",
+                       pio_get_fname_from_file(file), ncid, ioid);
     }
     pioassert(iodesc->rearranger == PIO_REARR_BOX || iodesc->rearranger == PIO_REARR_SUBSET,
               "unknown rearranger", __FILE__, __LINE__);
@@ -168,21 +170,20 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
 
     /* Run these on all tasks if async is not in use, but only on
      * non-IO tasks if async is in use. */
-    if (!ios->async || !ios->ioproc)
-    {
+    if (!ios->async || !ios->ioproc) {
         /* Get the number of dims for this var. */
         LOG((3, "about to call PIOc_inq_varndims varids[0] = %d", varids[0]));
         ierr = PIOc_inq_varndims(file->pio_ncid, varids[0], &fndims);
-        if(ierr != PIO_NOERR){
-          return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                          "Writing multiple variables to file (%s, ncid=%d) failed. Inquiring number of dimensions in the first variable (%s, varid=%d) in the list failed", pio_get_fname_from_file(file), ncid, pio_get_vname_from_file(file, varids[0]), varids[0]);
+        if (ierr != PIO_NOERR) {
+            return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                           "Writing multiple variables to file (%s, ncid=%d) failed. Inquiring number of dimensions in the first variable (%s, varid=%d) in the list failed",
+                           pio_get_fname_from_file(file), ncid, pio_get_vname_from_file(file, varids[0]), varids[0]);
         }
         LOG((3, "called PIOc_inq_varndims varids[0] = %d fndims = %d", varids[0], fndims));
     }
 
     /* If async is in use, and this is not an IO task, bcast the parameters. */
-    if (ios->async)
-    {
+    if (ios->async) {
         int msg = PIO_MSG_WRITEDARRAYMULTI;
         char frame_present = frame ? true : false;         /* Is frame non-NULL? */
         char fillvalue_present = fillvalue ? true : false; /* Is fillvalue non-NULL? */
@@ -191,28 +192,24 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
         int *amsg_frame = NULL;
         void *amsg_fillvalue = fillvalue;
 
-        if(!frame_present)
-        {
-            amsg_frame = (int *)calloc(nvars, sizeof(int));
+        if (!frame_present) {
+            amsg_frame = (int *) calloc(nvars, sizeof(int));
         }
-        if(!fillvalue_present)
-        {
-            amsg_fillvalue = calloc(nvars * iodesc->piotype_size, sizeof(char ));
+        if (!fillvalue_present) {
+            amsg_fillvalue = calloc(nvars * iodesc->piotype_size, sizeof(char));
         }
 
         PIO_SEND_ASYNC_MSG(ios, msg, &ierr,
-            ncid, nvars, nvars, varids, ioid, arraylen,
-            arraylen * iodesc->piotype_size, array, frame_present,
-            nvars,
-            (frame_present) ? frame : amsg_frame, fillvalue_present,
-            nvars * iodesc->piotype_size, amsg_fillvalue, flushtodisk_int);
+                           ncid, nvars, nvars, varids, ioid, arraylen,
+                           arraylen * iodesc->piotype_size, array, frame_present,
+                           nvars,
+                           (frame_present) ? frame : amsg_frame, fillvalue_present,
+                           nvars * iodesc->piotype_size, amsg_fillvalue, flushtodisk_int);
 
-        if(!frame_present)
-        {
+        if (!frame_present) {
             free(amsg_frame);
         }
-        if(!fillvalue_present)
-        {
+        if (!fillvalue_present) {
             free(amsg_fillvalue);
         }
 
@@ -223,17 +220,16 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
     }
 
     /* if the buffer is already in use in pnetcdf we need to flush first */
-    if (file->iotype == PIO_IOTYPE_PNETCDF && file->iobuf[ioid - PIO_IODESC_START_ID])
-    {
+    if (file->iotype == PIO_IOTYPE_PNETCDF && file->iobuf[ioid - PIO_IODESC_START_ID]) {
         ierr = flush_output_buffer(file, true, 0);
-        if (ierr != PIO_NOERR)
-        {
+        if (ierr != PIO_NOERR) {
             return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                            "Writing multiple variables to file (%s, ncid=%d) failed. Flushing data to disk (PIO_IOTYPE_PNETCDF) failed", pio_get_fname_from_file(file), ncid);
+                           "Writing multiple variables to file (%s, ncid=%d) failed. Flushing data to disk (PIO_IOTYPE_PNETCDF) failed",
+                           pio_get_fname_from_file(file), ncid);
         }
     }
 
-    pioassert(!file->iobuf[ioid - PIO_IODESC_START_ID], "buffer overwrite",__FILE__, __LINE__);
+    pioassert(!file->iobuf[ioid - PIO_IODESC_START_ID], "buffer overwrite", __FILE__, __LINE__);
 
     /* Determine total size of aggregated data (all vars/records).
      * For netcdf serial writes we collect the data on io nodes and
@@ -273,152 +269,149 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
 #endif
 
     /* Allocate iobuf. */
-    if (rlen > 0)
-    {
+    if (rlen > 0) {
         /* Allocate memory for the buffer for all vars/records. */
-        if (!(file->iobuf[ioid - PIO_IODESC_START_ID] = bget(iodesc->mpitype_size * rlen)))
-        {
+        if (!(file->iobuf[ioid - PIO_IODESC_START_ID] = bget(iodesc->mpitype_size * rlen))) {
             return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Writing multiple variables to file (%s, ncid=%d) failed. Out of memory (Trying to allocate %lld bytes for rearranged data for multiple variables with the same decomposition)", pio_get_fname_from_file(file), ncid, (unsigned long long)(iodesc->mpitype_size * rlen));
+                           "Writing multiple variables to file (%s, ncid=%d) failed. Out of memory (Trying to allocate %lld bytes for rearranged data for multiple variables with the same decomposition)",
+                           pio_get_fname_from_file(file), ncid, (unsigned long long) (iodesc->mpitype_size * rlen));
         }
         LOG((3, "allocated %lld bytes for variable buffer", rlen * iodesc->mpitype_size));
 
         /* If fill values are desired, and we're using the BOX
          * rearranger, insert fill values. */
-        if (iodesc->needsfill && iodesc->rearranger == PIO_REARR_BOX)
-        {
+        if (iodesc->needsfill && iodesc->rearranger == PIO_REARR_BOX) {
             LOG((3, "inerting fill values iodesc->maxiobuflen = %d", iodesc->maxiobuflen));
             for (int nv = 0; nv < nvars; nv++)
                 for (PIO_Offset i = 0; i < iodesc->maxiobuflen; i++)
-                    memcpy(&((char *)file->iobuf[ioid - PIO_IODESC_START_ID])[iodesc->mpitype_size * (i + nv * iodesc->maxiobuflen)],
-                           &((char *)fillvalue)[nv * iodesc->mpitype_size], iodesc->mpitype_size);
+                    memcpy(&((char *) file->iobuf[ioid - PIO_IODESC_START_ID])[iodesc->mpitype_size *
+                                                                               (i + nv * iodesc->maxiobuflen)],
+                           &((char *) fillvalue)[nv * iodesc->mpitype_size], iodesc->mpitype_size);
         }
-    }
-    else if (file->iotype == PIO_IOTYPE_PNETCDF && ios->ioproc)
-    {
-	/* this assures that iobuf is allocated on all iotasks thus
-	 assuring that the flush_output_buffer call above is called
-	 collectively (from all iotasks) */
-        if (!(file->iobuf[ioid - PIO_IODESC_START_ID] = bget(1)))
-        {
+    } else if (file->iotype == PIO_IOTYPE_PNETCDF && ios->ioproc) {
+        /* this assures that iobuf is allocated on all iotasks thus
+         assuring that the flush_output_buffer call above is called
+         collectively (from all iotasks) */
+        if (!(file->iobuf[ioid - PIO_IODESC_START_ID] = bget(1))) {
             return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Writing multiple variables to file (%s, ncid=%d) failed. Out of memory (Trying to allocate 1 byte)", pio_get_fname_from_file(file), ncid);
+                           "Writing multiple variables to file (%s, ncid=%d) failed. Out of memory (Trying to allocate 1 byte)",
+                           pio_get_fname_from_file(file), ncid);
         }
         LOG((3, "allocated token for variable buffer"));
     }
 
     /* Move data from compute to IO tasks. */
-    if ((ierr = rearrange_comp2io(ios, iodesc, array, file->iobuf[ioid - PIO_IODESC_START_ID], nvars)))
-    {
+    if ((ierr = rearrange_comp2io(ios, iodesc, array, file->iobuf[ioid - PIO_IODESC_START_ID], nvars))) {
         return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                        "Writing multiple variables to file (%s, ncid=%d) failed. Error rearranging and moving data from compute tasks to I/O tasks", pio_get_fname_from_file(file), ncid);
+                       "Writing multiple variables to file (%s, ncid=%d) failed. Error rearranging and moving data from compute tasks to I/O tasks",
+                       pio_get_fname_from_file(file), ncid);
     }
 
 #ifdef PIO_MICRO_TIMING
-    double rearr_time = 0;
-    /* Use the timer on the first variable to capture the total
-      *time to rearrange data for all variables
-      */
-    ierr = mtimer_pause(file->varlist[varids[0]].wr_rearr_mtimer, NULL);
-    if(ierr != PIO_NOERR)
-    {
-        return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                        "Writing multiple variables to file (%s, ncid=%d) failed. Pausing a micro timer (to measure rearrange time) failed", pio_get_fname_from_file(file), ncid);
-    }
-
-    ierr = mtimer_get_wtime(file->varlist[varids[0]].wr_rearr_mtimer,
-            &rearr_time);
-    if(ierr != PIO_NOERR)
-    {
-        return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                        "Writing multiple variables to file (%s, ncid=%d) failed. Retrieving wallclock time from a micro timer (rearrange time) failed", pio_get_fname_from_file(file), ncid);
-    }
-
-    /* Calculate the average rearrange time for a variable */
-    rearr_time /= nvars;
-    for(int i=0; i<nvars; i++)
-    {
-        /* Reset, update and flush each timer */
-        ierr = mtimer_reset(file->varlist[varids[i]].wr_rearr_mtimer);
+        double rearr_time = 0;
+        /* Use the timer on the first variable to capture the total
+          *time to rearrange data for all variables
+          */
+        ierr = mtimer_pause(file->varlist[varids[0]].wr_rearr_mtimer, NULL);
         if(ierr != PIO_NOERR)
         {
             return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                            "Writing multiple variables to file (%s, ncid=%d) failed. Resetting micro timer (to measure rearrange time) for variable %d failed", pio_get_fname_from_file(file), ncid, i);
+                            "Writing multiple variables to file (%s, ncid=%d) failed. Pausing a micro timer (to measure rearrange time) failed", pio_get_fname_from_file(file), ncid);
         }
 
-        /* Update the rearrange timer with avg rearrange time for a var */
-        ierr = mtimer_update(file->varlist[varids[i]].wr_rearr_mtimer,
-                rearr_time);
+        ierr = mtimer_get_wtime(file->varlist[varids[0]].wr_rearr_mtimer,
+                &rearr_time);
         if(ierr != PIO_NOERR)
         {
-            LOG((1, "ERROR: Unable to update wr rearr timer"));
             return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                            "Writing multiple variables to file (%s, ncid=%d) failed. Updating micro timer (to measure rearrange time) for variable %d failed", pio_get_fname_from_file(file), ncid, i);
-        }
-        ierr = mtimer_flush(file->varlist[varids[i]].wr_rearr_mtimer,
-                get_var_desc_str(file->pio_ncid, varids[i], NULL));
-        if(ierr != PIO_NOERR)
-        {
-            LOG((1, "ERROR: Unable to flush wr rearr timer"));
-            return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                            "Writing multiple variables to file (%s, ncid=%d) failed. Flushing micro timer (to measure rearrange time) for variable %d failed", pio_get_fname_from_file(file), ncid, i);
-        }
-        /* Update the write timer with avg rearrange time for a var
-         * i.e, the write timer includes the rearrange time
-         */
-        ierr = mtimer_update(file->varlist[varids[i]].wr_mtimer,
-                rearr_time);
-        if(ierr != PIO_NOERR)
-        {
-            LOG((1, "ERROR: Unable to update wr timer"));
-            return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                            "Writing multiple variables to file (%s, ncid=%d) failed. Updating micro timer (to measure write time) for variable %d failed", pio_get_fname_from_file(file), ncid, i);
+                            "Writing multiple variables to file (%s, ncid=%d) failed. Retrieving wallclock time from a micro timer (rearrange time) failed", pio_get_fname_from_file(file), ncid);
         }
 
-        /* If the write timer was already running, resume it */
-        if(var_mtimer_was_running[i])
+        /* Calculate the average rearrange time for a variable */
+        rearr_time /= nvars;
+        for(int i=0; i<nvars; i++)
         {
-            ierr = mtimer_resume(file->varlist[varids[i]].wr_mtimer);
+            /* Reset, update and flush each timer */
+            ierr = mtimer_reset(file->varlist[varids[i]].wr_rearr_mtimer);
             if(ierr != PIO_NOERR)
             {
-                LOG((1, "ERROR: Unable to resume wr timer"));
                 return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                            "Writing multiple variables to file (%s, ncid=%d) failed. Updating micro timer (to measure write time) for variable %d failed", pio_get_fname_from_file(file), ncid, i);
+                                "Writing multiple variables to file (%s, ncid=%d) failed. Resetting micro timer (to measure rearrange time) for variable %d failed", pio_get_fname_from_file(file), ncid, i);
+            }
+
+            /* Update the rearrange timer with avg rearrange time for a var */
+            ierr = mtimer_update(file->varlist[varids[i]].wr_rearr_mtimer,
+                    rearr_time);
+            if(ierr != PIO_NOERR)
+            {
+                LOG((1, "ERROR: Unable to update wr rearr timer"));
+                return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                                "Writing multiple variables to file (%s, ncid=%d) failed. Updating micro timer (to measure rearrange time) for variable %d failed", pio_get_fname_from_file(file), ncid, i);
+            }
+            ierr = mtimer_flush(file->varlist[varids[i]].wr_rearr_mtimer,
+                    get_var_desc_str(file->pio_ncid, varids[i], NULL));
+            if(ierr != PIO_NOERR)
+            {
+                LOG((1, "ERROR: Unable to flush wr rearr timer"));
+                return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                                "Writing multiple variables to file (%s, ncid=%d) failed. Flushing micro timer (to measure rearrange time) for variable %d failed", pio_get_fname_from_file(file), ncid, i);
+            }
+            /* Update the write timer with avg rearrange time for a var
+             * i.e, the write timer includes the rearrange time
+             */
+            ierr = mtimer_update(file->varlist[varids[i]].wr_mtimer,
+                    rearr_time);
+            if(ierr != PIO_NOERR)
+            {
+                LOG((1, "ERROR: Unable to update wr timer"));
+                return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                                "Writing multiple variables to file (%s, ncid=%d) failed. Updating micro timer (to measure write time) for variable %d failed", pio_get_fname_from_file(file), ncid, i);
+            }
+
+            /* If the write timer was already running, resume it */
+            if(var_mtimer_was_running[i])
+            {
+                ierr = mtimer_resume(file->varlist[varids[i]].wr_mtimer);
+                if(ierr != PIO_NOERR)
+                {
+                    LOG((1, "ERROR: Unable to resume wr timer"));
+                    return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                                "Writing multiple variables to file (%s, ncid=%d) failed. Updating micro timer (to measure write time) for variable %d failed", pio_get_fname_from_file(file), ncid, i);
+                }
             }
         }
-    }
 #endif
     /* Write the darray based on the iotype. */
     LOG((2, "about to write darray for iotype = %d", file->iotype));
-    switch (file->iotype)
-    {
-    case PIO_IOTYPE_NETCDF4P:
-    case PIO_IOTYPE_PNETCDF:
-        if ((ierr = write_darray_multi_par(file, nvars, fndims, varids, iodesc,
-                                           DARRAY_DATA, frame)))
-            return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                            "Writing multiple variables to file (%s, ncid=%d) failed. Internal error writing variable data in parallel (iotype = %s)", pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
-        break;
-    case PIO_IOTYPE_NETCDF4C:
-    case PIO_IOTYPE_NETCDF:
-        if ((ierr = write_darray_multi_serial(file, nvars, fndims, varids, iodesc,
-                                              DARRAY_DATA, frame)))
-            return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                            "Writing multiple variables to file (%s, ncid=%d) failed. Internal error writing variable data serially (iotype = %s)", pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
+    switch (file->iotype) {
+        case PIO_IOTYPE_NETCDF4P:
+        case PIO_IOTYPE_PNETCDF:
+            if ((ierr = write_darray_multi_par(file, nvars, fndims, varids, iodesc,
+                                               DARRAY_DATA, frame)))
+                return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                               "Writing multiple variables to file (%s, ncid=%d) failed. Internal error writing variable data in parallel (iotype = %s)",
+                               pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
+            break;
+        case PIO_IOTYPE_NETCDF4C:
+        case PIO_IOTYPE_NETCDF:
+            if ((ierr = write_darray_multi_serial(file, nvars, fndims, varids, iodesc,
+                                                  DARRAY_DATA, frame)))
+                return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                               "Writing multiple variables to file (%s, ncid=%d) failed. Internal error writing variable data serially (iotype = %s)",
+                               pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
 
-        break;
-    default:
-        return pio_err(NULL, NULL, PIO_EBADIOTYPE, __FILE__, __LINE__,
-                        "Writing multiple variables to file (%s, ncid=%d) failed. Invalid iotype (%d) provided", pio_get_fname_from_file(file), ncid, file->iotype);
+            break;
+        default:
+            return pio_err(NULL, NULL, PIO_EBADIOTYPE, __FILE__, __LINE__,
+                           "Writing multiple variables to file (%s, ncid=%d) failed. Invalid iotype (%d) provided",
+                           pio_get_fname_from_file(file), ncid, file->iotype);
     }
 
     /* For PNETCDF the iobuf is freed in flush_output_buffer() */
-    if (file->iotype != PIO_IOTYPE_PNETCDF)
-    {
+    if (file->iotype != PIO_IOTYPE_PNETCDF) {
         /* Release resources. */
-        if (file->iobuf[ioid - PIO_IODESC_START_ID])
-        {
-	    LOG((3,"freeing variable buffer in pio_darray"));
+        if (file->iobuf[ioid - PIO_IODESC_START_ID]) {
+            LOG((3, "freeing variable buffer in pio_darray"));
             brel(file->iobuf[ioid - PIO_IODESC_START_ID]);
             file->iobuf[ioid - PIO_IODESC_START_ID] = NULL;
         }
@@ -434,55 +427,54 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
      * points. This is generally faster than the netcdf method of
      * filling the entire array with missing values before overwriting
      * those values later. */
-    if (iodesc->rearranger == PIO_REARR_SUBSET && iodesc->needsfill)
-    {
+    if (iodesc->rearranger == PIO_REARR_SUBSET && iodesc->needsfill) {
         LOG((2, "nvars = %d holegridsize = %ld iodesc->needsfill = %d\n", nvars,
-             iodesc->holegridsize, iodesc->needsfill));
+                iodesc->holegridsize, iodesc->needsfill));
 
-	pioassert(!vdesc0->fillbuf, "buffer overwrite",__FILE__, __LINE__);
+        pioassert(!vdesc0->fillbuf, "buffer overwrite", __FILE__, __LINE__);
 
         /* Get a buffer. */
-	if (ios->io_rank == 0)
-	    vdesc0->fillbuf = bget(iodesc->maxholegridsize * iodesc->mpitype_size * nvars);
-	else if (iodesc->holegridsize > 0)
-	    vdesc0->fillbuf = bget(iodesc->holegridsize * iodesc->mpitype_size * nvars);
+        if (ios->io_rank == 0)
+            vdesc0->fillbuf = bget(iodesc->maxholegridsize * iodesc->mpitype_size * nvars);
+        else if (iodesc->holegridsize > 0)
+            vdesc0->fillbuf = bget(iodesc->holegridsize * iodesc->mpitype_size * nvars);
 
         /* copying the fill value into the data buffer for the box
          * rearranger. This will be overwritten with data where
          * provided. */
         for (int nv = 0; nv < nvars; nv++)
             for (int i = 0; i < iodesc->holegridsize; i++)
-                memcpy(&((char *)vdesc0->fillbuf)[iodesc->mpitype_size * (i + nv * iodesc->holegridsize)],
-                       &((char *)fillvalue)[iodesc->mpitype_size * nv], iodesc->mpitype_size);
+                memcpy(&((char *) vdesc0->fillbuf)[iodesc->mpitype_size * (i + nv * iodesc->holegridsize)],
+                       &((char *) fillvalue)[iodesc->mpitype_size * nv], iodesc->mpitype_size);
 
         /* Write the darray based on the iotype. */
-        switch (file->iotype)
-        {
-        case PIO_IOTYPE_PNETCDF:
-        case PIO_IOTYPE_NETCDF4P:
-            if ((ierr = write_darray_multi_par(file, nvars, fndims, varids, iodesc,
-                                               DARRAY_FILL, frame)))
-                return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                            "Writing multiple variables to file (%s, ncid=%d) failed. Internal error writing variable fillvalues in parallel (iotype = %s)", pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
-            break;
-        case PIO_IOTYPE_NETCDF4C:
-        case PIO_IOTYPE_NETCDF:
-            if ((ierr = write_darray_multi_serial(file, nvars, fndims, varids, iodesc,
-                                                  DARRAY_FILL, frame)))
-                return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                            "Writing multiple variables to file (%s, ncid=%d) failed. Internal error writing variable fillvalues serially (iotype = %s)", pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
-            break;
-        default:
-            return pio_err(ios, file, PIO_EBADIOTYPE, __FILE__, __LINE__,
-                        "Writing fillvalues for multiple variables to file (%s, ncid=%d) failed. Unsupported iotype (%s) provided", pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
+        switch (file->iotype) {
+            case PIO_IOTYPE_PNETCDF:
+            case PIO_IOTYPE_NETCDF4P:
+                if ((ierr = write_darray_multi_par(file, nvars, fndims, varids, iodesc,
+                                                   DARRAY_FILL, frame)))
+                    return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                                   "Writing multiple variables to file (%s, ncid=%d) failed. Internal error writing variable fillvalues in parallel (iotype = %s)",
+                                   pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
+                break;
+            case PIO_IOTYPE_NETCDF4C:
+            case PIO_IOTYPE_NETCDF:
+                if ((ierr = write_darray_multi_serial(file, nvars, fndims, varids, iodesc,
+                                                      DARRAY_FILL, frame)))
+                    return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                                   "Writing multiple variables to file (%s, ncid=%d) failed. Internal error writing variable fillvalues serially (iotype = %s)",
+                                   pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
+                break;
+            default:
+                return pio_err(ios, file, PIO_EBADIOTYPE, __FILE__, __LINE__,
+                               "Writing fillvalues for multiple variables to file (%s, ncid=%d) failed. Unsupported iotype (%s) provided",
+                               pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
         }
 
         /* For PNETCDF fillbuf is freed in flush_output_buffer() */
-        if (file->iotype != PIO_IOTYPE_PNETCDF)
-        {
+        if (file->iotype != PIO_IOTYPE_PNETCDF) {
             /* Free resources. */
-            if (vdesc0->fillbuf)
-            {
+            if (vdesc0->fillbuf) {
                 brel(vdesc0->fillbuf);
                 vdesc0->fillbuf = NULL;
             }
@@ -493,19 +485,15 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
      * needs an explicit flush/wait to make sure data is written
      * to disk (if the buffer is full)
      */
-    if (ios->ioproc && file->iotype == PIO_IOTYPE_PNETCDF)
-    {
+    if (ios->ioproc && file->iotype == PIO_IOTYPE_PNETCDF) {
         /* Flush data to disk for pnetcdf. */
-        if ((ierr = flush_output_buffer(file, flushtodisk, 0)))
-        {
+        if ((ierr = flush_output_buffer(file, flushtodisk, 0))) {
             return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                            "Writing multiple variables to file (%s, ncid=%d) failed. Flushing data to disk (PIO_IOTYPE_PNETCDF) failed", pio_get_fname_from_file(file), ncid);
+                           "Writing multiple variables to file (%s, ncid=%d) failed. Flushing data to disk (PIO_IOTYPE_PNETCDF) failed",
+                           pio_get_fname_from_file(file), ncid);
         }
-    }
-    else
-    {
-        for(int i=0; i<nvars; i++)
-        {
+    } else {
+        for (int i = 0; i < nvars; i++) {
             file->varlist[varids[i]].wb_pend = 0;
 #ifdef PIO_MICRO_TIMING
             /* No more async events pending (all buffered data is written out) */
@@ -532,8 +520,7 @@ int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars,
  * @ingroup PIO_write_darray
  * @author Ed Hartnett
 */
-int find_var_fillvalue(file_desc_t *file, int varid, var_desc_t *vdesc)
-{
+int find_var_fillvalue(file_desc_t *file, int varid, var_desc_t *vdesc) {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     int no_fill;
     int ierr = PIO_NOERR;
@@ -545,33 +532,33 @@ int find_var_fillvalue(file_desc_t *file, int varid, var_desc_t *vdesc)
     LOG((3, "find_var_fillvalue file->pio_ncid = %d varid = %d", file->pio_ncid, varid));
 
     /* Find out PIO data type of var. */
-    if ((ierr = PIOc_inq_vartype(file->pio_ncid, varid, &vdesc->pio_type)))
-    {
+    if ((ierr = PIOc_inq_vartype(file->pio_ncid, varid, &vdesc->pio_type))) {
         return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                        "Finding fillvalue for variable (%s, varid=%d) in file (%s, ncid=%d), failed. Inquiring variable data type failed", vdesc->vname, varid, file->fname, file->pio_ncid); 
+                       "Finding fillvalue for variable (%s, varid=%d) in file (%s, ncid=%d), failed. Inquiring variable data type failed",
+                       vdesc->vname, varid, file->fname, file->pio_ncid);
     }
 
     /* Find out length of type. */
-    if ((ierr = PIOc_inq_type(file->pio_ncid, vdesc->pio_type, NULL, &vdesc->type_size)))
-    {
+    if ((ierr = PIOc_inq_type(file->pio_ncid, vdesc->pio_type, NULL, &vdesc->type_size))) {
         return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                        "Finding fillvalue for variable (%s, varid=%d) in file (%s, ncid=%d), failed. Inquiring variable data type length failed", vdesc->vname, varid, file->fname, file->pio_ncid); 
+                       "Finding fillvalue for variable (%s, varid=%d) in file (%s, ncid=%d), failed. Inquiring variable data type length failed",
+                       vdesc->vname, varid, file->fname, file->pio_ncid);
     }
     LOG((3, "getting fill value for varid = %d pio_type = %d type_size = %d",
-         varid, vdesc->pio_type, vdesc->type_size));
+            varid, vdesc->pio_type, vdesc->type_size));
 
     /* Allocate storage for the fill value. */
-    if (!(vdesc->fillvalue = malloc(vdesc->type_size)))
-    {
+    if (!(vdesc->fillvalue = malloc(vdesc->type_size))) {
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                        "Finding fillvalue for variable (%s, varid=%d) in file (%s, ncid=%d), failed. Out of memory allocating %lld bytes for fill value", vdesc->vname, varid, file->fname, file->pio_ncid, (unsigned long long) (vdesc->type_size)); 
+                       "Finding fillvalue for variable (%s, varid=%d) in file (%s, ncid=%d), failed. Out of memory allocating %lld bytes for fill value",
+                       vdesc->vname, varid, file->fname, file->pio_ncid, (unsigned long long) (vdesc->type_size));
     }
 
     /* Get the fill value. */
-    if ((ierr = PIOc_inq_var_fill(file->pio_ncid, varid, &no_fill, vdesc->fillvalue)))
-    {
+    if ((ierr = PIOc_inq_var_fill(file->pio_ncid, varid, &no_fill, vdesc->fillvalue))) {
         return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                        "Finding fillvalue for variable (%s, varid=%d) in file (%s, ncid=%d), failed. Inquiring variable fillvalue failed", vdesc->vname, varid, file->fname, file->pio_ncid); 
+                       "Finding fillvalue for variable (%s, varid=%d) in file (%s, ncid=%d), failed. Inquiring variable fillvalue failed",
+                       vdesc->vname, varid, file->fname, file->pio_ncid);
     }
     vdesc->use_fill = no_fill ? 0 : 1;
     LOG((3, "vdesc->use_fill = %d", vdesc->use_fill));
@@ -593,26 +580,24 @@ int find_var_fillvalue(file_desc_t *file, int varid, var_desc_t *vdesc)
  * rearranged data until the write completes)
  * Returns 2 if a disk flush is required, 1 if an I/O flush is required, 0 otherwise
  */
-static int PIO_wmb_needs_flush(wmulti_buffer *wmb, int arraylen, io_desc_t *iodesc)
-{
+static int PIO_wmb_needs_flush(wmulti_buffer *wmb, int arraylen, io_desc_t *iodesc) {
     bufsize curalloc, totfree, maxfree;
     long nget, nrel;
-    const int NEEDS_DISK_FLUSH=2, NEEDS_IO_FLUSH=1, NO_FLUSH=0;
+    const int NEEDS_DISK_FLUSH = 2, NEEDS_IO_FLUSH = 1, NO_FLUSH = 0;
 
     assert(wmb && iodesc);
     /* Find out how much free, contiguous space is available. */
     bstats(&curalloc, &totfree, &maxfree, &nget, &nrel);
 
     LOG((2, "maxfree = %ld wmb->num_arrays = %d (1 + wmb->num_arrays) *"
-         " arraylen * iodesc->mpitype_size = %ld totfree = %ld\n",
-          maxfree, wmb->num_arrays,
-         (1 + wmb->num_arrays) * arraylen * iodesc->mpitype_size, totfree));
+            " arraylen * iodesc->mpitype_size = %ld totfree = %ld\n",
+            maxfree, wmb->num_arrays,
+            (1 + wmb->num_arrays) * arraylen * iodesc->mpitype_size, totfree));
 
     /* We have exceeded the set buffer write cache limit, write data to
      * disk
      */
-    if(curalloc >= pio_buffer_size_limit)
-    {
+    if (curalloc >= pio_buffer_size_limit) {
         return NEEDS_DISK_FLUSH;
     }
 
@@ -628,9 +613,8 @@ static int PIO_wmb_needs_flush(wmulti_buffer *wmb, int arraylen, io_desc_t *iode
      * to being exhausted/filled, flush so that we have enough space
      * to satisfy future requests
      * FIXME: What is the logic for using 110% here?
-     */ 
-    if(maxfree <= 1.1 * wmb_req_cache_sz)
-    {
+     */
+    if (maxfree <= 1.1 * wmb_req_cache_sz) {
         return NEEDS_IO_FLUSH;
     }
 
@@ -638,14 +622,12 @@ static int PIO_wmb_needs_flush(wmulti_buffer *wmb, int arraylen, io_desc_t *iode
 }
 
 #ifdef _ADIOS2
-static int needs_to_write_decomp(file_desc_t *file, int ioid)
-{
+
+static int needs_to_write_decomp(file_desc_t *file, int ioid) {
     assert(file != NULL);
     int ret = 1; // Yes
-    for (int i = 0; i < file->n_written_ioids; i++)
-    {
-        if (file->written_ioids[i] == ioid)
-        {
+    for (int i = 0; i < file->n_written_ioids; i++) {
+        if (file->written_ioids[i] == ioid) {
             ret = 0; // No
             break;
         }
@@ -654,14 +636,13 @@ static int needs_to_write_decomp(file_desc_t *file, int ioid)
     return ret;
 }
 
-static int register_decomp(file_desc_t *file, int ioid)
-{
+static int register_decomp(file_desc_t *file, int ioid) {
     assert(file != NULL);
-    if (file->n_written_ioids >= ADIOS_PIO_MAX_DECOMPS)
-    {
+    if (file->n_written_ioids >= ADIOS_PIO_MAX_DECOMPS) {
         return pio_err(NULL, NULL, PIO_EINVAL, __FILE__, __LINE__,
-					"Registering (ADIOS) I/O decomposition (id = %d) failed for file (%s, ncid=%d). I/O decompositions registered (%d) is more than allowed for the file (%d)", 
-					ioid, pio_get_fname_from_file(file), file->pio_ncid, file->n_written_ioids, ADIOS_PIO_MAX_DECOMPS);
+                       "Registering (ADIOS) I/O decomposition (id = %d) failed for file (%s, ncid=%d). I/O decompositions registered (%d) is more than allowed for the file (%d)",
+                       ioid, pio_get_fname_from_file(file), file->pio_ncid, file->n_written_ioids,
+                       ADIOS_PIO_MAX_DECOMPS);
     }
 
     file->written_ioids[file->n_written_ioids] = ioid;
@@ -670,10 +651,9 @@ static int register_decomp(file_desc_t *file, int ioid)
     return PIO_NOERR;
 }
 
-#define _BLOCK_MERGE 
+#define _BLOCK_MERGE
 
-static int PIOc_write_decomp_adios(file_desc_t *file, int ioid)
-{
+static int PIOc_write_decomp_adios(file_desc_t *file, int ioid) {
     assert(file != NULL);
     adios2_error adiosErr = adios2_error_none;
     io_desc_t *iodesc = pio_get_iodesc_from_id(ioid);
@@ -681,269 +661,244 @@ static int PIOc_write_decomp_adios(file_desc_t *file, int ioid)
     snprintf(name, PIO_MAX_NAME, "/__pio__/decomp/%d", ioid);
 
 #ifdef _BLOCK_MERGE /* Merge buffers */
-	if (file->block_myrank==0) 
-	{
-		if (file->array_counts==NULL) 
-		{
-           return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                          "Writing (ADIOS) I/O decomposition (id = %d) failed for file (%s, ncid=%d). file->array_counts is NULL.", 
-					      ioid, pio_get_fname_from_file(file), file->pio_ncid);
-		}
-		if (file->array_disp==NULL)
-		{
-           return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                          "Writing (ADIOS) I/O decomposition (id = %d) failed for file (%s, ncid=%d). file->array_disp is NULL.", 
-					      ioid, pio_get_fname_from_file(file), file->pio_ncid);
-		}
-	}
-	unsigned int inp_count = 0;
-	unsigned int buffer_count = 0;
-	int can_merge_buffers = 1;
+    if (file->block_myrank == 0) {
+        if (file->array_counts == NULL) {
+            return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                           "Writing (ADIOS) I/O decomposition (id = %d) failed for file (%s, ncid=%d). file->array_counts is NULL.",
+                           ioid, pio_get_fname_from_file(file), file->pio_ncid);
+        }
+        if (file->array_disp == NULL) {
+            return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                           "Writing (ADIOS) I/O decomposition (id = %d) failed for file (%s, ncid=%d). file->array_disp is NULL.",
+                           ioid, pio_get_fname_from_file(file), file->pio_ncid);
+        }
+    }
+    unsigned int inp_count = 0;
+    unsigned int buffer_count = 0;
+    int can_merge_buffers = 1;
 #endif
-	int total_num_block_writers = 0;
+    int total_num_block_writers = 0;
 
-	int elem_size = (int)sizeof(int32_t);
+    int elem_size = (int) sizeof(int32_t);
     adios2_type type = adios2_type_int32_t;
     if (sizeof(PIO_Offset) == 8) {
         type = adios2_type_int64_t;
-		elem_size = (int)sizeof(int64_t);
-	}
+        elem_size = (int) sizeof(int64_t);
+    }
 
-	ADIOS2_BEGIN_STEP(file,NULL);
+    ADIOS2_BEGIN_STEP(file, NULL);
 
     size_t av_count[1];
-	int maplen = (int)(iodesc->maplen);
-	void *mapbuf = iodesc->map; 
-	char need_free_mapbuf = 0;
-	if (iodesc->maplen < 1)
-	{
-		maplen = 2;
-		mapbuf = (long*)calloc(2,sizeof(long));
-		if (mapbuf == NULL)
-        {
-           return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                          "Writing (ADIOS) I/O decomposition (id = %d) failed for file (%s, ncid=%d). Out of memory allocating %lld bytes for map buffer", 
-					      ioid, pio_get_fname_from_file(file), file->pio_ncid, (long long)(maplen * sizeof(long)));
+    int maplen = (int) (iodesc->maplen);
+    void *mapbuf = iodesc->map;
+    char need_free_mapbuf = 0;
+    if (iodesc->maplen < 1) {
+        maplen = 2;
+        mapbuf = (long *) calloc(2, sizeof(long));
+        if (mapbuf == NULL) {
+            return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
+                           "Writing (ADIOS) I/O decomposition (id = %d) failed for file (%s, ncid=%d). Out of memory allocating %lld bytes for map buffer",
+                           ioid, pio_get_fname_from_file(file), file->pio_ncid, (long long) (maplen * sizeof(long)));
         }
-        ((long*)mapbuf)[0] = 0;
-        ((long*)mapbuf)[1] = 0;
-		need_free_mapbuf = 1;
-	} 
-	else if (iodesc->maplen == 1)
-	{
-    	maplen = iodesc->maplen + 1;
-        if (type == adios2_type_int32_t)
-        {
-            mapbuf = (int*)calloc(maplen, sizeof(int));
-            if (mapbuf == NULL)
-            {
+        ((long *) mapbuf)[0] = 0;
+        ((long *) mapbuf)[1] = 0;
+        need_free_mapbuf = 1;
+    } else if (iodesc->maplen == 1) {
+        maplen = iodesc->maplen + 1;
+        if (type == adios2_type_int32_t) {
+            mapbuf = (int *) calloc(maplen, sizeof(int));
+            if (mapbuf == NULL) {
                 return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                                "Writing (ADIOS) I/O decomposition (id = %d) failed for file (%s, ncid=%d). Out of memory allocating %lld bytes for map buffer", 
-								ioid, pio_get_fname_from_file(file), file->pio_ncid, (long long)(maplen * sizeof(int)));
+                               "Writing (ADIOS) I/O decomposition (id = %d) failed for file (%s, ncid=%d). Out of memory allocating %lld bytes for map buffer",
+                               ioid, pio_get_fname_from_file(file), file->pio_ncid, (long long) (maplen * sizeof(int)));
             }
-            ((int*)mapbuf)[0] = iodesc->map[0];
-            ((int*)mapbuf)[1] = 0;
-        }
-        else
-        {
-            mapbuf = (long*)calloc(maplen, sizeof(long));
-            if (mapbuf == NULL)
-            {
+            ((int *) mapbuf)[0] = iodesc->map[0];
+            ((int *) mapbuf)[1] = 0;
+        } else {
+            mapbuf = (long *) calloc(maplen, sizeof(long));
+            if (mapbuf == NULL) {
                 return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                                "Writing (ADIOS) I/O decomposition (id = %d) failed for file (%s, ncid=%d). Out of memory allocating %lld bytes for map buffer", 
-								ioid, pio_get_fname_from_file(file), file->pio_ncid, (long long)(maplen * sizeof(long)));
+                               "Writing (ADIOS) I/O decomposition (id = %d) failed for file (%s, ncid=%d). Out of memory allocating %lld bytes for map buffer",
+                               ioid, pio_get_fname_from_file(file), file->pio_ncid,
+                               (long long) (maplen * sizeof(long)));
             }
-            ((long*)mapbuf)[0] = iodesc->map[0];
-            ((long*)mapbuf)[1] = 0;
+            ((long *) mapbuf)[0] = iodesc->map[0];
+            ((long *) mapbuf)[1] = 0;
         }
-		need_free_mapbuf = 1;
-	}
+        need_free_mapbuf = 1;
+    }
 
-	av_count[0] = (size_t)maplen;
+    av_count[0] = (size_t) maplen;
 #ifdef _BLOCK_MERGE
-	inp_count = buffer_count = maplen;
-	MPI_Reduce(&inp_count,&buffer_count,1,MPI_INT,MPI_SUM,0,file->block_comm);
-	memset(file->array_counts,0,(size_t)(file->array_counts_size));
-	MPI_Gather(&inp_count,1,MPI_INT,file->array_counts,1,MPI_INT,0,file->block_comm);
-	if (file->block_myrank==0) 
-	{
-		for (int ii=0;ii<file->block_nprocs;ii++) { 
-			file->array_counts[ii] *= elem_size;
-		}
-		file->array_disp[0] = 0;
-		for (int ii=1;ii<file->block_nprocs;ii++) {
-			file->array_disp[ii] = file->array_disp[ii-1]+file->array_counts[ii-1];
-		}
-	}
+    inp_count = buffer_count = maplen;
+    MPI_Reduce(&inp_count, &buffer_count, 1, MPI_INT, MPI_SUM, 0, file->block_comm);
+    memset(file->array_counts, 0, (size_t) (file->array_counts_size));
+    MPI_Gather(&inp_count, 1, MPI_INT, file->array_counts, 1, MPI_INT, 0, file->block_comm);
+    if (file->block_myrank == 0) {
+        for (int ii = 0; ii < file->block_nprocs; ii++) {
+            file->array_counts[ii] *= elem_size;
+        }
+        file->array_disp[0] = 0;
+        for (int ii = 1; ii < file->block_nprocs; ii++) {
+            file->array_disp[ii] = file->array_disp[ii - 1] + file->array_counts[ii - 1];
+        }
+    }
 
-	if (file->block_myrank==0) {
-		av_count[0] = (size_t)buffer_count;
-	} else {
-		av_count[0] = (size_t)inp_count;
-	}
+    if (file->block_myrank == 0) {
+        av_count[0] = (size_t) buffer_count;
+    } else {
+        av_count[0] = (size_t) inp_count;
+    }
 #endif
 
-	adios2_variable *variableH = adios2_inquire_variable(file->ioH, name);
-	if (variableH == NULL)
-	{
-		variableH = adios2_define_variable(file->ioH, name, type,
-										   1, NULL, NULL, av_count,
-										   adios2_constant_dims_true);
-		if (variableH == NULL)
-		{
-			return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, 
-						"Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)", 
-						name, pio_get_fname_from_file(file), file->pio_ncid);
-		}
-	}
+    adios2_variable *variableH = adios2_inquire_variable(file->ioH, name);
+    if (variableH == NULL) {
+        variableH = adios2_define_variable(file->ioH, name, type,
+                                           1, NULL, NULL, av_count,
+                                           adios2_constant_dims_true);
+        if (variableH == NULL) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)",
+                           name, pio_get_fname_from_file(file), file->pio_ncid);
+        }
+    }
 
 #ifdef _BLOCK_MERGE
-	/* Variable to store the number of writer blocks, in case buffer merging doesn't happen */
-	adios2_variable *num_decomp_block_writers_varid; 
-	if (file->block_myrank==0) 
-	{
-		char name_varid[PIO_MAX_NAME];
-		snprintf(name_varid, PIO_MAX_NAME, "num_decomp_block_writers/%s", name);
-		av_count[0] = 1;
-		num_decomp_block_writers_varid = adios2_inquire_variable(file->ioH, name_varid);
-		if (num_decomp_block_writers_varid == NULL)
-		{
-			num_decomp_block_writers_varid = adios2_define_variable(file->ioH, name_varid, adios2_type_int32_t,
-													   1, NULL, NULL, av_count,
-													   adios2_constant_dims_true);
-			if (num_decomp_block_writers_varid == NULL)
-			{
-				return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, 
-						"Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)", 
-						name_varid, pio_get_fname_from_file(file), file->pio_ncid);
-			}
-		}
-	}
-#endif 
+    /* Variable to store the number of writer blocks, in case buffer merging doesn't happen */
+    adios2_variable *num_decomp_block_writers_varid;
+    if (file->block_myrank == 0) {
+        char name_varid[PIO_MAX_NAME];
+        snprintf(name_varid, PIO_MAX_NAME, "num_decomp_block_writers/%s", name);
+        av_count[0] = 1;
+        num_decomp_block_writers_varid = adios2_inquire_variable(file->ioH, name_varid);
+        if (num_decomp_block_writers_varid == NULL) {
+            num_decomp_block_writers_varid = adios2_define_variable(file->ioH, name_varid, adios2_type_int32_t,
+                                                                    1, NULL, NULL, av_count,
+                                                                    adios2_constant_dims_true);
+            if (num_decomp_block_writers_varid == NULL) {
+                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)",
+                               name_varid, pio_get_fname_from_file(file), file->pio_ncid);
+            }
+        }
+    }
+#endif
 
 #ifdef _BLOCK_MERGE
-	can_merge_buffers = 1;
-	if (file->block_myrank==0) {
-		size_t av_buffer_size = elem_size*buffer_count;
-		if (file->block_array_size<av_buffer_size) {
-			if (file->block_array!=NULL) {
-				file->block_array = (char*)realloc(file->block_array,av_buffer_size);
-			} else {
-				file->block_array = (char*)calloc(av_buffer_size,sizeof(char));
-			}
-			if (file->block_array!=NULL) {
-				can_merge_buffers = 1;
-				file->block_array_size = av_buffer_size;
-			} else {
-				can_merge_buffers = 0;
-				file->block_array_size = 0;
-			}
-		}
-	}
-	MPI_Bcast(&can_merge_buffers,1,MPI_INT,0,file->block_comm);
-	size_t num_decomp_block_writers = file->block_nprocs;
-	if (can_merge_buffers)
-	{
-		MPI_Gatherv(mapbuf,elem_size*inp_count,MPI_CHAR,file->block_array,
-					file->array_counts,file->array_disp,MPI_CHAR,0,file->block_comm);
-		if (file->block_myrank==0) 
-		{
-			adiosErr = adios2_put(file->engineH, variableH, file->block_array, adios2_mode_sync);
-			if (adiosErr != adios2_error_none)
-			{
-				return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, "Putting (ADIOS) variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)", 
-							name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
-			}
-			total_num_block_writers++;
-		}
-		num_decomp_block_writers = 1;
-	} 
-	else 
-	{
-		adiosErr = adios2_put(file->engineH, variableH, mapbuf, adios2_mode_sync);
-		if (adiosErr != adios2_error_none)
-		{
-			return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, "Putting (ADIOS) variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)", 
-						name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
-		}
-		num_decomp_block_writers = file->block_nprocs;
-		total_num_block_writers++;
-	}
+    can_merge_buffers = 1;
+    if (file->block_myrank == 0) {
+        size_t av_buffer_size = elem_size * buffer_count;
+        if (file->block_array_size < av_buffer_size) {
+            if (file->block_array != NULL) {
+                file->block_array = (char *) realloc(file->block_array, av_buffer_size);
+            } else {
+                file->block_array = (char *) calloc(av_buffer_size, sizeof(char));
+            }
+            if (file->block_array != NULL) {
+                can_merge_buffers = 1;
+                file->block_array_size = av_buffer_size;
+            } else {
+                can_merge_buffers = 0;
+                file->block_array_size = 0;
+            }
+        }
+    }
+    MPI_Bcast(&can_merge_buffers, 1, MPI_INT, 0, file->block_comm);
+    size_t num_decomp_block_writers = file->block_nprocs;
+    if (can_merge_buffers) {
+        MPI_Gatherv(mapbuf, elem_size * inp_count, MPI_CHAR, file->block_array,
+                    file->array_counts, file->array_disp, MPI_CHAR, 0, file->block_comm);
+        if (file->block_myrank == 0) {
+            adiosErr = adios2_put(file->engineH, variableH, file->block_array, adios2_mode_sync);
+            if (adiosErr != adios2_error_none) {
+                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Putting (ADIOS) variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                               name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
+            }
+            total_num_block_writers++;
+        }
+        num_decomp_block_writers = 1;
+    } else {
+        adiosErr = adios2_put(file->engineH, variableH, mapbuf, adios2_mode_sync);
+        if (adiosErr != adios2_error_none) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Putting (ADIOS) variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                           name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
+        }
+        num_decomp_block_writers = file->block_nprocs;
+        total_num_block_writers++;
+    }
 
-	/* Write the number of block writers */
-	if (file->block_myrank==0) 
-	{
-		adiosErr = adios2_put(file->engineH, num_decomp_block_writers_varid, &num_decomp_block_writers, adios2_mode_sync);
-		if (adiosErr != adios2_error_none)
-		{
-			return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, "Putting (ADIOS) variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)", 
-						name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
-		}
-		total_num_block_writers++;
-	}
+    /* Write the number of block writers */
+    if (file->block_myrank == 0) {
+        adiosErr = adios2_put(file->engineH, num_decomp_block_writers_varid, &num_decomp_block_writers,
+                              adios2_mode_sync);
+        if (adiosErr != adios2_error_none) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Putting (ADIOS) variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                           name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
+        }
+        total_num_block_writers++;
+    }
 #else
-	adiosErr = adios2_put(file->engineH, variableH, mapbuf, adios2_mode_sync);
-	if (adiosErr != adios2_error_none)
-	{
-		return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, "Putting (ADIOS) variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)", 
-					name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
-	}
-	total_num_block_writers++;
-#endif 
+    adiosErr = adios2_put(file->engineH, variableH, mapbuf, adios2_mode_sync);
+    if (adiosErr != adios2_error_none)
+    {
+        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, "Putting (ADIOS) variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                    name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
+    }
+    total_num_block_writers++;
+#endif
 
-	if (need_free_mapbuf)
-	{
-		if (mapbuf!=NULL) 
-			free(mapbuf);
-		mapbuf = NULL;
-	}
+    if (need_free_mapbuf) {
+        if (mapbuf != NULL)
+            free(mapbuf);
+        mapbuf = NULL;
+    }
 
     /* ADIOS: assume all procs are also IO tasks */
-    if (file->adios_iomaster == MPI_ROOT)
-    {
+    if (file->adios_iomaster == MPI_ROOT) {
         char att_name[PIO_MAX_NAME];
 
         snprintf(att_name, PIO_MAX_NAME, "%s/piotype", name);
         adios2_attribute *attributeH = adios2_inquire_attribute(file->ioH, att_name);
-        if (attributeH == NULL)
-        {
+        if (attributeH == NULL) {
             attributeH = adios2_define_attribute(file->ioH, att_name, adios2_type_int32_t, &iodesc->piotype);
-            if (attributeH == NULL)
-            {
-                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, "Defining (ADIOS) attribute (name=%s) failed for file (%s, ncid=%d)", 
-							att_name, pio_get_fname_from_file(file), file->pio_ncid);
+            if (attributeH == NULL) {
+                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Defining (ADIOS) attribute (name=%s) failed for file (%s, ncid=%d)",
+                               att_name, pio_get_fname_from_file(file), file->pio_ncid);
             }
         }
 
         snprintf(att_name, PIO_MAX_NAME, "%s/ndims", name);
         attributeH = adios2_inquire_attribute(file->ioH, att_name);
-        if (attributeH == NULL)
-        {
+        if (attributeH == NULL) {
             attributeH = adios2_define_attribute(file->ioH, att_name, adios2_type_int32_t, &iodesc->ndims);
-            if (attributeH == NULL)
-            {
-                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, "Defining (ADIOS) attribute (name=%s) failed for file (%s, ncid=%d)", 
-							att_name, pio_get_fname_from_file(file), file->pio_ncid);
+            if (attributeH == NULL) {
+                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Defining (ADIOS) attribute (name=%s) failed for file (%s, ncid=%d)",
+                               att_name, pio_get_fname_from_file(file), file->pio_ncid);
             }
         }
 
         snprintf(att_name, PIO_MAX_NAME, "%s/dimlen", name);
         attributeH = adios2_inquire_attribute(file->ioH, att_name);
-        if (attributeH == NULL)
-        {
-            attributeH = adios2_define_attribute_array(file->ioH, att_name, adios2_type_int32_t, iodesc->dimlen, iodesc->ndims);
-            if (attributeH == NULL)
-            {
-                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, "Defining (ADIOS) attribute array (name=%s, size=%d) failed for file (%s, ncid=%d)", 
-							att_name, iodesc->ndims, pio_get_fname_from_file(file), file->pio_ncid);
+        if (attributeH == NULL) {
+            attributeH = adios2_define_attribute_array(file->ioH, att_name, adios2_type_int32_t, iodesc->dimlen,
+                                                       iodesc->ndims);
+            if (attributeH == NULL) {
+                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Defining (ADIOS) attribute array (name=%s, size=%d) failed for file (%s, ncid=%d)",
+                               att_name, iodesc->ndims, pio_get_fname_from_file(file), file->pio_ncid);
             }
         }
     }
-	file->num_written_blocks += 3;
+    file->num_written_blocks += 3;
 
-	int sum_num_block_writers = 0;
-	MPI_Allreduce(&total_num_block_writers,&sum_num_block_writers,1,MPI_INT,MPI_SUM,file->all_comm);
-	file->num_written_blocks += sum_num_block_writers;
+    int sum_num_block_writers = 0;
+    MPI_Allreduce(&total_num_block_writers, &sum_num_block_writers, 1, MPI_INT, MPI_SUM, file->all_comm);
+    file->num_written_blocks += sum_num_block_writers;
 
     return PIO_NOERR;
 }
@@ -1017,8 +972,7 @@ static int PIOc_write_decomp_adios(file_desc_t *file, int ioid)
 
 static void *PIOc_convert_buffer_adios(file_desc_t *file, io_desc_t *iodesc,
                                        adios_var_desc_t *av, void *array, int arraylen,
-                                       int *ierr)
-{
+                                       int *ierr) {
     assert(file != NULL && iodesc != NULL && av != NULL && array != NULL && ierr != NULL);
     void *buf = array;
     *ierr = 0;
@@ -1045,32 +999,20 @@ static void *PIOc_convert_buffer_adios(file_desc_t *file, io_desc_t *iodesc,
         memcpy(temp_buf, array, sizeof(var_type)); \
 }
 
-void *PIOc_copy_one_element_adios(void *array, io_desc_t *iodesc)
-{
+void *PIOc_copy_one_element_adios(void *array, io_desc_t *iodesc) {
     assert(array != NULL && iodesc != NULL);
     void *temp_buf = NULL;
-    if (iodesc->piotype == PIO_DOUBLE)
-    {
+    if (iodesc->piotype == PIO_DOUBLE) {
         ADIOS_COPY_ONE(temp_buf, array, double);
-    }
-    else if (iodesc->piotype == PIO_FLOAT || iodesc->piotype == PIO_REAL)
-    {
+    } else if (iodesc->piotype == PIO_FLOAT || iodesc->piotype == PIO_REAL) {
         ADIOS_COPY_ONE(temp_buf, array, float);
-    }
-    else if (iodesc->piotype == PIO_INT || iodesc->piotype == PIO_UINT)
-    {
+    } else if (iodesc->piotype == PIO_INT || iodesc->piotype == PIO_UINT) {
         ADIOS_COPY_ONE(temp_buf, array, int);
-    }
-    else if (iodesc->piotype == PIO_SHORT || iodesc->piotype == PIO_USHORT)
-    {
+    } else if (iodesc->piotype == PIO_SHORT || iodesc->piotype == PIO_USHORT) {
         ADIOS_COPY_ONE(temp_buf, array, short int);
-    }
-    else if (iodesc->piotype == PIO_INT64 || iodesc->piotype == PIO_UINT64)
-    {
+    } else if (iodesc->piotype == PIO_INT64 || iodesc->piotype == PIO_UINT64) {
         ADIOS_COPY_ONE(temp_buf, array, int64_t);
-    }
-    else if (iodesc->piotype == PIO_CHAR || iodesc->piotype == PIO_BYTE || iodesc->piotype == PIO_UBYTE)
-    {
+    } else if (iodesc->piotype == PIO_CHAR || iodesc->piotype == PIO_BYTE || iodesc->piotype == PIO_UBYTE) {
         ADIOS_COPY_ONE(temp_buf, array, char);
     }
 
@@ -1084,16 +1026,14 @@ void *PIOc_copy_one_element_adios(void *array, io_desc_t *iodesc)
 */
 static int PIOc_write_darray_adios(file_desc_t *file, int varid, int ioid,
                                    io_desc_t *iodesc, PIO_Offset arraylen,
-                                   void *array, void *fillvalue)
-{
+                                   void *array, void *fillvalue) {
     assert(file != NULL && iodesc != NULL && array != NULL);
     int ierr = PIO_NOERR;
     adios2_error adiosErr = adios2_error_none;
-    if (varid < 0 || varid >= file->num_vars)
-    {
+    if (varid < 0 || varid >= file->num_vars) {
         return pio_err(NULL, file, PIO_EBADID, __FILE__, __LINE__,
-                        "Writing (ADIOS) variable (varid=%d) to file (%s, ncid=%d) failed. Invalid variable id, %d (expected >=0 && < number of variables in file, %d), provided", 
-						varid, pio_get_fname_from_file(file), file->pio_ncid, varid, file->num_vars);
+                       "Writing (ADIOS) variable (varid=%d) to file (%s, ncid=%d) failed. Invalid variable id, %d (expected >=0 && < number of variables in file, %d), provided",
+                       varid, pio_get_fname_from_file(file), file->pio_ncid, varid, file->num_vars);
     }
 
 #ifdef TIMING
@@ -1101,189 +1041,170 @@ static int PIOc_write_darray_adios(file_desc_t *file, int varid, int ioid,
 #endif
 
 #ifdef _BLOCK_MERGE /* Merge buffers */
-	if (file->block_myrank==0)
-	{
-		if (file->array_counts==NULL)
-		{
+    if (file->block_myrank == 0) {
+        if (file->array_counts == NULL) {
             return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Writing (ADIOS) variable (varid=%d) to file (%s, ncid=%d) failed. file->array_counts is NULL.", 
-							varid, pio_get_fname_from_file(file), file->pio_ncid);
-		}
-		if (file->array_disp==NULL) 
-		{
+                           "Writing (ADIOS) variable (varid=%d) to file (%s, ncid=%d) failed. file->array_counts is NULL.",
+                           varid, pio_get_fname_from_file(file), file->pio_ncid);
+        }
+        if (file->array_disp == NULL) {
             return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Writing (ADIOS) variable (varid=%d) to file (%s, ncid=%d) failed. file->array_disp is NULL.", 
-							varid, pio_get_fname_from_file(file), file->pio_ncid);
-		}
-	}
-#endif 
-	int total_num_block_writers = 0;
+                           "Writing (ADIOS) variable (varid=%d) to file (%s, ncid=%d) failed. file->array_disp is NULL.",
+                           varid, pio_get_fname_from_file(file), file->pio_ncid);
+        }
+    }
+#endif
+    int total_num_block_writers = 0;
 
-	int WRITE_DECOMP_ID  = file->num_all_procs-1;
-	int WRITE_FRAME_ID   = (WRITE_DECOMP_ID*2)/3;
-	int WRITE_FILLVAL_ID = WRITE_DECOMP_ID/3;
+    int WRITE_DECOMP_ID = file->num_all_procs - 1;
+    int WRITE_FRAME_ID = (WRITE_DECOMP_ID * 2) / 3;
+    int WRITE_FILLVAL_ID = WRITE_DECOMP_ID / 3;
 
-	ADIOS2_BEGIN_STEP(file,NULL);
-    
-	adios_var_desc_t *av = &(file->adios_vars[varid]);
+    ADIOS2_BEGIN_STEP(file, NULL);
+
+    adios_var_desc_t *av = &(file->adios_vars[varid]);
 
     void *temp_buf = NULL;
     if (arraylen == 1) /* Handle the case where there is one array element */
     {
         arraylen = 2;
         temp_buf = PIOc_copy_one_element_adios(array, iodesc);
-        if (temp_buf == NULL)
-        {
+        if (temp_buf == NULL) {
             return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Writing (ADIOS) variable (varid=%d) to file (%s, ncid=%d) failed. Out of memory allocating %lld bytes for a temporary buffer", 
-							varid, pio_get_fname_from_file(file), file->pio_ncid, (long long) (arraylen * iodesc->piotype_size));
+                           "Writing (ADIOS) variable (varid=%d) to file (%s, ncid=%d) failed. Out of memory allocating %lld bytes for a temporary buffer",
+                           varid, pio_get_fname_from_file(file), file->pio_ncid,
+                           (long long) (arraylen * iodesc->piotype_size));
         }
         array = temp_buf;
-    }
-    else if (arraylen == 0) /* Handle the case where there is zero array element */
+    } else if (arraylen == 0) /* Handle the case where there is zero array element */
     {
         arraylen = 2;
-        temp_buf = (int64_t*)calloc(arraylen, sizeof(int64_t));
-        if (temp_buf == NULL)
-        {
+        temp_buf = (int64_t *) calloc(arraylen, sizeof(int64_t));
+        if (temp_buf == NULL) {
             return pio_err(NULL, file, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Writing (ADIOS) variable (varid=%d) to file (%s, ncid=%d) failed. Out of memory allocating %lld bytes for a temporary buffer", 
-							varid, pio_get_fname_from_file(file), file->pio_ncid, (long long) (arraylen * sizeof(int64_t)));
+                           "Writing (ADIOS) variable (varid=%d) to file (%s, ncid=%d) failed. Out of memory allocating %lld bytes for a temporary buffer",
+                           varid, pio_get_fname_from_file(file), file->pio_ncid,
+                           (long long) (arraylen * sizeof(int64_t)));
         }
         array = temp_buf;
     }
 
 
-	unsigned int inp_count    = arraylen;
-	unsigned int buffer_count = arraylen;
-#ifdef _BLOCK_MERGE 
-	MPI_Reduce(&inp_count,&buffer_count,1,MPI_INT,MPI_SUM,0,file->block_comm);
-#endif 
-    if (av->adios_varid == NULL)
-    {
-       	adios2_type atype = av->adios_type;
-       	size_t av_count[1];
-		av_count[0] = inp_count;
-
-#ifdef _BLOCK_MERGE 
-		if (file->block_myrank==0) {
-       		av_count[0] = (size_t)buffer_count; 
-		}
-
-		av->elem_size = -1;
-		if (av->adios_type==adios2_type_float) {
-			av->elem_size = (int)sizeof(float);
-		} else if (av->adios_type==adios2_type_double) {
-			av->elem_size = (int)sizeof(double);
-		} else if (av->adios_type==adios2_type_int8_t || av->adios_type==adios2_type_uint8_t) {
-			av->elem_size = (int)sizeof(char);
-		} else if (av->adios_type==adios2_type_int16_t || av->adios_type==adios2_type_uint16_t) {
-			av->elem_size = (int)sizeof(int16_t);
-		} else if (av->adios_type==adios2_type_int32_t || av->adios_type==adios2_type_uint32_t) {
-			av->elem_size = (int)sizeof(int32_t);
-		} else if (av->adios_type==adios2_type_int64_t || av->adios_type==adios2_type_uint64_t) {
-			av->elem_size = (int)sizeof(int64_t);
-		} else {
-			return pio_err(NULL, file, PIO_EBADTYPE, __FILE__, __LINE__,
-			               "Writing (ADIOS) variable (varid=%d) to file (%s, ncid=%d) failed. Bad type.",
-						   varid, pio_get_fname_from_file(file), file->pio_ncid);
-		}
-#endif 
-
-       	/* Define the variable */
-       	av->adios_varid = adios2_define_variable(file->ioH, av->name, atype,
-                                                1, NULL, NULL, av_count,
-                                                adios2_constant_dims_false);
-       	if (av->adios_varid == NULL)
-       	{
-           	return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, 
-						"Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)", 
-						av->name, pio_get_fname_from_file(file), file->pio_ncid);
-       	}
-
-		/* Different decompositions at different frames */
-		char name_varid[PIO_MAX_NAME];
-        if (file->myrank == WRITE_DECOMP_ID)
-        {
-			snprintf(name_varid, PIO_MAX_NAME, "decomp_id/%s", av->name);
-			av_count[0] = 1;
-			av->decomp_varid = adios2_inquire_variable(file->ioH, name_varid);
-			if (av->decomp_varid == NULL)
-			{
-				av->decomp_varid = adios2_define_variable(file->ioH, name_varid, adios2_type_int32_t,
-														  1, NULL, NULL, av_count,
-														  adios2_constant_dims_true);
-				if (av->decomp_varid == NULL)
-				{
-					return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, 
-							"Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)", 
-							name_varid, pio_get_fname_from_file(file), file->pio_ncid);
-				}
-			}
-		}
-
-		if (file->myrank == WRITE_FRAME_ID) 
-		{
-			snprintf(name_varid, PIO_MAX_NAME, "frame_id/%s", av->name);
-			av_count[0] = 1;
-			av->frame_varid = adios2_inquire_variable(file->ioH, name_varid);
-			if (av->frame_varid == NULL)
-			{
-				av->frame_varid = adios2_define_variable(file->ioH, name_varid, adios2_type_int32_t,
-														 1, NULL, NULL, av_count,
-														 adios2_constant_dims_true);
-				if (av->frame_varid == NULL)
-				{
-					return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, 
-							"Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)", 
-							name_varid, pio_get_fname_from_file(file), file->pio_ncid);
-				}
-			}
-		}
-
-		if (file->myrank == WRITE_FILLVAL_ID) 
-		{
-			snprintf(name_varid, PIO_MAX_NAME, "fillval_id/%s", av->name);
-			av_count[0] = 1;
-			av->fillval_varid = adios2_inquire_variable(file->ioH, name_varid);
-			if (av->fillval_varid == NULL)
-			{
-				av->fillval_varid = adios2_define_variable(file->ioH, name_varid, atype,
-														   1, NULL, NULL, av_count,
-														   adios2_constant_dims_true);
-				if (av->fillval_varid == NULL)
-				{
-					return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, 
-							"Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)", 
-							name_varid, pio_get_fname_from_file(file), file->pio_ncid);
-				}
-			}
-		}
+    unsigned int inp_count = arraylen;
+    unsigned int buffer_count = arraylen;
+#ifdef _BLOCK_MERGE
+    MPI_Reduce(&inp_count, &buffer_count, 1, MPI_INT, MPI_SUM, 0, file->block_comm);
+#endif
+    if (av->adios_varid == NULL) {
+        adios2_type atype = av->adios_type;
+        size_t av_count[1];
+        av_count[0] = inp_count;
 
 #ifdef _BLOCK_MERGE
-		/* Variable to store the number of writer blocks, in case buffer merging doesn't happen */
-		if (file->block_myrank==0) 
-		{
-			snprintf(name_varid, PIO_MAX_NAME, "num_data_block_writers/%s", av->name);
-			av_count[0] = 1;
-			av->num_block_writers_varid = adios2_inquire_variable(file->ioH, name_varid);
-			if (av->num_block_writers_varid == NULL)
-			{
-				av->num_block_writers_varid = adios2_define_variable(file->ioH, name_varid, adios2_type_int32_t,
-														   1, NULL, NULL, av_count,
-														   adios2_constant_dims_true);
-				if (av->num_block_writers_varid == NULL)
-				{
-					return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, 
-							"Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)", 
-							name_varid, pio_get_fname_from_file(file), file->pio_ncid);
-				}
-			}
-		}
-#endif 
+        if (file->block_myrank == 0) {
+            av_count[0] = (size_t) buffer_count;
+        }
 
-		if (file->myrank == 0)
-		{
+        av->elem_size = -1;
+        if (av->adios_type == adios2_type_float) {
+            av->elem_size = (int) sizeof(float);
+        } else if (av->adios_type == adios2_type_double) {
+            av->elem_size = (int) sizeof(double);
+        } else if (av->adios_type == adios2_type_int8_t || av->adios_type == adios2_type_uint8_t) {
+            av->elem_size = (int) sizeof(char);
+        } else if (av->adios_type == adios2_type_int16_t || av->adios_type == adios2_type_uint16_t) {
+            av->elem_size = (int) sizeof(int16_t);
+        } else if (av->adios_type == adios2_type_int32_t || av->adios_type == adios2_type_uint32_t) {
+            av->elem_size = (int) sizeof(int32_t);
+        } else if (av->adios_type == adios2_type_int64_t || av->adios_type == adios2_type_uint64_t) {
+            av->elem_size = (int) sizeof(int64_t);
+        } else {
+            return pio_err(NULL, file, PIO_EBADTYPE, __FILE__, __LINE__,
+                           "Writing (ADIOS) variable (varid=%d) to file (%s, ncid=%d) failed. Bad type.",
+                           varid, pio_get_fname_from_file(file), file->pio_ncid);
+        }
+#endif
+
+        /* Define the variable */
+        av->adios_varid = adios2_define_variable(file->ioH, av->name, atype,
+                                                 1, NULL, NULL, av_count,
+                                                 adios2_constant_dims_false);
+        if (av->adios_varid == NULL) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)",
+                           av->name, pio_get_fname_from_file(file), file->pio_ncid);
+        }
+
+        /* Different decompositions at different frames */
+        char name_varid[PIO_MAX_NAME];
+        if (file->myrank == WRITE_DECOMP_ID) {
+            snprintf(name_varid, PIO_MAX_NAME, "decomp_id/%s", av->name);
+            av_count[0] = 1;
+            av->decomp_varid = adios2_inquire_variable(file->ioH, name_varid);
+            if (av->decomp_varid == NULL) {
+                av->decomp_varid = adios2_define_variable(file->ioH, name_varid, adios2_type_int32_t,
+                                                          1, NULL, NULL, av_count,
+                                                          adios2_constant_dims_true);
+                if (av->decomp_varid == NULL) {
+                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)",
+                                   name_varid, pio_get_fname_from_file(file), file->pio_ncid);
+                }
+            }
+        }
+
+        if (file->myrank == WRITE_FRAME_ID) {
+            snprintf(name_varid, PIO_MAX_NAME, "frame_id/%s", av->name);
+            av_count[0] = 1;
+            av->frame_varid = adios2_inquire_variable(file->ioH, name_varid);
+            if (av->frame_varid == NULL) {
+                av->frame_varid = adios2_define_variable(file->ioH, name_varid, adios2_type_int32_t,
+                                                         1, NULL, NULL, av_count,
+                                                         adios2_constant_dims_true);
+                if (av->frame_varid == NULL) {
+                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)",
+                                   name_varid, pio_get_fname_from_file(file), file->pio_ncid);
+                }
+            }
+        }
+
+        if (file->myrank == WRITE_FILLVAL_ID) {
+            snprintf(name_varid, PIO_MAX_NAME, "fillval_id/%s", av->name);
+            av_count[0] = 1;
+            av->fillval_varid = adios2_inquire_variable(file->ioH, name_varid);
+            if (av->fillval_varid == NULL) {
+                av->fillval_varid = adios2_define_variable(file->ioH, name_varid, atype,
+                                                           1, NULL, NULL, av_count,
+                                                           adios2_constant_dims_true);
+                if (av->fillval_varid == NULL) {
+                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)",
+                                   name_varid, pio_get_fname_from_file(file), file->pio_ncid);
+                }
+            }
+        }
+
+#ifdef _BLOCK_MERGE
+        /* Variable to store the number of writer blocks, in case buffer merging doesn't happen */
+        if (file->block_myrank == 0) {
+            snprintf(name_varid, PIO_MAX_NAME, "num_data_block_writers/%s", av->name);
+            av_count[0] = 1;
+            av->num_block_writers_varid = adios2_inquire_variable(file->ioH, name_varid);
+            if (av->num_block_writers_varid == NULL) {
+                av->num_block_writers_varid = adios2_define_variable(file->ioH, name_varid, adios2_type_int32_t,
+                                                                     1, NULL, NULL, av_count,
+                                                                     adios2_constant_dims_true);
+                if (av->num_block_writers_varid == NULL) {
+                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)",
+                                   name_varid, pio_get_fname_from_file(file), file->pio_ncid);
+                }
+            }
+        }
+#endif
+
+        if (file->myrank == 0) {
             /* Some of the codes were moved to pio_nc.c */
             char decompname[PIO_MAX_NAME];
             char att_name[PIO_MAX_NAME];
@@ -1291,49 +1212,42 @@ static int PIOc_write_darray_adios(file_desc_t *file, int varid, int ioid,
             snprintf(decompname, PIO_MAX_NAME, "%d", ioid);
             snprintf(att_name, PIO_MAX_NAME, "%s/__pio__/decomp", av->name);
             adios2_attribute *attributeH = adios2_inquire_attribute(file->ioH, att_name);
-            if (attributeH == NULL)
-            {
+            if (attributeH == NULL) {
                 attributeH = adios2_define_attribute(file->ioH, att_name, adios2_type_string, decompname);
-                if (attributeH == NULL)
-                {
-                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, 
-							"Defining (ADIOS) attribute (name=%s) failed for file (%s, ncid=%d)", 
-							att_name, pio_get_fname_from_file(file), file->pio_ncid);
+                if (attributeH == NULL) {
+                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Defining (ADIOS) attribute (name=%s) failed for file (%s, ncid=%d)",
+                                   att_name, pio_get_fname_from_file(file), file->pio_ncid);
                 }
             }
 
             snprintf(att_name, PIO_MAX_NAME, "%s/__pio__/ncop", av->name);
             attributeH = adios2_inquire_attribute(file->ioH, att_name);
-            if (attributeH == NULL)
-            {
+            if (attributeH == NULL) {
                 attributeH = adios2_define_attribute(file->ioH, att_name, adios2_type_string, "darray");
-                if (attributeH == NULL)
-                {
-                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, 
-							"Defining (ADIOS) attribute (name=%s) failed for file (%s, ncid=%d)", 
-							att_name, pio_get_fname_from_file(file), file->pio_ncid);
+                if (attributeH == NULL) {
+                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Defining (ADIOS) attribute (name=%s) failed for file (%s, ncid=%d)",
+                                   att_name, pio_get_fname_from_file(file), file->pio_ncid);
                 }
             }
         }
-		file->num_written_blocks += 2;
+        file->num_written_blocks += 2;
     }
 
     /* Check if we need to write the decomposition. Write it */
-    if (needs_to_write_decomp(file, ioid))
-    {
+    if (needs_to_write_decomp(file, ioid)) {
         ierr = PIOc_write_decomp_adios(file, ioid);
-        if (ierr != PIO_NOERR)
-        {
+        if (ierr != PIO_NOERR) {
             return pio_err(NULL, file, ierr, __FILE__, __LINE__,
-                            "Writing (ADIOS) variable (varid=%d) to file (%s, ncid=%d) failed. Writing the I/O decomposition (ioid=%d) associated with the variable failed", 
-							varid, pio_get_fname_from_file(file), file->pio_ncid, ioid);
+                           "Writing (ADIOS) variable (varid=%d) to file (%s, ncid=%d) failed. Writing the I/O decomposition (ioid=%d) associated with the variable failed",
+                           varid, pio_get_fname_from_file(file), file->pio_ncid, ioid);
         }
         ierr = register_decomp(file, ioid);
-        if (ierr != PIO_NOERR)
-        {
+        if (ierr != PIO_NOERR) {
             return pio_err(NULL, file, ierr, __FILE__, __LINE__,
-                            "Writing (ADIOS) variable (varid=%d) to file (%s, ncid=%d) failed. Registering the I/O decomposition (ioid=%d) associated with the variable failed", 
-							varid, pio_get_fname_from_file(file), file->pio_ncid, ioid);
+                           "Writing (ADIOS) variable (varid=%d) to file (%s, ncid=%d) failed. Registering the I/O decomposition (ioid=%d) associated with the variable failed",
+                           varid, pio_get_fname_from_file(file), file->pio_ncid, ioid);
         }
     }
 
@@ -1341,187 +1255,175 @@ static int PIOc_write_darray_adios(file_desc_t *file, int varid, int ioid,
     void *databuf = array;
     void *fillbuf = fillvalue;
     int buf_needs_free = 0;
-    if (iodesc->piotype != av->nc_type)
-    {
+    if (iodesc->piotype != av->nc_type) {
         databuf = PIOc_convert_buffer_adios(file, iodesc, av, array, arraylen, &ierr);
-        if (ierr != PIO_NOERR)
-        {
+        if (ierr != PIO_NOERR) {
             return pio_err(NULL, file, ierr, __FILE__, __LINE__,
-                            "Writing (ADIOS) variable (varid=%d) to file (%s, ncid=%d) failed. Type conversion for data buffer failed", 
-							varid, pio_get_fname_from_file(file), file->pio_ncid);
+                           "Writing (ADIOS) variable (varid=%d) to file (%s, ncid=%d) failed. Type conversion for data buffer failed",
+                           varid, pio_get_fname_from_file(file), file->pio_ncid);
         }
 
-        if (fillvalue != NULL)
-        {
+        if (fillvalue != NULL) {
             fillbuf = PIOc_convert_buffer_adios(file, iodesc, av, fillvalue, 1, &ierr);
-            if (ierr != PIO_NOERR)
-            {
+            if (ierr != PIO_NOERR) {
                 return pio_err(NULL, file, ierr, __FILE__, __LINE__,
-                                "Writing (ADIOS) variable (varid=%d) to file (%s, ncid=%d) failed. Type conversion for fill buffer failed", 
-								varid, pio_get_fname_from_file(file), file->pio_ncid);
+                               "Writing (ADIOS) variable (varid=%d) to file (%s, ncid=%d) failed. Type conversion for fill buffer failed",
+                               varid, pio_get_fname_from_file(file), file->pio_ncid);
             }
         }
 
         buf_needs_free = 1;
     }
 
-#ifdef _BLOCK_MERGE 
-	memset(file->array_counts,0,file->array_counts_size);
-	MPI_Gather(&inp_count,1,MPI_INT,file->array_counts,1,MPI_INT,0,file->block_comm);
-	if (file->block_myrank==0) {
-		for (int ii=0;ii<file->block_nprocs;ii++) { 
-			file->array_counts[ii] *= av->elem_size;
-		}
-		file->array_disp[0] = 0;
-		for (int ii=1;ii<file->block_nprocs;ii++) {
-			file->array_disp[ii] = file->array_disp[ii-1]+file->array_counts[ii-1];
-		}
-	}
-
-	size_t num_block_writers = file->block_nprocs;
-	int can_merge_buffers = 1;
-	if (file->block_myrank==0) {
-		size_t av_buffer_size = av->elem_size*buffer_count;
-		if (file->block_array_size<av_buffer_size) {
-			if (file->block_array!=NULL) {
-				file->block_array = (char*)realloc(file->block_array,av_buffer_size);
-			} else {
-				file->block_array = (char*)calloc(av_buffer_size,sizeof(char));
-			}
-			if (file->block_array!=NULL) {
-				can_merge_buffers = 1;
-				file->block_array_size = av_buffer_size;
-			} else {
-				can_merge_buffers = 0;
-				file->block_array_size = 0;
-			}
-		}
-
-		/* TEST */
-		double rand_val = (rand()*1.0)/RAND_MAX;
-		if (rand_val >= 1.1) {
-			can_merge_buffers = 0;
-		}
-		can_merge_buffers = 0;
-	}
-	MPI_Bcast(&can_merge_buffers,1,MPI_INT,0,file->block_comm);
-
-	if (can_merge_buffers==1) {
-		MPI_Gatherv(databuf,av->elem_size*inp_count,MPI_CHAR,file->block_array,
-					file->array_counts,file->array_disp,MPI_CHAR,0,file->block_comm);
-		adiosErr = adios2_error_none;
-		if (file->block_myrank==0) {
-			size_t count_val = (size_t)buffer_count;
-			adiosErr = adios2_set_selection(av->adios_varid, 1, NULL, &count_val);
-			if (adiosErr != adios2_error_none)
-			{
-				return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, 
-						"Putting (ADIOS) variable (name=decomp_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)", 
-						av->name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
-			}
-    		adiosErr = adios2_put(file->engineH, av->adios_varid, file->block_array, adios2_mode_sync);
-			if (adiosErr != adios2_error_none)
-			{
-				return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, 
-						"Putting (ADIOS) variable (name=decomp_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)", 
-						av->name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
-			}
-			total_num_block_writers++;
-		}
-		num_block_writers = 1;
-		(file->num_merge)++;
-	} else {
-		size_t count_val = (size_t)inp_count;
-		adiosErr = adios2_set_selection(av->adios_varid, 1, NULL, &count_val);
-		if (adiosErr != adios2_error_none)
-		{
-			return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, 
-					"Putting (ADIOS) variable (name=decomp_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)", 
-					av->name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
-		}
-		adiosErr = adios2_put(file->engineH, av->adios_varid, databuf, adios2_mode_sync);
-		if (adiosErr != adios2_error_none)
-		{
-			return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, 
-					"Putting (ADIOS) variable (name=decomp_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)", 
-					av->name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
-		}
-		total_num_block_writers++;
-		num_block_writers = file->block_nprocs;
-		(file->num_not_merge)++;
-	}
-
-	/* Write the number of block writers */
-	if (file->block_myrank==0) {
-		adiosErr = adios2_put(file->engineH, av->num_block_writers_varid, &num_block_writers, adios2_mode_sync);
-		total_num_block_writers++;
-	}
-#else
-	{
-		size_t count_val[1];
-		count_val[0] = (size_t)inp_count;
-		adiosErr = adios2_set_selection(av->adios_varid, 1, NULL, count_val);
-		if (adiosErr != adios2_error_none)
-		{
-			return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, 
-					"Putting (ADIOS) variable (name=decomp_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)", 
-					av->name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
-		}
-		adiosErr = adios2_put(file->engineH, av->adios_varid, databuf, adios2_mode_sync);
-		total_num_block_writers++;
-	}
-#endif
-    if (adiosErr != adios2_error_none)
-    {
-     	return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, 
-				"Putting (ADIOS) variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)", 
-	 			av->name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
+#ifdef _BLOCK_MERGE
+    memset(file->array_counts, 0, file->array_counts_size);
+    MPI_Gather(&inp_count, 1, MPI_INT, file->array_counts, 1, MPI_INT, 0, file->block_comm);
+    if (file->block_myrank == 0) {
+        for (int ii = 0; ii < file->block_nprocs; ii++) {
+            file->array_counts[ii] *= av->elem_size;
+        }
+        file->array_disp[0] = 0;
+        for (int ii = 1; ii < file->block_nprocs; ii++) {
+            file->array_disp[ii] = file->array_disp[ii - 1] + file->array_counts[ii - 1];
+        }
     }
 
-	/* NOTE: PIOc_setframe with different decompositions */
-	/* Different decompositions at different frames and fillvalue */
-	if (fillbuf != NULL) /* Write out user provided fillvalue */
-	{
-		if (file->myrank==WRITE_FILLVAL_ID) 
-		{
-			adiosErr = adios2_put(file->engineH, av->fillval_varid, fillbuf, adios2_mode_sync);
-			if (adiosErr != adios2_error_none)
-			{
-				return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, "Putting (ADIOS) variable (name=fillval_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)", 
-							av->name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
-			}
-			total_num_block_writers++;
-		}
-	}
-	else
-	{
-		ioid = -ioid;
-	}
+    size_t num_block_writers = file->block_nprocs;
+    int can_merge_buffers = 1;
+    if (file->block_myrank == 0) {
+        size_t av_buffer_size = av->elem_size * buffer_count;
+        if (file->block_array_size < av_buffer_size) {
+            if (file->block_array != NULL) {
+                file->block_array = (char *) realloc(file->block_array, av_buffer_size);
+            } else {
+                file->block_array = (char *) calloc(av_buffer_size, sizeof(char));
+            }
+            if (file->block_array != NULL) {
+                can_merge_buffers = 1;
+                file->block_array_size = av_buffer_size;
+            } else {
+                can_merge_buffers = 0;
+                file->block_array_size = 0;
+            }
+        }
 
-	if (file->myrank==WRITE_DECOMP_ID)
-	{
-		adiosErr = adios2_put(file->engineH, av->decomp_varid, &ioid, adios2_mode_sync);
-		if (adiosErr != adios2_error_none)
-		{
-			return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, "Putting (ADIOS) variable (name=decomp_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)", 
-						av->name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
-		}
-		total_num_block_writers++;
-	}
+        /* TEST */
+        double rand_val = (rand() * 1.0) / RAND_MAX;
+        if (rand_val >= 1.1) {
+            can_merge_buffers = 0;
+        }
+        can_merge_buffers = 0;
+    }
+    MPI_Bcast(&can_merge_buffers, 1, MPI_INT, 0, file->block_comm);
 
-	if (file->myrank==WRITE_FRAME_ID)
-	{
-		adiosErr = adios2_put(file->engineH, av->frame_varid, &(file->varlist[varid].record), adios2_mode_sync);
-		if (adiosErr != adios2_error_none)
-		{
-			return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__, "Putting (ADIOS) variable (name=frame_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)", 
-						av->name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
-		}
-		total_num_block_writers++;
-	}
+    if (can_merge_buffers == 1) {
+        MPI_Gatherv(databuf, av->elem_size * inp_count, MPI_CHAR, file->block_array,
+                    file->array_counts, file->array_disp, MPI_CHAR, 0, file->block_comm);
+        adiosErr = adios2_error_none;
+        if (file->block_myrank == 0) {
+            size_t count_val = (size_t) buffer_count;
+            adiosErr = adios2_set_selection(av->adios_varid, 1, NULL, &count_val);
+            if (adiosErr != adios2_error_none) {
+                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Putting (ADIOS) variable (name=decomp_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                               av->name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file),
+                               file->pio_ncid);
+            }
+            adiosErr = adios2_put(file->engineH, av->adios_varid, file->block_array, adios2_mode_sync);
+            if (adiosErr != adios2_error_none) {
+                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Putting (ADIOS) variable (name=decomp_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                               av->name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file),
+                               file->pio_ncid);
+            }
+            total_num_block_writers++;
+        }
+        num_block_writers = 1;
+        (file->num_merge)++;
+    } else {
+        size_t count_val = (size_t) inp_count;
+        adiosErr = adios2_set_selection(av->adios_varid, 1, NULL, &count_val);
+        if (adiosErr != adios2_error_none) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Putting (ADIOS) variable (name=decomp_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                           av->name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
+        }
+        adiosErr = adios2_put(file->engineH, av->adios_varid, databuf, adios2_mode_sync);
+        if (adiosErr != adios2_error_none) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Putting (ADIOS) variable (name=decomp_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                           av->name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
+        }
+        total_num_block_writers++;
+        num_block_writers = file->block_nprocs;
+        (file->num_not_merge)++;
+    }
 
-    if (buf_needs_free)
+    /* Write the number of block writers */
+    if (file->block_myrank == 0) {
+        adiosErr = adios2_put(file->engineH, av->num_block_writers_varid, &num_block_writers, adios2_mode_sync);
+        total_num_block_writers++;
+    }
+#else
     {
+        size_t count_val[1];
+        count_val[0] = (size_t)inp_count;
+        adiosErr = adios2_set_selection(av->adios_varid, 1, NULL, count_val);
+        if (adiosErr != adios2_error_none)
+        {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                    "Putting (ADIOS) variable (name=decomp_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                    av->name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
+        }
+        adiosErr = adios2_put(file->engineH, av->adios_varid, databuf, adios2_mode_sync);
+        total_num_block_writers++;
+    }
+#endif
+    if (adiosErr != adios2_error_none) {
+        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Putting (ADIOS) variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                       av->name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
+    }
+
+    /* NOTE: PIOc_setframe with different decompositions */
+    /* Different decompositions at different frames and fillvalue */
+    if (fillbuf != NULL) /* Write out user provided fillvalue */
+    {
+        if (file->myrank == WRITE_FILLVAL_ID) {
+            adiosErr = adios2_put(file->engineH, av->fillval_varid, fillbuf, adios2_mode_sync);
+            if (adiosErr != adios2_error_none) {
+                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Putting (ADIOS) variable (name=fillval_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                               av->name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file),
+                               file->pio_ncid);
+            }
+            total_num_block_writers++;
+        }
+    } else {
+        ioid = -ioid;
+    }
+
+    if (file->myrank == WRITE_DECOMP_ID) {
+        adiosErr = adios2_put(file->engineH, av->decomp_varid, &ioid, adios2_mode_sync);
+        if (adiosErr != adios2_error_none) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Putting (ADIOS) variable (name=decomp_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                           av->name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
+        }
+        total_num_block_writers++;
+    }
+
+    if (file->myrank == WRITE_FRAME_ID) {
+        adiosErr = adios2_put(file->engineH, av->frame_varid, &(file->varlist[varid].record), adios2_mode_sync);
+        if (adiosErr != adios2_error_none) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Putting (ADIOS) variable (name=frame_id/%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                           av->name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file), file->pio_ncid);
+        }
+        total_num_block_writers++;
+    }
+
+    if (buf_needs_free) {
         if (databuf != NULL)
             free(databuf);
 
@@ -1532,25 +1434,25 @@ static int PIOc_write_darray_adios(file_desc_t *file, int varid, int ioid,
     if (temp_buf != NULL)
         free(temp_buf);
 
-	int sum_num_block_writers = 0;
-	MPI_Allreduce(&total_num_block_writers,&sum_num_block_writers,1,MPI_INT,MPI_SUM,file->all_comm);
-	file->num_written_blocks += sum_num_block_writers;
-	adios2_check_end_step(NULL,file);
+    int sum_num_block_writers = 0;
+    MPI_Allreduce(&total_num_block_writers, &sum_num_block_writers, 1, MPI_INT, MPI_SUM, file->all_comm);
+    file->num_written_blocks += sum_num_block_writers;
+    adios2_check_end_step(NULL, file);
 
 #if 0
-	/* Check if any process group cannot merge buffers */
-	int all_can_merge_buffers = 1;
-	MPI_Allreduce(&can_merge_buffers,&all_can_merge_buffers,1,MPI_INT,MPI_MIN,file->all_comm);
-	if (all_can_merge_buffers==0) 
-	{
-		(file->num_darray_calls)++;
-		if (file->num_darray_calls>file->max_darray_calls) 
-		{
-			ADIOS2_END_STEP(file,NULL);
-			file->num_darray_calls = 0;
-			file->num_end_step_calls = 0;
-		}
-	}
+    /* Check if any process group cannot merge buffers */
+    int all_can_merge_buffers = 1;
+    MPI_Allreduce(&can_merge_buffers,&all_can_merge_buffers,1,MPI_INT,MPI_MIN,file->all_comm);
+    if (all_can_merge_buffers==0)
+    {
+        (file->num_darray_calls)++;
+        if (file->num_darray_calls>file->max_darray_calls)
+        {
+            ADIOS2_END_STEP(file,NULL);
+            file->num_darray_calls = 0;
+            file->num_end_step_calls = 0;
+        }
+    }
 #endif
 
 #ifdef TIMING
@@ -1611,8 +1513,7 @@ static int PIOc_write_darray_adios(file_desc_t *file, int varid, int ioid,
  * @author Jim Edwards, Ed Hartnett
  */
 int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *array,
-                      void *fillvalue)
-{
+                      void *fillvalue) {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Info about file we are writing to. */
     io_desc_t *iodesc;     /* The IO description. */
@@ -1631,13 +1532,12 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
     GPTLstart("PIO:PIOc_write_darray");
 #endif
     LOG((1, "PIOc_write_darray ncid = %d varid = %d ioid = %d arraylen = %d",
-         ncid, varid, ioid, arraylen));
+            ncid, varid, ioid, arraylen));
 
     /* Get the file info. */
-    if ((ierr = pio_get_file(ncid, &file)))
-    {
+    if ((ierr = pio_get_file(ncid, &file))) {
         return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__,
-                        "Writing variable (varid=%d) failed on file. Invalid file id (ncid=%d) provided", varid, ncid);
+                       "Writing variable (varid=%d) failed on file. Invalid file id (ncid=%d) provided", varid, ncid);
     }
     ios = file->iosystem;
 
@@ -1645,42 +1545,44 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
 #ifdef _ADIOS2 /* TAHSIN: timing */
     if (file->iotype == PIO_IOTYPE_ADIOS) {
         GPTLstart("PIO:PIOc_write_darray_adios"); /* TAHSIN: start */
-	}
+    }
 #endif
 #endif
 
     LOG((1, "PIOc_write_darray ncid=%d varid=%d wb_pend=%llu file_wb_pend=%llu",
-          ncid, varid,
-          (unsigned long long int) file->varlist[varid].wb_pend,
-          (unsigned long long int) file->wb_pend
-    ));
+            ncid, varid,
+            (unsigned long long int) file->varlist[varid].wb_pend,
+            (unsigned long long int) file->wb_pend
+        ));
 
     /* Can we write to this file? */
-    if (!(file->mode & PIO_WRITE))
-    {
+    if (!(file->mode & PIO_WRITE)) {
         return pio_err(ios, file, PIO_EPERM, __FILE__, __LINE__,
-                        "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. The file was not opened for writing, try reopening the file in write mode (use the PIO_WRITE flag)", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+                       "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. The file was not opened for writing, try reopening the file in write mode (use the PIO_WRITE flag)",
+                       pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
     }
 
     /* Get decomposition information. */
-    if (!(iodesc = pio_get_iodesc_from_id(ioid)))
-    {
+    if (!(iodesc = pio_get_iodesc_from_id(ioid))) {
         return pio_err(ios, file, PIO_EBADID, __FILE__, __LINE__,
-                        "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Invalid I/O descriptor id (ioid=%d) provided", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, ioid);
+                       "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Invalid I/O descriptor id (ioid=%d) provided",
+                       pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid,
+                       ioid);
     }
 
     /* Check that the local size of the variable passed in matches the
      * size expected by the io descriptor. Fail if arraylen is too
      * small, just put a warning in the log and truncate arraylen
      * if it is too big (the excess values will be ignored.) */
-    if (arraylen < iodesc->ndof)
-    {
+    if (arraylen < iodesc->ndof) {
         return pio_err(ios, file, PIO_EINVAL, __FILE__, __LINE__,
-                        "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. The local array size (arraylen=%lld) is smaller than expected, the I/O decomposition (ioid=%d) requires a local array of size = %lld", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (long long int) arraylen, ioid, (long long int) iodesc->ndof);
+                       "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. The local array size (arraylen=%lld) is smaller than expected, the I/O decomposition (ioid=%d) requires a local array of size = %lld",
+                       pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid,
+                       (long long int) arraylen, ioid, (long long int) iodesc->ndof);
     }
     LOG((2, "%s arraylen = %d iodesc->ndof = %d",
-         (arraylen > iodesc->ndof) ? "WARNING: arraylen > iodesc->ndof" : "",
-         arraylen, iodesc->ndof));
+            (arraylen > iodesc->ndof) ? "WARNING: arraylen > iodesc->ndof" : "",
+            arraylen, iodesc->ndof));
     if (arraylen > iodesc->ndof)
         arraylen = iodesc->ndof;
 
@@ -1710,10 +1612,10 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
 
     /* If we don't know the fill value for this var, get it. */
     if (!vdesc->fillvalue)
-        if ((ierr = find_var_fillvalue(file, varid, vdesc)))
-        {
+        if ((ierr = find_var_fillvalue(file, varid, vdesc))) {
             return pio_err(ios, file, PIO_EBADID, __FILE__, __LINE__,
-                            "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Finding fillvalue associated with the variable failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+                           "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Finding fillvalue associated with the variable failed",
+                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
         }
 
     /* Is this a record variable? The user must set the vdesc->record
@@ -1729,8 +1631,7 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
     LOG((3, "wmb->ioid = %d wmb->recordvar = %d", wmb->ioid, wmb->recordvar));
 
 #ifdef _ADIOS2
-    if (file->iotype == PIO_IOTYPE_ADIOS)
-    {
+    if (file->iotype == PIO_IOTYPE_ADIOS) {
         ierr = PIOc_write_darray_adios(file, varid, ioid, iodesc, arraylen, array, fillvalue);
 #ifdef TIMING
         GPTLstop("PIO:PIOc_write_darray_adios"); /* TAHSIN: stop */
@@ -1741,14 +1642,14 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
 #endif
 
     /* If we did not find an existing wmb entry, create a new wmb. */
-    if (wmb->ioid != ioid || wmb->recordvar != recordvar)
-    {
+    if (wmb->ioid != ioid || wmb->recordvar != recordvar) {
         /* Allocate a buffer. */
         LOG((3, "allocating multi-buffer"));
-        if (!(wmb->next = calloc(1, sizeof(wmulti_buffer))))
-        {
+        if (!(wmb->next = calloc(1, sizeof(wmulti_buffer)))) {
             return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Out of memory allocating %lld bytes for a write multi buffer to cache user data", pio_get_fname_from_file(file), varid, pio_get_fname_from_file(file), file->pio_ncid, (unsigned long long) sizeof(wmulti_buffer));
+                           "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Out of memory allocating %lld bytes for a write multi buffer to cache user data",
+                           pio_get_fname_from_file(file), varid, pio_get_fname_from_file(file), file->pio_ncid,
+                           (unsigned long long) sizeof(wmulti_buffer));
         }
         LOG((3, "allocated multi-buffer"));
 
@@ -1765,7 +1666,7 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
         wmb->fillvalue = NULL;
     }
     LOG((2, "wmb->num_arrays = %d arraylen = %d iodesc->mpitype_size = %d\n",
-         wmb->num_arrays, arraylen, iodesc->mpitype_size));
+            wmb->num_arrays, arraylen, iodesc->mpitype_size));
 
     needsflush = PIO_wmb_needs_flush(wmb, arraylen, iodesc);
     assert(needsflush >= 0);
@@ -1786,29 +1687,25 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
     io_max_regions = (1 + wmb->num_arrays) * decomp_max_regions;
     if (io_max_regions > PIO_MAX_CACHED_IO_REGIONS)
         needsflush = 2;
-#endif 
+#endif
 
     /* Tell all tasks on the computation communicator whether we need
      * to flush data. */
-    if ((mpierr = MPI_Allreduce(MPI_IN_PLACE, &needsflush, 1,  MPI_INT,  MPI_MAX,
+    if ((mpierr = MPI_Allreduce(MPI_IN_PLACE, &needsflush, 1, MPI_INT, MPI_MAX,
                                 ios->comp_comm)))
         return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
     LOG((2, "needsflush = %d", needsflush));
 
-    if(!ios->async || !ios->ioproc)
-    {
-        if(file->varlist[varid].vrsize == 0)
-        {
+    if (!ios->async || !ios->ioproc) {
+        if (file->varlist[varid].vrsize == 0) {
             ierr = calc_var_rec_sz(ncid, varid);
-            if(ierr != PIO_NOERR)
-            {
+            if (ierr != PIO_NOERR) {
                 LOG((1, "Unable to calculate the variable record size"));
             }
         }
     }
     /* Flush data if needed. */
-    if (needsflush > 0)
-    {
+    if (needsflush > 0) {
 #if !PIO_USE_MALLOC
 #ifdef PIO_ENABLE_LOGGING
         /* Collect a debug report about buffer. */
@@ -1822,10 +1719,11 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
          * true will force flush the buffer to disk for all
          * iotypes (wait for write to complete for PnetCDF)
          */
-        if ((ierr = flush_buffer(ncid, wmb, (needsflush == 2))))
-        {
+        if ((ierr = flush_buffer(ncid, wmb, (needsflush == 2)))) {
             return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                            "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Flushing data (multiple cached variables with the same decomposition) from compute processes to I/O processes %s failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (needsflush == 2) ? "and to disk" : "");
+                           "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Flushing data (multiple cached variables with the same decomposition) from compute processes to I/O processes %s failed",
+                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid,
+                           (needsflush == 2) ? "and to disk" : "");
         }
     }
 
@@ -1833,10 +1731,10 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
     file->varlist[varid].wb_pend += file->varlist[varid].vrsize;
     file->wb_pend += file->varlist[varid].vrsize;
     LOG((1, "Current pending bytes for ncid=%d, varid=%d var_wb_pend= %llu, file_wb_pend=%llu",
-          ncid, varid,
-          (unsigned long long int) file->varlist[varid].wb_pend,
-          (unsigned long long int) file->wb_pend
-    ));
+            ncid, varid,
+            (unsigned long long int) file->varlist[varid].wb_pend,
+            (unsigned long long int) file->wb_pend
+        ));
     /* Buffering data is considered an async event (to indicate
       *that the event is not yet complete)
       */
@@ -1845,58 +1743,57 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
 #endif
 
     /* Get memory for data. */
-    if (arraylen > 0)
-    {
-        if (!(wmb->data = bgetr(wmb->data, (1 + wmb->num_arrays) * arraylen * iodesc->mpitype_size)))
-        {
+    if (arraylen > 0) {
+        if (!(wmb->data = bgetr(wmb->data, (1 + wmb->num_arrays) * arraylen * iodesc->mpitype_size))) {
             return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Out of memory allocating space (realloc %lld bytes) to cache user data", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (long long int )((1 + wmb->num_arrays) * arraylen * iodesc->mpitype_size));
+                           "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Out of memory allocating space (realloc %lld bytes) to cache user data",
+                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid,
+                           (long long int) ((1 + wmb->num_arrays) * arraylen * iodesc->mpitype_size));
         }
         LOG((2, "got %ld bytes for data", (1 + wmb->num_arrays) * arraylen * iodesc->mpitype_size));
     }
 
     /* vid is an array of variable ids in the wmb list, grow the list
      * and add the new entry. */
-    if (!(wmb->vid = realloc(wmb->vid, sizeof(int) * (1 + wmb->num_arrays))))
-    {
+    if (!(wmb->vid = realloc(wmb->vid, sizeof(int) * (1 + wmb->num_arrays)))) {
         return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                        "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Out of memory allocating space (realloc %lld bytes) for array of variable ids in write multi buffer to cache user data", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (unsigned long long)(sizeof(int) * (1 + wmb->num_arrays)));
+                       "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Out of memory allocating space (realloc %lld bytes) for array of variable ids in write multi buffer to cache user data",
+                       pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid,
+                       (unsigned long long) (sizeof(int) * (1 + wmb->num_arrays)));
     }
 
     /* wmb->frame is the record number, we assume that the variables
      * in the wmb list may not all have the same unlimited dimension
      * value although they usually do. */
     if (vdesc->record >= 0)
-        if (!(wmb->frame = realloc(wmb->frame, sizeof(int) * (1 + wmb->num_arrays))))
-        {
+        if (!(wmb->frame = realloc(wmb->frame, sizeof(int) * (1 + wmb->num_arrays)))) {
             return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Out of memory allocating space (realloc %lld bytes) for array of frame numbers in write multi buffer to cache user data", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (unsigned long long)(sizeof(int) * (1 + wmb->num_arrays)));
+                           "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Out of memory allocating space (realloc %lld bytes) for array of frame numbers in write multi buffer to cache user data",
+                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid,
+                           (unsigned long long) (sizeof(int) * (1 + wmb->num_arrays)));
         }
 
     /* If we need a fill value, get it. If we are using the subset
      * rearranger and not using the netcdf fill mode then we need to
      * do an extra write to fill in the holes with the fill value. */
-    if (iodesc->needsfill)
-    {
+    if (iodesc->needsfill) {
         /* Get memory to hold fill value. */
-        if (!(wmb->fillvalue = bgetr(wmb->fillvalue, iodesc->mpitype_size * (1 + wmb->num_arrays))))
-        {
+        if (!(wmb->fillvalue = bgetr(wmb->fillvalue, iodesc->mpitype_size * (1 + wmb->num_arrays)))) {
             return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Out of memory allocating space (realloc %lld bytes) for variable fillvalues in write multi buffer to cache user data", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (unsigned long long)(iodesc->mpitype_size * (1 + wmb->num_arrays)));
+                           "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Out of memory allocating space (realloc %lld bytes) for variable fillvalues in write multi buffer to cache user data",
+                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid,
+                           (unsigned long long) (iodesc->mpitype_size * (1 + wmb->num_arrays)));
         }
 
         /* If the user passed a fill value, use that, otherwise use
          * the default fill value of the netCDF type. Copy the fill
          * value to the buffer. */
-        if (fillvalue)
-        {
-            memcpy((char *)wmb->fillvalue + iodesc->mpitype_size * wmb->num_arrays,
+        if (fillvalue) {
+            memcpy((char *) wmb->fillvalue + iodesc->mpitype_size * wmb->num_arrays,
                    fillvalue, iodesc->mpitype_size);
             LOG((3, "copied user-provided fill value iodesc->mpitype_size = %d",
-                 iodesc->mpitype_size));
-        }
-        else
-        {
+                    iodesc->mpitype_size));
+        } else {
             void *fill;
             signed char byte_fill = PIO_FILL_BYTE;
             char char_fill = PIO_FILL_CHAR;
@@ -1911,7 +1808,7 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
             long long int64_fill = PIO_FILL_INT64;
             long long uint64_fill = PIO_FILL_UINT64;
 #endif /* _NETCDF4 */
-            vtype = (MPI_Datatype)iodesc->mpitype;
+            vtype = (MPI_Datatype) iodesc->mpitype;
             LOG((3, "caller did not provide fill value vtype = %d", vtype));
 
             /* This must be done with an if statement, not a case, or
@@ -1929,22 +1826,24 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
             else if (vtype == MPI_DOUBLE)
                 fill = &double_fill;
 #ifdef _NETCDF4
-            else if (vtype == MPI_UNSIGNED_CHAR)
-                fill = &ubyte_fill;
-            else if (vtype == MPI_UNSIGNED_SHORT)
-                fill = &ushort_fill;
-            else if (vtype == MPI_UNSIGNED)
-                fill = &uint_fill;
-            else if (vtype == MPI_LONG_LONG)
-                fill = &int64_fill;
-            else if (vtype == MPI_UNSIGNED_LONG_LONG)
-                fill = &uint64_fill;
+                else if (vtype == MPI_UNSIGNED_CHAR)
+                    fill = &ubyte_fill;
+                else if (vtype == MPI_UNSIGNED_SHORT)
+                    fill = &ushort_fill;
+                else if (vtype == MPI_UNSIGNED)
+                    fill = &uint_fill;
+                else if (vtype == MPI_LONG_LONG)
+                    fill = &int64_fill;
+                else if (vtype == MPI_UNSIGNED_LONG_LONG)
+                    fill = &uint64_fill;
 #endif /* _NETCDF4 */
             else
                 return pio_err(ios, file, PIO_EBADTYPE, __FILE__, __LINE__,
-                                "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Unable to find a default fillvalue for variable, unsupported variable type (MPI type = %x)", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, vtype);
+                               "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Unable to find a default fillvalue for variable, unsupported variable type (MPI type = %x)",
+                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file),
+                               file->pio_ncid, vtype);
 
-            memcpy((char *)wmb->fillvalue + iodesc->mpitype_size * wmb->num_arrays,
+            memcpy((char *) wmb->fillvalue + iodesc->mpitype_size * wmb->num_arrays,
                    fill, iodesc->mpitype_size);
             LOG((3, "copied fill value"));
         }
@@ -1954,12 +1853,11 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
     wmb->arraylen = arraylen;
     wmb->vid[wmb->num_arrays] = varid;
     LOG((3, "wmb->num_arrays = %d wmb->vid[wmb->num_arrays] = %d", wmb->num_arrays,
-         wmb->vid[wmb->num_arrays]));
+            wmb->vid[wmb->num_arrays]));
 
     /* Copy the user-provided data to the buffer. */
-    bufptr = (void *)((char *)wmb->data + arraylen * iodesc->mpitype_size * wmb->num_arrays);
-    if (arraylen > 0)
-    {
+    bufptr = (void *) ((char *) wmb->data + arraylen * iodesc->mpitype_size * wmb->num_arrays);
+    if (arraylen > 0) {
         memcpy(bufptr, array, arraylen * iodesc->mpitype_size);
         LOG((3, "copied %ld bytes of user data", arraylen * iodesc->mpitype_size));
     }
@@ -1971,13 +1869,13 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
     wmb->num_arrays++;
 
     LOG((2, "wmb->num_arrays = %d iodesc->maxbytes / iodesc->mpitype_size = %d "
-         "iodesc->ndof = %d iodesc->llen = %d", wmb->num_arrays,
-         iodesc->maxbytes / iodesc->mpitype_size, iodesc->ndof, iodesc->llen));
+            "iodesc->ndof = %d iodesc->llen = %d", wmb->num_arrays,
+            iodesc->maxbytes / iodesc->mpitype_size, iodesc->ndof, iodesc->llen));
 
-        LOG((1, "Write darray end : pending bytes for ncid=%d, varid=%d var_wb_pend=%llu file_wb_pend=%llu",
-              ncid, varid,
-              (unsigned long long int) file->varlist[varid].wb_pend,
-              (unsigned long long int) file->wb_pend
+    LOG((1, "Write darray end : pending bytes for ncid=%d, varid=%d var_wb_pend=%llu file_wb_pend=%llu",
+            ncid, varid,
+            (unsigned long long int) file->varlist[varid].wb_pend,
+            (unsigned long long int) file->wb_pend
         ));
 #ifdef PIO_MICRO_TIMING
     mtimer_stop(file->varlist[varid].wr_mtimer, get_var_desc_str(ncid, varid, NULL));
@@ -2006,8 +1904,7 @@ int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *
  * @author Jim Edwards, Ed Hartnett
  */
 int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
-                     void *array)
-{
+                     void *array) {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
     io_desc_t *iodesc;     /* Pointer to IO description information. */
@@ -2020,20 +1917,22 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
     GPTLstart("PIO:PIOc_read_darray");
 #endif
     /* Get the file info. */
-    if ((ierr = pio_get_file(ncid, &file)))
-    {
+    if ((ierr = pio_get_file(ncid, &file))) {
         return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__,
-                        "Reading variable (varid=%d) failed. Invalid arguments provided, file id (ncid=%d) is invalid", varid, ncid);
+                       "Reading variable (varid=%d) failed. Invalid arguments provided, file id (ncid=%d) is invalid",
+                       varid, ncid);
     }
     ios = file->iosystem;
 
-    LOG((1, "PIOc_read_darray (ncid=%d (%s), varid=%d (%s)", ncid, pio_get_fname_from_file(file), varid, pio_get_vname_from_file(file, varid)));
+    LOG((1, "PIOc_read_darray (ncid=%d (%s), varid=%d (%s)", ncid, pio_get_fname_from_file(
+            file), varid, pio_get_vname_from_file(file, varid)));
 
     /* Get the iodesc. */
-    if (!(iodesc = pio_get_iodesc_from_id(ioid)))
-    {
+    if (!(iodesc = pio_get_iodesc_from_id(ioid))) {
         return pio_err(ios, file, PIO_EBADID, __FILE__, __LINE__,
-                        "Reading variable (%s, varid=%d) from file (%s, ncid=%d)failed. Invalid arguments provided, I/O descriptor id (ioid=%d) is invalid", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, ioid);
+                       "Reading variable (%s, varid=%d) from file (%s, ncid=%d)failed. Invalid arguments provided, I/O descriptor id (ioid=%d) is invalid",
+                       pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid,
+                       ioid);
     }
     pioassert(iodesc->rearranger == PIO_REARR_BOX || iodesc->rearranger == PIO_REARR_SUBSET,
               "unknown rearranger", __FILE__, __LINE__);
@@ -2043,24 +1942,30 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
 #endif
 
 #ifdef _ADIOS2
-    if (file->iotype == PIO_IOTYPE_ADIOS)
-    {
+    if (file->iotype == PIO_IOTYPE_ADIOS) {
+        //adios2_begin_step(file->engineH, const adios2_step_mode mode,
+        //const float timeout_seconds, adios2_step_status *status);
         int errio = adios2_get(file->engineH, file->adios_vars[varid].adios_varid, array, adios2_mode_deferred);
-        return pio_err(ios, file, PIO_EADIOSREAD, __FILE__, __LINE__,
-                        "Reading variable (%s, varid=%d) from file (%s, ncid=%d)failed . ADIOS currently does not support reading variables", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+        //adios2_end_step(file->engineH);
+        if (errio != 0) {
+            return pio_err(ios, file, PIO_EADIOSREAD, __FILE__, __LINE__,
+                           "Reading variable (%s, varid=%d) from file (%s, ncid=%d)failed ",
+                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+        }
+
     }
 #endif
 
     /* Run these on all tasks if async is not in use, but only on
      * non-IO tasks if async is in use. */
-    if (!ios->async || !ios->ioproc)
-    {
+    if (!ios->async || !ios->ioproc) {
         /* Get the number of dims for this var. */
         LOG((3, "about to call PIOc_inq_varndims varid = %d", varid));
         ierr = PIOc_inq_varndims(file->pio_ncid, varid, &fndims);
-        if(ierr != PIO_NOERR){
+        if (ierr != PIO_NOERR) {
             return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                            "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Inquiring number of variable dimensions failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+                           "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Inquiring number of variable dimensions failed",
+                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
         }
         LOG((3, "called PIOc_inq_varndims varid = %d fndims = %d", varid, fndims));
     }
@@ -2070,13 +1975,10 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
     else
         rlen = iodesc->llen;
 
-    if(!ios->async || !ios->ioproc)
-    {
-        if(file->varlist[varid].vrsize == 0)
-        {
+    if (!ios->async || !ios->ioproc) {
+        if (file->varlist[varid].vrsize == 0) {
             ierr = calc_var_rec_sz(ncid, varid);
-            if(ierr != PIO_NOERR)
-            {
+            if (ierr != PIO_NOERR) {
                 LOG((1, "Unable to calculate the variable record size"));
             }
         }
@@ -2087,28 +1989,27 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
 
     /* Allocate a buffer for one record. */
     if (ios->ioproc && rlen > 0)
-        if (!(iobuf = bget(iodesc->mpitype_size * rlen)))
-        {
+        if (!(iobuf = bget(iodesc->mpitype_size * rlen))) {
             return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                            "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Out of memory allocating space (%lld bytes) in I/O processes to read data from file (before rearrangement)", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, (long long int) (iodesc->mpitype_size * rlen));
+                           "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Out of memory allocating space (%lld bytes) in I/O processes to read data from file (before rearrangement)",
+                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid,
+                           (long long int) (iodesc->mpitype_size * rlen));
         }
 
-    if(ios->async)
-    {
+    if (ios->async) {
         /* Send relevant args from compute procs to I/O procs */
         int msg = PIO_MSG_READDARRAY;
-        
+
         PIO_SEND_ASYNC_MSG(ios, msg, &ierr, ncid, varid, ioid);
-        if(ierr != PIO_NOERR)
-        {
+        if (ierr != PIO_NOERR) {
             return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                            "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Sending async message, PIO_MSG_READDARRAY, failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+                           "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Sending async message, PIO_MSG_READDARRAY, failed",
+                           pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
         }
 
         /* Share results known only on computation tasks with IO tasks. */
         mpierr = MPI_Bcast(&fndims, 1, MPI_INT, ios->comproot, ios->my_comm);
-        if(mpierr != MPI_SUCCESS)
-        {
+        if (mpierr != MPI_SUCCESS) {
             check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
         }
         LOG((3, "shared fndims = %d", fndims));
@@ -2131,29 +2032,31 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
     }
 #endif
     /* Call the correct darray read function based on iotype. */
-    if(!ios->async || ios->ioproc)
-    {
-        switch (file->iotype)
-        {
-        case PIO_IOTYPE_NETCDF:
-        case PIO_IOTYPE_NETCDF4C:
-            if ((ierr = pio_read_darray_nc_serial(file, fndims, iodesc, varid, iobuf)))
-            {
-                return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                                "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Reading variable in serial (iotype=%s) failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype));
-            }
-            break;
-        case PIO_IOTYPE_PNETCDF:
-        case PIO_IOTYPE_NETCDF4P:
-            if ((ierr = pio_read_darray_nc(file, fndims, iodesc, varid, iobuf)))
-            {
-                return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                                "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Reading variable in parallel (iotype=%s) failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype));
-            }
-            break;
-        default:
-            return pio_err(NULL, NULL, PIO_EBADIOTYPE, __FILE__, __LINE__,
-                             "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Invalid iotype (%d) provided", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, file->iotype);
+    if (!ios->async || ios->ioproc) {
+        switch (file->iotype) {
+            case PIO_IOTYPE_NETCDF:
+            case PIO_IOTYPE_NETCDF4C:
+                if ((ierr = pio_read_darray_nc_serial(file, fndims, iodesc, varid, iobuf))) {
+                    return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Reading variable in serial (iotype=%s) failed",
+                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file),
+                                   file->pio_ncid, pio_iotype_to_string(file->iotype));
+                }
+                break;
+            case PIO_IOTYPE_PNETCDF:
+            case PIO_IOTYPE_NETCDF4P:
+                if ((ierr = pio_read_darray_nc(file, fndims, iodesc, varid, iobuf))) {
+                    return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Reading variable in parallel (iotype=%s) failed",
+                                   pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file),
+                                   file->pio_ncid, pio_iotype_to_string(file->iotype));
+                }
+                break;
+            default:
+                return pio_err(NULL, NULL, PIO_EBADIOTYPE, __FILE__, __LINE__,
+                               "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Invalid iotype (%d) provided",
+                               pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file),
+                               file->pio_ncid, file->iotype);
         }
     }
 
@@ -2161,10 +2064,10 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
     mtimer_start(file->varlist[varid].rd_rearr_mtimer);
 #endif
     /* Rearrange the data. */
-    if ((ierr = rearrange_io2comp(ios, iodesc, iobuf, array)))
-    {
+    if ((ierr = rearrange_io2comp(ios, iodesc, iobuf, array))) {
         return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                         "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Rearranging data read in the I/O processes to compute processes failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+                       "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Rearranging data read in the I/O processes to compute processes failed",
+                       pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
     }
 
 #ifdef PIO_MICRO_TIMING

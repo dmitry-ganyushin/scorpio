@@ -3061,6 +3061,88 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                    "Opening (ADIOS) file (%s) failed",
                                    pio_get_fname_from_file(file));
                 }
+                //TODODG get available variables and set structures.
+                // restrict to the first step only
+                adios2_step_status status;
+                size_t step = 0;
+                while (adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
+                                         &status) == adios2_error_none)
+                {
+                    if (step > 0 || status == adios2_step_status_end_of_stream)
+                    {
+                        break;
+                    }
+                    step++;
+                    size_t var_size;
+                    char **var_names = adios2_available_variables(file->ioH, &var_size);
+                    size_t current_var_cnt = 0;
+                    for (size_t i = 0; i < var_size; i++)
+                    {
+                        printf("variable: %s\n", var_names[i]);
+                        /* variables do not have slashes */
+                        if (strchr(var_names[i], '/') == NULL){
+                            file->adios_vars[current_var_cnt].name = (char*)malloc(strlen(var_names[i]) + 1);
+                            if (file->adios_vars[current_var_cnt].name)
+                            {
+                                strcpy(file->adios_vars[current_var_cnt].name, var_names[i]);
+                            }
+
+                            current_var_cnt++;
+                        }
+                        free(var_names[i]);
+                    }
+                    free(var_names);
+                    file->num_vars = current_var_cnt;
+                    size_t attr_size;
+                    char **attr_names = adios2_available_attributes(file->ioH, &attr_size);
+                    for (size_t i = 0; i < attr_size; i++)
+                    {
+                        printf("attribute: %s\n", attr_names[i]);
+                        free(attr_names[i]);
+                    }
+                    /*set up parameters for variables */
+                    //int pio_type;
+                    /* The size of the data type (2 for PIO_SHORT, 4 for PIO_INT, etc.) */
+                    //PIO_Offset type_size;
+                    //file->varlist[current_var].type_size = N;
+                    /* Size of one record of the variable (number of bytes)*/
+                    //PIO_Offset vrsize;
+                    //file->varlist[current_var].vrsize = N;
+                    //file->varlist[current_var].record = N;
+                    //ADIOS2_BEGIN_STEP(file,ios);
+
+                    assert(file->num_vars < PIO_MAX_VARS);
+                    for (size_t var = 0; var < file->num_vars; var++) {
+                    /*    file->adios_vars[var].nc_type = xtype;
+                        file->adios_vars[var].adios_type = PIOc_get_adios_type(xtype);
+                        file->adios_vars[var].adios_type_size = adios2_type_size(
+                                file->adios_vars[var].adios_type, NULL);
+                        file->adios_vars[var].nattrs = 0;
+                        file->adios_vars[var].ndims = ndims;
+                        file->adios_vars[var].adios_varid = 0;
+                        file->adios_vars[var].decomp_varid = 0;
+                        file->adios_vars[var].frame_varid = 0;
+                        file->adios_vars[var].fillval_varid = 0;
+                        */
+                        /* block merge */
+                        /*
+                        file->adios_vars[var].elem_size = 0;
+
+                        file->adios_vars[var].gdimids = (int *) malloc(ndims * sizeof(int));
+                        if (file->adios_vars[var].gdimids == NULL) {
+                            const char *vname = (name) ? name : "UNKNOWN";
+                            return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                                           "Defining variable %s in file %s (ncid=%d) using ADIOS iotype failed. Out of memory allocating %lld bytes for global dimensions",
+                                           vname, pio_get_fname_from_file(file), ncid,
+                                           (unsigned long long) (ndims * sizeof(int)));
+                        }
+                        memcpy(file->adios_vars[file->num_vars].gdimids, dimidsp, ndims * sizeof(int)); */
+                    }
+
+                    // remove memory
+                    free(attr_names);
+                    adios2_end_step(file->engineH);
+                }
 
                 LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
             }
@@ -3950,8 +4032,8 @@ adios2_type PIOc_get_adios_type(nc_type xtype)
     return t;
 }
 
-/*
-#ifndef strdup
+
+/*#ifndef strdup
 char *strdup(const char *str)
 {
     int n = strlen(str) + 1;
@@ -3963,8 +4045,8 @@ char *strdup(const char *str)
 
     return dup;
 }
-#endif
-*/
+#endif*/
+
 
 const char *adios2_error_to_string(adios2_error error)
 {
