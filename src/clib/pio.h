@@ -46,8 +46,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <adios2_c.h>
-#define _ADIOS_ALL_PROCS 1 /* ADIOS: assume all procs are also IO tasks */
-#define ADIOS_PIO_MAX_DECOMPS 200 /* Maximum number of decomps */
+#define ADIOS_PIO_MAX_DECOMPS 1024 /* Maximum number of decomps */
+#define MAX_BEGIN_STEP_CALLS   100
+#define MAX_ADIOS_BUFFER_COUNT 500 
+#define END_STEP_THRESHOLD ((unsigned long)(1024*1024*1024*1.9)) 
+#define BLOCK_METADATA_SIZE 70
 adios2_adios *get_adios2_adios();
 unsigned long get_adios2_io_cnt();
 #endif
@@ -782,7 +785,7 @@ typedef struct wmulti_buffer
 typedef struct adios_var_desc_t
 {
     /** Variable name */
-    char * name;
+    char *name;
 
     /** NC type give at def_var time */
     int nc_type;
@@ -795,7 +798,7 @@ typedef struct adios_var_desc_t
     int ndims;
 
     /** Global dims (dim var ids) */
-    int * gdimids;
+    int *gdimids;
 
     /** Number of attributes defined for this variable */
     int nattrs;
@@ -803,17 +806,25 @@ typedef struct adios_var_desc_t
     /** ADIOS varID, if it has already been defined.
      * We avoid defining again when writing multiple records over time
      */
-    adios2_variable* adios_varid; // 0: undefined yet
+    adios2_variable *adios_varid; // 0: undefined yet
 
     /* to handle PIOc_setframe with different decompositions */
-    adios2_variable* decomp_varid;
-    adios2_variable* frame_varid;
-    adios2_variable* fillval_varid;
-	adios2_variable* num_block_writers_varid;
+    adios2_variable *decomp_varid;
+    adios2_variable *frame_varid;
+    adios2_variable *fillval_varid;
+	adios2_variable *num_block_writers_varid;
+
+	/* to buffer decomp id, frame id, fill value, and writer blocks */
+	int32_t *decomp_buffer;
+	int32_t *frame_buffer;
+	char    *fillval_buffer;
+	int32_t fillval_size;
+	int32_t *num_wb_buffer;
+	int32_t decomp_cnt, frame_cnt, fillval_cnt, num_wb_cnt;
+	int32_t max_buffer_cnt;
 
 	/* for merging blocks */
 	size_t elem_size;
-
 } adios_var_desc_t;
 
 /* Track attributes */
@@ -865,12 +876,6 @@ typedef struct file_desc_t
 	int num_begin_step_calls;
 	int max_begin_step_calls;
 
-	int num_end_step_calls;
-	int num_merge;
-	int num_not_merge;
-	int num_darray_calls;
-	int max_darray_calls;
-
 	/* 
 	 * Used to call adios2_end_step to avoid buffer overflow in MPI_Gatherv 
 	 * during ADIOS metadata write operation. 
@@ -879,6 +884,10 @@ typedef struct file_desc_t
 	 */
 	unsigned int num_written_blocks;
 	unsigned int num_all_procs;
+
+	int WRITE_DECOMP_ID;
+    int WRITE_FRAME_ID;
+    int WRITE_FILLVAL_ID; 
 
     /** Handler for ADIOS group (of variables) */
     adios2_io *ioH;
@@ -910,16 +919,18 @@ typedef struct file_desc_t
     int adios_iomaster;
 	int myrank;
 
+	/* Merging distributed array blocks to reduce I/O overhead */
 	/* ADIOS: grouping of processes for block merging */
 	MPI_Comm node_comm;
 	int node_myrank, node_nprocs;
 	MPI_Comm block_comm;
 	int block_myrank, block_nprocs;
+	int *block_list;
 	MPI_Comm one_node_comm;
 	int one_node_rank, one_node_nprocs;
 	MPI_Comm all_comm;
 
-	/* Merge buffers */
+	/* Buffers for merging distributed array blocks */
 	int *array_counts;
 	int array_counts_size;
 	int *array_disp;
@@ -928,7 +939,6 @@ typedef struct file_desc_t
 	unsigned long block_array_size;
 
     /* Track attributes */
-    /** attribute information. Allow PIO_MAX_VARS for now. */
     struct adios_att_desc_t adios_attrs[PIO_MAX_ATTRS];
     int num_attrs;
 
@@ -1492,9 +1502,19 @@ extern "C" {
 #ifdef _ADIOS2
     adios2_type PIOc_get_adios_type(nc_type xtype);
     int adios2_type_size(adios2_type type, const void *var);
+	int adios2_flush_tracking_data(file_desc_t *file);
 	int adios2_check_end_step(iosystem_desc_t *ios,file_desc_t *file);
     const char *adios2_error_to_string(adios2_error error);
+#ifndef strdup
+    char *strdup(const char *str);
+#endif
+#endif
 
+#if defined(__cplusplus)
+}
+#endif
+
+#ifdef _ADIOS2
 #define ADIOS2_BEGIN_STEP(file,ios) \
 { \
 	if (0==file->begin_step_called) \
@@ -1513,6 +1533,7 @@ extern "C" {
 
 #define ADIOS2_END_STEP(file,ios) \
 { \
+    adios2_flush_tracking_data(file); \
 	if (1==file->begin_step_called) \
 	{ \
 		adios2_error adiosStepErr = adios2_end_step(file->engineH); \
@@ -1523,19 +1544,10 @@ extern "C" {
 					adios2_error_to_string(adiosStepErr), pio_get_fname_from_file(file)); \
 		} \
 		file->begin_step_called = 0; \
-		(file->num_end_step_calls)++; \
+		file->num_begin_step_calls = 0; \
+		file->num_written_blocks = 0; \
 	} \
 }
-
-/*
-#ifndef strdup
-    char *strdup(const char *str);
-#endif
-*/
-#endif
-
-#if defined(__cplusplus)
-}
-#endif
+#endif 
 
 #endif  // _PIO_H_

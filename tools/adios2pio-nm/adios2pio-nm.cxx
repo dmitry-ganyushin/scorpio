@@ -105,16 +105,16 @@ int main(int argc, char *argv[])
     string idir, infilepath, outfilename, piotype;
     int mem_opt = 0;
     int debug_lvl = 0;
-	/*
     ret = get_user_options(ap, argc, argv,
                             idir, infilepath, outfilename,
                             piotype, mem_opt, debug_lvl);
-	*/
 
-	std::string fullpath = "/gpfs/alpine/csc303/proj-shared/tkurc1/work/replay_tool_end_step/build.v270/tests/performance/"; 
-	infilepath  = fullpath + "pioperf-rearr-1-ncomptasks-1344-niotasks-0032-stride-0042-iotype-5-nframes-960-nvars-575.nc.bp"; 
+#if 0
+	std::string fullpath = "/gpfs/alpine/csc303/proj-shared/tkurc1/work/replay_tool_end_step/build.v271/tests/performance/"; 
+	infilepath  = fullpath + "pioperf-rearr-1-ncomptasks-1344-niotasks-0192-stride-0007-iotype-5-nframes-960-nvars-575.nc.bp"; 
 	outfilename = fullpath + "output.nc";
 	piotype = "pnetcdf";
+#endif 
 
     if (ret != 0)
     {

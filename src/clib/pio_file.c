@@ -135,9 +135,9 @@ int PIOc_createfile(int iosysid, int *ncidp, int *iotype, const char *filename,
 #ifdef TIMING
     GPTLstart("PIO:PIOc_createfile");
 
-#ifdef _ADIOS2 /* TAHSIN: timing */
+#ifdef _ADIOS2 
     if (*iotype == PIO_IOTYPE_ADIOS)
-        GPTLstart("PIO:PIOc_createfile_adios"); /* TAHSIN: start */
+        GPTLstart("PIO:PIOc_createfile_adios"); 
 #endif
 #endif
 
@@ -156,7 +156,7 @@ int PIOc_createfile(int iosysid, int *ncidp, int *iotype, const char *filename,
 
 #ifdef _ADIOS2 /* TAHSIN: timing */
         if (*iotype == PIO_IOTYPE_ADIOS)
-            GPTLstop("PIO:PIOc_createfile_adios"); /* TAHSIN: stop */
+            GPTLstop("PIO:PIOc_createfile_adios"); 
 #endif
 #endif
 
@@ -181,9 +181,9 @@ int PIOc_createfile(int iosysid, int *ncidp, int *iotype, const char *filename,
 #ifdef TIMING
     GPTLstop("PIO:PIOc_createfile");
 
-#ifdef _ADIOS2 /* TAHSIN: timing */
+#ifdef _ADIOS2 
     if (*iotype == PIO_IOTYPE_ADIOS)
-        GPTLstop("PIO:PIOc_createfile_adios"); /* TAHSIN: stop */
+        GPTLstop("PIO:PIOc_createfile_adios"); 
 #endif
 #endif
 
@@ -254,15 +254,15 @@ static int sync_file(int ncid)
                         "Syncing file (ncid=%d) failed. Invalid file id. Unable to find internal structure associated with the file id", ncid);
     }
 
+    ios = file->iosystem;
+
 #ifdef _ADIOS2
     if (file->iotype == PIO_IOTYPE_ADIOS)
 	{
-		ADIOS2_END_STEP(file,ios);
+		ADIOS2_END_STEP(file,ios); 
         return PIO_NOERR;
 	}
 #endif
-
-    ios = file->iosystem;
 
     /* Flush data buffers on computational tasks. */
     if (!ios->async || !ios->ioproc)
@@ -390,9 +390,9 @@ int PIOc_closefile(int ncid)
     ios = file->iosystem;
 
 #ifdef TIMING
-#ifdef _ADIOS2 /* TAHSIN: timing */
+#ifdef _ADIOS2 
     if (file->iotype == PIO_IOTYPE_ADIOS)
-        GPTLstart("PIO:PIOc_closefile_adios"); /* TAHSIN: start */
+        GPTLstart("PIO:PIOc_closefile_adios"); 
 #endif
 
     if (file->mode & PIO_WRITE)
@@ -455,7 +455,7 @@ int PIOc_closefile(int ncid)
                     if (variableH == NULL)
                     {
                         return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, 
-									"Defining (ADIOS) variable (name=/__pio__/info/nproc) failed for file (%s)", 
+									"Defining (ADIOS) variable (name=/__pio__/info/testing) failed for file (%s)", 
 									pio_get_fname_from_file(file));
                     }
                 }
@@ -464,11 +464,11 @@ int PIOc_closefile(int ncid)
                 if (adiosErr != adios2_error_none)
                 {
                     return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, 
-								"Putting (ADIOS) variable (name=/__pio__/info/nproc) failed (adios2_error=%s) for file (%s)", 
+								"Putting (ADIOS) variable (name=/__pio__/info/testing) failed (adios2_error=%s) for file (%s)", 
 								adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
                 }
 			}
-			
+
 			ADIOS2_END_STEP(file,ios);
 
             adios2_error adiosErr = adios2_close(file->engineH);
@@ -501,9 +501,29 @@ int PIOc_closefile(int ncid)
             file->adios_vars[i].frame_varid = NULL;
             file->adios_vars[i].fillval_varid = NULL;
 
+			if (file->adios_vars[i].fillval_buffer!=NULL) {
+				free(file->adios_vars[i].fillval_buffer);
+				file->adios_vars[i].fillval_buffer = NULL;
+				file->adios_vars[i].fillval_cnt = 0;
+			}
+			if (file->adios_vars[i].decomp_buffer!=NULL) {
+				free(file->adios_vars[i].decomp_buffer);
+				file->adios_vars[i].decomp_buffer = NULL;
+				file->adios_vars[i].decomp_cnt = 0;
+			}
+			if (file->adios_vars[i].frame_buffer!=NULL) {
+				free(file->adios_vars[i].frame_buffer);
+				file->adios_vars[i].frame_buffer = NULL;
+				file->adios_vars[i].frame_cnt = 0;
+			}
+			if (file->adios_vars[i].num_wb_buffer!=NULL) {
+				free(file->adios_vars[i].num_wb_buffer);
+				file->adios_vars[i].num_wb_buffer = NULL;
+				file->adios_vars[i].num_wb_cnt = 0;
+			}
+
 			file->adios_vars[i].elem_size = 0;
         }
-
         file->num_vars = 0;
 
         /* Track attributes */
@@ -512,26 +532,28 @@ int PIOc_closefile(int ncid)
             free(file->adios_attrs[i].att_name);
             file->adios_attrs[i].att_name = NULL;*/
         }
-
         file->num_attrs = 0;
 
 		/* Block merging */
 		if (file->block_myrank==0) {
-			if (file->block_array!=NULL) free(file->block_array);
-			file->block_array = NULL;
-			if (file->array_counts!=NULL) free(file->array_counts);
-			file->array_counts = NULL;
-			if (file->array_disp!=NULL) free(file->array_disp);
-			file->array_disp = NULL;
+			if (file->block_array!=NULL) {
+				free(file->block_array);
+				file->block_array = NULL;
+			}
+			if (file->array_counts!=NULL) {
+				free(file->array_counts);
+				file->array_counts = NULL;
+			}
+			if (file->array_disp!=NULL) {
+				free(file->array_disp);
+				file->array_disp = NULL;
+			}
+			if (file->block_list!=NULL) {
+				free(file->block_list);
+				file->block_list = NULL;
+			}
 		}
 
-		if (file->myrank==0) {
-			printf("ADIOS: Number of merges: %d not_merges: %d num_end_step: %d\n",
-					file->num_merge,file->num_not_merge,file->num_end_step_calls);
-			fflush(stdout);
-		}
-
-#undef _ADIOS_BP2NC_TEST /* TEST */
 #ifdef _ADIOS_BP2NC_TEST /* Comment out for large scale run */
 #ifdef _PNETCDF
         char conv_iotype[] = "pnetcdf";
@@ -544,7 +566,6 @@ int PIOc_closefile(int ncid)
         assert(len > 6 && len <= PIO_MAX_NAME);
         strncpy(outfilename, file->filename, len - 3);
         outfilename[len - 3] = '\0';
-		printf("ADIOS Converting: %s\n",file->filename);
         LOG((1, "CONVERTING: %s", file->filename));
         MPI_Barrier(ios->union_comm);
         ierr = C_API_ConvertBPToNC(file->filename, outfilename, conv_iotype, 0, ios->union_comm);
@@ -561,7 +582,7 @@ int PIOc_closefile(int ncid)
 
 #ifdef TIMING
         if (file->iotype == PIO_IOTYPE_ADIOS)
-            GPTLstop("PIO:PIOc_closefile_adios"); /* TAHSIN: stop */
+            GPTLstop("PIO:PIOc_closefile_adios"); 
 
         if (file->mode & PIO_WRITE)
             GPTLstop("PIO:PIOc_closefile_write_mode");
