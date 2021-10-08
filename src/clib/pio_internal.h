@@ -344,6 +344,10 @@ extern "C" {
                                   io_desc_t *iodesc, int fill, const int *frame);
 
     int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid, void *iobuf);
+    /* a function that maps a frame id to adios steps */
+    int get_adios_step(int frame_id);
+    /* a function for reading d arrays with adios2 */
+    int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid, void *iobuf);
     int pio_read_darray_nc_serial(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid, void *iobuf);
 
     /* Read atts with type conversion. */

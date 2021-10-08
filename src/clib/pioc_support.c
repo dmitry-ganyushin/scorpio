@@ -3197,6 +3197,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
     file->iotype = *iotype;
+#if 0 // TODODG if adios iotype is changed to PIO_IOTYPE_PNETCDF
 #ifdef _ADIOS2
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
@@ -3212,6 +3213,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
 #endif
 #endif
     }
+#endif
 #endif
     file->iosystem = ios;
     file->mode = mode;
@@ -3265,6 +3267,20 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                             "Opening file (%s) failed. Sending asynchronous message, PIO_MSG_OPEN_FILE, failed on iosystem (iosysid=%d)", filename, ios->iosysid);
         }
     }
+
+    /* Add this file to the list of currently open files. */
+    MPI_Comm comm = MPI_COMM_NULL;
+    if(ios->async)
+    {
+        /* For asynchronous I/O service, since file ids are passed across
+         * disjoint comms we need it to be unique across the union comm
+         */
+        comm = ios->union_comm;
+    }
+    *ncidp = pio_add_to_file_list(file, comm);
+
+    LOG((2, "Opened file %s file->pio_ncid = %d file->fh = %d ierr = %d",
+            filename, file->pio_ncid, file->fh, ierr));
 
     /* If this is an IO task, then call the netCDF function. */
     if (ios->ioproc)
@@ -3324,6 +3340,384 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             }
             LOG((2, "ncmpi_open(%s) : fd = %d", filename, file->fh));
             break;
+#endif
+#ifdef _ADIOS2
+            case PIO_IOTYPE_ADIOS: {
+                char declare_name[PIO_MAX_NAME];
+                char bpname[PIO_MAX_NAME];
+                strcat(bpname, filename);
+                strcat(bpname, ".bp");
+                strncpy(file->fname, bpname, PIO_MAX_NAME);
+                snprintf(declare_name, PIO_MAX_NAME, "%s%lu", file->fname, get_adios2_io_cnt());
+                /* init adios structure */
+                assert(file->num_vars < PIO_MAX_VARS);
+                for (size_t var = 0; var < PIO_MAX_VARS; var++) {
+                    file->adios_vars[var].nc_type = PIO_NAT;
+                    file->adios_vars[var].adios_type = adios2_type_unknown;
+                    file->adios_vars[var].adios_type_size = 0;
+                    file->adios_vars[var].nattrs = 0;
+                    file->adios_vars[var].ndims = 0;
+                    file->adios_vars[var].adios_varid = 0;
+                    file->adios_vars[var].decomp_varid = 0;
+                    file->adios_vars[var].frame_varid = 0;
+                    file->adios_vars[var].fillval_varid = 0;
+                    file->adios_vars[var].elem_size = 0;
+                    file->adios_vars[var].gdimids = NULL;
+                }
+                /*restart mode */
+
+                file->ioH = adios2_declare_io(ios->adiosH, (const char *) declare_name);
+                if (file->ioH == NULL) {
+                    return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Declaring (ADIOS) IO (name=%s) failed for file (%s)",
+                                   declare_name, pio_get_fname_from_file(file));
+                }
+
+                adios2_error adiosErr = adios2_set_engine(file->ioH, "FileStream");
+                if (adiosErr != adios2_error_none) {
+                    return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Setting (ADIOS) engine (type=FileStream) failed (adios2_error=%s) for file (%s)",
+                                   adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
+                }
+
+                LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+                file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
+                if (file->engineH == NULL) {
+                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Opening (ADIOS) file (%s) failed",
+                                   pio_get_fname_from_file(file));
+                }
+                //TODODG get available variables and set structures.
+                // restrict to the first step only
+                adios2_step_status status;
+                size_t step = 0;
+                while (adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
+                                         &status) == adios2_error_none) {
+                    if (step > 0 || status == adios2_step_status_end_of_stream) {
+                        break;
+                    }
+                    step++;
+                    size_t var_size;
+                    char **var_names = adios2_available_variables(file->ioH, &var_size);
+                    size_t current_var_cnt = 0;
+                    char const var_prefix[] = "/__pio__/var/";
+                    for (size_t i = 0; i < var_size; i++) {
+                        /* strings that start with /__pio__/var/ are variables */
+                        if (strstr(var_names[i], var_prefix) != NULL) {
+                            //get substring from string for name
+                            int sub_length = strlen(var_names[i]) - strlen(var_prefix);
+                            int full_length = strlen(var_names[i]);
+                            int prefix_length = strlen(var_prefix);
+                            file->adios_vars[current_var_cnt].name = (char *) malloc(sub_length + 1);
+                            if (file->adios_vars[current_var_cnt].name) {
+                                for (int c = 0; c < sub_length + 1; c++) {
+                                    file->adios_vars[current_var_cnt].name[c] = var_names[i][prefix_length + c];
+
+                                }
+                                /***** get nc_type ******/
+                                {
+                                    char prefix_att_name[] = "/__pio__/var/";
+                                    char suffix_att_name[] = "/def/nctype";
+                                    char *attr_name = malloc(
+                                            strlen(prefix_att_name) + strlen(file->adios_vars[current_var_cnt].name) +
+                                            strlen(suffix_att_name) + 1);
+                                    strcpy(attr_name, prefix_att_name);
+                                    strcat(attr_name, file->adios_vars[current_var_cnt].name);
+                                    strcat(attr_name, suffix_att_name);
+                                    int32_t attr_data;
+                                    size_t size_attr;
+                                    adios2_attribute *attr = adios2_inquire_attribute(file->ioH, attr_name);
+                                    adios2_error err = adios2_attribute_data(&attr_data, &size_attr, attr);
+                                    file->adios_vars[current_var_cnt].nc_type = attr_data;
+                                    free(attr_name);
+                                }
+
+                                /***** end of get nc_type *****/
+
+                                /****** get adios type *****/
+                                {
+                                    char prefix_att_name[] = "/__pio__/var/";
+                                    char suffix_att_name[] = "/def/adiostype";
+                                    char *attr_name = malloc(
+                                            strlen(prefix_att_name) + strlen(file->adios_vars[current_var_cnt].name) +
+                                            strlen(suffix_att_name) + 1);
+                                    strcpy(attr_name, prefix_att_name);
+                                    strcat(attr_name, file->adios_vars[current_var_cnt].name);
+                                    strcat(attr_name, suffix_att_name);
+                                    int32_t attr_data = adios2_type_unknown;
+                                    size_t size_attr;
+                                    adios2_attribute *attr = adios2_inquire_attribute(file->ioH, attr_name);
+                                    adios2_error err = adios2_attribute_data(&attr_data, &size_attr, attr);
+                                    file->adios_vars[current_var_cnt].adios_type = attr_data;
+                                    free(attr_name);
+                                }
+
+                                /* end of get adios type ****/
+                                /*get ndims*/
+                                {
+                                    char prefix_var_name[] = "/__pio__/var/";
+                                    char suffix_att_name[] = "/def/ndims";
+                                    char *ndims_attr_name = malloc(
+                                            strlen(prefix_var_name) + strlen(file->adios_vars[current_var_cnt].name) +
+                                            strlen(suffix_att_name) + 1);
+                                    strcpy(ndims_attr_name, prefix_var_name);
+                                    strcat(ndims_attr_name, file->adios_vars[current_var_cnt].name);
+                                    strcat(ndims_attr_name, suffix_att_name);
+                                    int32_t attr_data;
+                                    size_t size_attr;
+                                    adios2_attribute *ndims_attr = adios2_inquire_attribute(file->ioH, ndims_attr_name);
+                                    adios2_error err = adios2_attribute_data(&attr_data, &size_attr, ndims_attr);
+                                    file->adios_vars[current_var_cnt].ndims = attr_data;
+                                    free(ndims_attr_name);
+                                }
+                                /*end get ndims*/
+                                /*reading dims */
+                                {
+                                    char prefix_var_name[] = "/__pio__/var/";
+                                    char suffix_att_name[] = "/def/dims";
+                                    char *dims_attr_name = malloc(
+                                            strlen(prefix_var_name) + strlen(file->adios_vars[current_var_cnt].name) +
+                                            strlen(suffix_att_name) + 1);
+                                    strcpy(dims_attr_name, prefix_var_name);
+                                    strcat(dims_attr_name, file->adios_vars[current_var_cnt].name);
+                                    strcat(dims_attr_name, suffix_att_name);
+                                    adios2_attribute *attr = adios2_inquire_attribute(file->ioH, dims_attr_name);
+                                    if (attr){
+                                        size_t size_attr;
+                                        adios2_error err = adios2_attribute_size(&size_attr, attr);
+                                        if (size_attr == 1) {
+                                            char *attr_data = calloc(PIO_MAX_NAME, sizeof(char));
+                                            err = adios2_attribute_data(&attr_data, &size_attr, attr);
+                                            file->adios_vars[current_var_cnt].gdimids = malloc(
+                                                    file->adios_vars[current_var_cnt].ndims * sizeof(int));
+                                            char prefix_gdim_name[] = "/__pio__/dim/";
+                                            char *gdims_var_name = malloc(
+                                                    strlen(prefix_var_name) + strlen(attr_data) + 1);
+                                            strcpy(gdims_var_name, prefix_gdim_name);
+                                            strcat(gdims_var_name, attr_data);
+                                            uint64_t attr_gdims;
+                                            size_t size_gdims;
+                                            adios2_variable *gdims_var = adios2_inquire_variable(file->ioH,
+                                                                                                 gdims_var_name);
+                                            free(gdims_var_name);
+                                            free(attr_data);
+                                            adios2_type type;
+                                            adios2_variable_type(&type, gdims_var);
+                                            if (type == adios2_type_uint64_t) {
+                                                uint64_t data;
+                                                adios2_get(file->engineH, gdims_var, &data, adios2_mode_sync);
+                                                //gdims denotes as a scalar in bp file
+                                                file->adios_vars[current_var_cnt].gdimids[0] = data;
+                                            } else {
+                                                /*not implemented*/
+                                            }
+                                        }else if (size_attr == 2){
+
+                                                char **attr_data = malloc(2);
+                                                attr_data[0] = calloc(PIO_MAX_NAME, sizeof(char));
+                                                attr_data[1] = calloc(PIO_MAX_NAME, sizeof(char));
+                                                err = adios2_attribute_data(attr_data, &size_attr, attr);
+                                                //TODODG error handling
+                                                /* first dimension */
+                                                file->adios_vars[current_var_cnt].gdimids = malloc(
+                                                        file->adios_vars[current_var_cnt].ndims * sizeof(int));
+                                            {
+                                                char prefix_gdim_name[] = "/__pio__/dim/";
+                                                char *gdims_var_name = malloc(
+                                                        strlen(prefix_var_name) + strlen(attr_data[0]) + 1);
+                                                strcpy(gdims_var_name, prefix_gdim_name);
+                                                strcat(gdims_var_name, attr_data[0]);
+                                                uint64_t attr_gdims;
+                                                size_t size_gdims;
+                                                adios2_variable *gdims_var = adios2_inquire_variable(file->ioH,
+                                                                                                     gdims_var_name);
+                                                free(gdims_var_name);
+                                                free(attr_data[0]);
+                                                adios2_type type;
+                                                adios2_variable_type(&type, gdims_var);
+                                                if (type == adios2_type_uint64_t) {
+                                                    uint64_t data;
+                                                    adios2_get(file->engineH, gdims_var, &data, adios2_mode_sync);
+                                                    //gdims denotes as a scalar in bp file
+                                                    file->adios_vars[current_var_cnt].gdimids[0] = data;
+                                                } else {
+                                                    /*not implemented*/
+                                                }
+                                            }
+                                            /*second dimension */
+                                            {
+                                                char prefix_gdim_name[] = "/__pio__/dim/";
+                                                char *gdims_var_name = malloc(
+                                                        strlen(prefix_var_name) + strlen(attr_data[1]) + 1);
+                                                strcpy(gdims_var_name, prefix_gdim_name);
+                                                strcat(gdims_var_name, attr_data[1]);
+                                                uint64_t attr_gdims;
+                                                size_t size_gdims;
+                                                adios2_variable *gdims_var = adios2_inquire_variable(file->ioH,
+                                                                                                     gdims_var_name);
+                                                free(gdims_var_name);
+                                                free(attr_data[1]);
+                                                adios2_type type;
+                                                adios2_variable_type(&type, gdims_var);
+                                                if (type == adios2_type_uint64_t) {
+                                                    uint64_t data;
+                                                    adios2_get(file->engineH, gdims_var, &data, adios2_mode_sync);
+                                                    //gdims denotes as a scalar in bp file
+                                                    file->adios_vars[current_var_cnt].gdimids[1] = data;
+                                                } else {
+                                                    /*not implemented*/
+                                                }
+                                            }
+                                            free(attr_data);
+
+                                        }
+                                    }
+                                    free(dims_attr_name);
+                                }
+                            }
+
+                            current_var_cnt++;
+                        }
+                        free(var_names[i]);
+                    }
+                    free(var_names);
+                    file->num_vars = current_var_cnt;
+                }
+                /*close file */
+                adios2_error err = adios2_close(file->engineH);
+                LOG((2, "adios2_close(%s) : fd = %d", file->fname));
+                //open it again
+                file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
+                if (file->engineH == NULL) {
+                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Opening (ADIOS) file (%s) failed",
+                                   pio_get_fname_from_file(file));
+                }
+                LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+                int current_var_cnt = 0;
+                step = 0;
+                while (adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
+                                         &status) == adios2_error_none) {
+                    if (step > 0 || status == adios2_step_status_end_of_stream) {
+                        break;
+                    }
+
+                    size_t attr_size;
+                    char **attr_names = adios2_available_attributes(file->ioH, &attr_size);
+                    /** parse global attributes */
+                    for (size_t i = 0; i < attr_size; i++) {
+                        /*get global attributes*/
+                        char const attr_prefix[] = "/__pio__/global/";
+                        /* strings that start with /__pio__/var/ are variables */
+                        if (strstr(attr_names[i], attr_prefix) != NULL) {
+                            //get substring from string for name
+                            int sub_length = strlen(attr_names[i]) - strlen(attr_prefix);
+                            int full_length = strlen(attr_names[i]);
+                            int prefix_length = strlen(attr_prefix);
+                            file->adios_attrs[current_var_cnt].att_name = (char *) malloc(sub_length + 1);
+                            if (file->adios_attrs[current_var_cnt].att_name) {
+                                for (int c = 0; c < sub_length + 1; c++) {
+                                    file->adios_attrs[current_var_cnt].att_name[c] = attr_names[i][prefix_length + c];
+                                }
+                                file->adios_attrs[current_var_cnt].att_varid = -1;
+                                file->adios_attrs[current_var_cnt].att_ncid = *ncidp;
+                                /*get parameters of attributes*/
+                                //TODODG error handling
+                                adios2_attribute *attr = adios2_inquire_attribute(file->ioH, attr_names[i]);
+                                adios2_type type;
+                                adios2_error err = adios2_attribute_type(&type, attr);
+                                if (type == adios2_type_int32_t) {
+                                    file->adios_attrs[current_var_cnt].att_type = NC_INT;
+                                    file->adios_attrs[current_var_cnt].att_len = (PIO_Offset) sizeof(int32_t);
+                                } else if (type == adios2_type_float) {
+                                    file->adios_attrs[current_var_cnt].att_type = NC_FLOAT;
+                                    file->adios_attrs[current_var_cnt].att_len = (PIO_Offset) sizeof(float);
+                                } else if (type == adios2_type_string) {
+                                    file->adios_attrs[current_var_cnt].att_type = NC_CHAR;
+                                    size_t size_attr;
+                                    char *attr_data = calloc(sizeof(char), PIO_MAX_NAME);
+                                    adios2_error attr_err = adios2_attribute_data(attr_data, &size_attr, attr);
+                                    size_t size = strlen(attr_data);
+                                    file->adios_attrs[current_var_cnt].att_len = (PIO_Offset) (size * sizeof(char) + 1);
+                                    free(attr_data);
+                                }
+
+                            }
+                            current_var_cnt++;
+                        }
+                    }
+                    file->num_gattrs = current_var_cnt;
+                    /* parse variable attributes*/
+                    for (size_t i = 0; i < attr_size; i++ ){
+                        /**************get variable attribute***********/
+
+                        char prefix_att_name[] = "/__pio__/var/";
+                        char suffix_att_name[] = "/";
+
+                        for (size_t var_cnt = 0; var_cnt < file->num_vars; var_cnt++){
+                            char *attr_full_prefix = malloc(
+                                    strlen(prefix_att_name) + strlen(file->adios_vars[var_cnt].name) + strlen(suffix_att_name) + 1);
+                            strcpy(attr_full_prefix, prefix_att_name);
+                            strcat(attr_full_prefix, file->adios_vars[var_cnt].name);
+                            strcat(attr_full_prefix, suffix_att_name);
+                            if (strstr(attr_names[i], attr_full_prefix) != NULL) {
+                                int sub_length = strlen(attr_names[i]) - strlen(attr_full_prefix);
+                                int full_length = strlen(attr_names[i]);
+                                int prefix_length = strlen(attr_full_prefix);
+                                if (strrchr(attr_names[i], '/') > &attr_names[i][prefix_length]) continue;
+                                file->adios_attrs[current_var_cnt].att_name = (char *) malloc(sub_length + 1);
+                                if (file->adios_attrs[current_var_cnt].att_name) {
+                                    for (int c = 0; c < sub_length + 1; c++) {
+                                        file->adios_attrs[current_var_cnt].att_name[c] = attr_names[i][prefix_length +
+                                                                                                       c];
+                                    }
+                                    int att_varid = -1;
+                                    int ret = PIOc_inq_varid(*ncidp, file->adios_vars[var_cnt].name, &att_varid);
+                                    //TODODG errors handling
+                                    file->adios_attrs[current_var_cnt].att_varid = att_varid;//TODODG
+                                    file->adios_attrs[current_var_cnt].att_ncid = *ncidp;
+                                    adios2_attribute *attr = adios2_inquire_attribute(file->ioH, attr_names[i]);
+                                    adios2_type type;
+                                    adios2_error err = adios2_attribute_type(&type, attr);
+                                    //TODODG errors nandling
+                                    if (type == adios2_type_int32_t) {
+                                        file->adios_attrs[current_var_cnt].att_type = NC_INT;
+                                        file->adios_attrs[current_var_cnt].adios_type = adios2_type_int32_t;
+                                        file->adios_attrs[current_var_cnt].att_len = (PIO_Offset) sizeof(int32_t);
+                                    } else if (type == adios2_type_float) {
+                                        file->adios_attrs[current_var_cnt].att_type = NC_FLOAT;
+                                        file->adios_attrs[current_var_cnt].adios_type = adios2_type_float;
+                                        file->adios_attrs[current_var_cnt].att_len = (PIO_Offset) sizeof(float);
+                                    } else if (type == adios2_type_string) {
+                                        file->adios_attrs[current_var_cnt].att_type = NC_CHAR;
+                                        file->adios_attrs[current_var_cnt].adios_type = adios2_type_string;
+                                        size_t size_attr;
+                                        char *attr_data = calloc(sizeof(char), PIO_MAX_NAME);
+                                        adios2_error attr_err = adios2_attribute_data(attr_data, &size_attr, attr);
+                                        size_t size = strlen(attr_data);
+                                        file->adios_attrs[current_var_cnt].att_len = (PIO_Offset) (size * sizeof(char) + 1);
+                                        free(attr_data);
+                                    }
+                                }
+                                current_var_cnt++;
+                            }
+                            free(attr_full_prefix);
+                        }
+                        free(attr_names[i]);
+                    }
+
+                    // remove memory
+                    free(attr_names);
+                    file->num_attrs = current_var_cnt;
+                    adios2_end_step(file->engineH);
+                }
+            }
+
+                adios2_error err = adios2_close(file->engineH);
+                LOG((2, "adios2_close(%s) : fd = %d", file->fname));
+
+
+                break;
 #endif
 
         default:
@@ -3431,19 +3825,6 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                         "Opening file (%s) with iotype %d (%s) failed. The low level I/O library call failed", filename, tmp_iotype, pio_iotype_to_string(tmp_iotype));;
     }
 
-    /* Add this file to the list of currently open files. */
-    MPI_Comm comm = MPI_COMM_NULL;
-    if(ios->async)
-    {
-        /* For asynchronous I/O service, since file ids are passed across
-         * disjoint comms we need it to be unique across the union comm
-         */
-        comm = ios->union_comm;
-    }
-    *ncidp = pio_add_to_file_list(file, comm);
-
-    LOG((2, "Opened file %s file->pio_ncid = %d file->fh = %d ierr = %d",
-         filename, file->pio_ncid, file->fh, ierr));
 
     /* Check if the file has unlimited dimensions */
     if(!ios->async || !ios->ioproc)

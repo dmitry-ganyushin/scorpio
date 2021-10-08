@@ -629,7 +629,7 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
         }
 #endif /* _PNETCDF */
 
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
         {
             switch(memtype)
             {
@@ -686,6 +686,94 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
                 return pio_err(ios, file, PIO_EBADTYPE, __FILE__, __LINE__,
                                 "Reading variable (%s, varid=%d) attribute (%s) failed. Unsupported attribute type (type = %x)", (varid != PIO_GLOBAL) ? file->varlist[varid].vname : "PIO_GLOBAL", varid, name, memtype);
             }
+        }
+
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+        {
+#ifdef _ADIOS2
+            char *full_name;
+
+            if (varid == NC_GLOBAL){
+                char prefix_att_name[] = "/__pio__/global/";
+                full_name = malloc(strlen(prefix_att_name) + strlen(name) + 1);
+                strcpy(full_name, prefix_att_name);
+                strcat(full_name, name);
+            }else{
+                char prefix_att_name[] = "/__pio__/var/";
+                /*sprintf(full_name, "/__pio__/var/%s/%s", file->adios_vars[varid].name, name);*/
+                full_name = malloc(strlen(prefix_att_name) + strlen(file->adios_vars[varid].name) + strlen("/") + strlen(name) + 1);
+                strcpy(full_name, prefix_att_name);
+                strcat(full_name, file->adios_vars[varid].name);
+                strcat(full_name, "/");
+                strcat(full_name, name);
+            }
+            //TODODG I copied the pnetcdf part, but check correctness
+            file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
+            if (file->engineH == NULL) {
+                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Opening (ADIOS) file (%s) failed",
+                               pio_get_fname_from_file(file));
+            }
+            LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+            adios2_step_status step_status;
+            adios2_error adiosStepErr = adios2_begin_step(file->engineH, adios2_step_mode_read, 10.0, &step_status);
+
+#endif
+
+            switch(memtype)
+            {
+#ifdef _ADIOS2
+                case NC_FLOAT:
+               {
+                   adios2_attribute *attr = adios2_inquire_attribute(file->ioH, full_name);
+                   size_t size_attr = 1;
+                   float attr_data;
+                   adios2_error err = adios2_attribute_data(&attr_data, &size_attr, attr);
+                   memcpy(ip, &attr_data, size_attr * sizeof(float));
+                   break;
+                }
+                case NC_INT:
+                {
+                    adios2_attribute *attr = adios2_inquire_attribute(file->ioH, full_name);
+                    size_t size_attr = 1;
+                    int32_t attr_data;
+                    adios2_error err = adios2_attribute_data(&attr_data, &size_attr, attr);
+                    memcpy(ip, &attr_data, size_attr * sizeof(int32_t));
+                    break;
+                }
+                case NC_CHAR:
+                {
+                    adios2_attribute *attr = adios2_inquire_attribute(file->ioH, full_name);
+                    size_t size_attr;
+                    adios2_attribute_size(&size_attr, attr);
+                    char attr_data[PIO_MAX_NAME];
+                    memset(attr_data, 0, PIO_MAX_NAME);
+                    adios2_error err = adios2_attribute_data(&attr_data, &size_attr, attr);
+                    memcpy((char *)ip, &attr_data, strlen(attr_data) * sizeof(char));
+                    break;
+                }
+#endif
+                default:
+                    GPTLstop("PIO:PIOc_get_att_tc");
+                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    return pio_err(ios, file, PIO_EBADTYPE, __FILE__, __LINE__,
+                                   "Reading variable (%s, varid=%d) attribute (%s) failed. Unsupported attribute type (type = %x)", (varid != PIO_GLOBAL) ? file->varlist[varid].vname : "PIO_GLOBAL", varid, name, memtype);
+            }
+#if _ADIOS2
+            free(full_name);
+            adiosStepErr = adios2_end_step(file->engineH);
+            if (adiosStepErr != adios2_error_none)
+            {
+                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "adios2_end_step failed (adios2_error=%s) for file (%s)",
+                               adios2_error_to_string(adiosStepErr), pio_get_fname_from_file(file));
+            }
+            adios2_error err = adios2_close(file->engineH);
+            LOG((2, "adios2_close(%s) : fd = %d", file->fname));
+#endif
         }
     }
 
@@ -1018,7 +1106,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         }
 #endif /* _PNETCDF */
 
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
             switch(xtype)
             {
 #ifdef _NETCDF
@@ -1088,6 +1176,373 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                 "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Unsupported variable type (type=%x)", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, xtype);
             }
     }
+#ifdef _ADIOS2
+    if (file->iotype == PIO_IOTYPE_ADIOS){
+        if (varid < 0 || varid >= file->num_vars)
+        {
+            GPTLstop("PIO:PIOc_put_vars_tc");
+            GPTLstop("PIO:write_total");
+            spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->wr_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            GPTLstop("PIO:PIOc_put_vars_tc_adios");
+            GPTLstop("PIO:write_total_adios");
+            return pio_err(ios, file, PIO_EBADID, __FILE__, __LINE__,
+                           "Writing variable to file (%s, ncid=%d) failed. Invalid variable id (varid=%d, expected >=0 and < number of variables in the file, %d) provided",
+                           pio_get_fname_from_file(file), ncid, varid, file->num_vars);
+        }
+
+
+
+        file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
+        if (file->engineH == NULL) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Opening (ADIOS) file (%s) failed",
+                           pio_get_fname_from_file(file));
+        }
+        LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+        adios2_step_status status;
+        adios2_error adiosErr = adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
+                          &status);
+
+        /* First we need to define the variable now that we know it's decomposition */
+        adios_var_desc_t *av = &(file->adios_vars[varid]);
+
+        /* Write ADIOS with memory type since ADIOS does not do conversions.
+         * Add an attribute describing the target output type (defined type).
+         */
+        if (xtype == PIO_NAT)
+            xtype = vartype;
+
+        if (xtype == PIO_LONG_INTERNAL)
+        {
+            int typesize = sizeof(long int);
+            if (typesize == 4)
+                xtype = PIO_INT;
+            else
+                xtype = PIO_INT64;
+        }
+
+        /* No conversion to vartype will be made. Use the in-memory type of the data buffer */
+        av->adios_type = PIOc_get_adios_type(xtype);
+        av->adios_type_size = get_adios2_type_size(av->adios_type, NULL);
+
+        char vname[PIO_MAX_NAME];
+
+        /* Scalars have to be handled differently. */
+        /* ndims should be initialized in the Open function*/
+
+        if (av->ndims == 0)
+        {
+            /* Only the IO master does the IO, so we are not really
+             * getting parallel IO here. */
+            if (file->myrank == 0)
+            {
+                if (start)
+                {
+                    /* Ignore if user specifies start[0] == 0 */
+                    if (start[0] != 0)
+                    {
+                        printf("PIO: WARNING: Ignoring user-specified start indices while writing the scalar variable (%s) to file (%s, ncid=%d). An invalid start index (start[0] = %lld) provided (%s:%d)\n", av->name, pio_get_fname_from_file(file), file->pio_ncid, (long long int)start[0], __FILE__, __LINE__);
+                    }
+                }
+                if (count)
+                {
+                    /* Ignore if user specifies count[0] == 1 */
+                    if (count[0] != 1)
+                    {
+                        printf("PIO: WARNING: Ignoring user-specified counts while writing the scalar variable (%s) to file (%s, ncid=%d). An invalid count (count[0] = %lld) provided (%s:%d)\n", av->name, pio_get_fname_from_file(file), file->pio_ncid, (long long int)count[0], __FILE__, __LINE__);
+                    }
+                }
+                if (stride)
+                {
+                    /* Ignore if user specifies stride[0] == 1 */
+                    if (stride[0] != 1)
+                    {
+                        printf("PIO: WARNING: Ignoring user-specified strides while writing the scalar variable (%s) to file (%s, ncid=%d). An invalid stride (stride[0] = %lld) provided (%s:%d)\n", av->name, pio_get_fname_from_file(file), file->pio_ncid, (long long int)stride[0], __FILE__, __LINE__);
+                    }
+                }
+
+                ios->io_fstats->wb += num_elem * typelen;
+                file->io_fstats->wb += num_elem * typelen;
+
+                assert((strlen("/__pio__/var/") + strlen(av->name)) < PIO_MAX_NAME);
+                snprintf(vname, PIO_MAX_NAME, "/__pio__/var/%s", av->name);
+                av->adios_varid = adios2_inquire_variable(file->ioH, vname);
+                if (av->adios_varid == NULL)
+                {
+                        GPTLstop("PIO:PIOc_put_vars_tc");
+                        GPTLstop("PIO:write_total");
+                        spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                        spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                        GPTLstop("PIO:PIOc_put_vars_tc_adios");
+                        GPTLstop("PIO:write_total_adios");
+                        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)",
+                                       vname, pio_get_fname_from_file(file), file->pio_ncid);
+
+                }else {
+
+                    if (av->adios_type == adios2_type_int32_t){
+                        int32_t mem_buf;
+                        adiosErr = adios2_get(file->engineH, av->adios_varid, &mem_buf, adios2_mode_sync);
+                        ((int32_t *) buf)[0] = mem_buf;
+                    }else if (av->adios_type == adios2_type_float){
+                        float mem_buf;
+                        adiosErr = adios2_get(file->engineH, av->adios_varid, &mem_buf, adios2_mode_sync);
+                        ((float *) buf)[0] = mem_buf;
+
+                    }else {
+                        /*not implemented*/
+                    }
+
+                    if (adiosErr != adios2_error_none) {
+                        GPTLstop("PIO:PIOc_put_vars_tc");
+                        GPTLstop("PIO:write_total");
+                        spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                        spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                        GPTLstop("PIO:PIOc_put_vars_tc_adios");
+                        GPTLstop("PIO:write_total_adios");
+                        return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Putting (ADIOS) variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                                       av->name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file),
+                                       file->pio_ncid);
+                    }
+                }
+            }
+        }else {
+            /* This is not a scalar var. */
+            if (stride_present) {
+                LOG((2, "ADIOS does not support striding %s:%s\n"
+                        "Variable %s will be corrupted in the output"
+                        , __FILE__, __func__, av->name));
+                GPTLstop("PIO:PIOc_put_vars_tc");
+                GPTLstop("PIO:write_total");
+                spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                GPTLstop("PIO:PIOc_put_vars_tc_adios");
+                GPTLstop("PIO:write_total_adios");
+                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "ADIOS does not support striding. Variable %s file (%s, ncid=%d)",
+                               av->name, pio_get_fname_from_file(file), file->pio_ncid);
+            }
+
+            /* Only the IO master actually does these ADIOS calls. */
+            if (file->myrank == 0) {
+                /* Write start and count arrays to be able to reconstruct the variable during conversion. */
+                int64_t pio_var_start[PIO_MAX_DIMS], pio_var_count[PIO_MAX_DIMS];
+                if (start) {
+                    for (int d = 0; d < av->ndims; d++) {
+                        pio_var_start[d] = (int64_t) start[d];
+                    }
+                } else {
+                    pio_var_start[0] = -1; /* if start is NULL */
+                }
+
+                if (count) {
+                    for (int d = 0; d < av->ndims; d++) {
+                        pio_var_count[d] = (int64_t) count[d];
+                    }
+                } else {
+                    pio_var_count[0] = -1; /* if count is NULL */
+                }
+
+                /* Create a one-dimensional byte array to combine start, count and buf */
+                size_t av_size = 2 * av->ndims * sizeof(int64_t); /* pio_var_start and pio_var_count */
+                size_t buf_size = 1;
+                if (count) {
+                    for (int d = 0; d < av->ndims; d++) {
+                        if (file->dim_values[av->gdimids[d]] != PIO_UNLIMITED) {
+                            buf_size *= (size_t) count[d];
+                        }
+                    }
+                } else {
+                    for (int d = 0; d < av->ndims; d++) {
+                        if (file->dim_values[av->gdimids[d]] != PIO_UNLIMITED) {
+                            buf_size *= (size_t) file->dim_values[av->gdimids[d]];
+                        }
+                    }
+                }
+                buf_size *= av->adios_type_size;
+                av_size += buf_size;
+
+                ios->io_fstats->wb += num_elem * typelen;
+                file->io_fstats->wb += num_elem * typelen;
+
+                /* PIOc_put_var may be called multiple times with different start/count values
+                 * for a variable. ADIOS should output data for each of those calls not just
+                 * when the variable is not defined */
+                assert((strlen("/__pio__/var/") + strlen(av->name)) < PIO_MAX_NAME);
+                snprintf(vname, PIO_MAX_NAME, "/__pio__/var/%s", av->name);
+                av->adios_varid = adios2_inquire_variable(file->ioH, vname);
+                if (av->adios_varid == NULL) {
+
+                    GPTLstop("PIO:PIOc_put_vars_tc");
+                    GPTLstop("PIO:write_total");
+                    spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                    spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    GPTLstop("PIO:PIOc_put_vars_tc_adios");
+                    GPTLstop("PIO:write_total_adios");
+                    return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Getting (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)",
+                                   vname, pio_get_fname_from_file(file), file->pio_ncid);
+
+                } else {
+                    /*reading adios block */
+                    //TODODG
+                    uint64_t time_step = 0;
+                    adios2_varinfo *data_blocks = adios2_inquire_blockinfo(file->engineH, av->adios_varid, time_step);
+                    int32_t data_blocks_size = data_blocks->nblocks;
+                    adios2_type read_type;
+                    adios2_variable_type(&read_type, av->adios_varid);
+                    size_t var_size = 0;
+                    size_t header_size = 2 * (av->ndims * sizeof(int64_t));
+                    size_t block_size = 0;
+                    /* blocks structure
+                     * block1: |start| count| data |     block2: |start|count|data| */
+                    /* 2D */
+                    /* |start[0],start[1]|count[0], count[1]| data| */
+                    for (size_t i = 0; i < data_blocks_size; i++) {
+                        adios2_set_block_selection(av->adios_varid, i);
+                        adiosErr = adios2_selection_size(&var_size, av->adios_varid);
+                        block_size = var_size * sizeof(char);
+                        if (adiosErr != adios2_error_none) {
+                            GPTLstop("PIO:PIOc_put_vars_tc");
+                            GPTLstop("PIO:write_total");
+                            spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                            spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                            GPTLstop("PIO:PIOc_put_vars_tc_adios");
+                            GPTLstop("PIO:write_total_adios");
+                            return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                           "Setting (ADIOS) selection to variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                                           av->name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file),
+                                           file->pio_ncid);
+                        }
+                        size_t data_size = block_size - header_size;
+
+                        char *mem_buffer = (char *) calloc(var_size, sizeof(char));
+                        adios2_get(file->engineH, av->adios_varid, mem_buffer, adios2_mode_sync);
+                        if (mem_buffer == NULL) {
+                            GPTLstop("PIO:PIOc_put_vars_tc");
+                            GPTLstop("PIO:write_total");
+                            spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                            spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                            GPTLstop("PIO:PIOc_put_vars_tc_adios");
+                            GPTLstop("PIO:write_total_adios");
+                            return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                                           "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Out of memory, allocating memory (%lld bytes) for putting ADIOS variable (name = %s)",
+                                           pio_get_vname_from_file(file, varid), varid,
+                                           pio_get_fname_from_file(file), ncid,
+                                           (long long int) (av_size * sizeof(unsigned char)), av->name);
+                        }
+                        /* find out start and count */
+                        int64_t start_read = *((int64_t *) mem_buffer);
+                        int64_t count_read = *((int64_t *) (mem_buffer + sizeof(int64_t)));
+                        /* check that we are inside the required single adios block */
+
+                        if (av->adios_type == adios2_type_double && read_type == adios2_type_uint8_t) {
+                            /* 0000xxx00*/
+                            /*single adios block*/
+                            size_t read_type_size = av->adios_type_size;
+                            if ((start_read <= start[0] && start[0] < start_read + count_read) &&
+                                (start_read <= count[0] && start[0] + count[0] < start_read + count_read)) {
+                                for (size_t pos = start[0]; pos < start[0] + count[0]; pos++) {
+                                    double number;
+                                    memcpy(&number, mem_buffer + header_size + pos * read_type_size, read_type_size);
+                                    ((double *) buf)[pos] = number;
+                                }
+                                /* adios block contains start[0] */
+                                /* 0000xxxxx*/
+                            } else if (start_read <= start[0] && start[0] < start_read + count_read) {
+                                for (size_t pos = start[0] - start_read; pos < count_read; pos++) {
+                                    double number;
+                                    memcpy(&number, mem_buffer + header_size + pos * read_type_size, read_type_size);
+                                    ((double *) buf)[start_read + pos] = number;
+                                }
+                                /* xxxxx000*/
+                            } else if (start[0] + count[0] < start_read + count_read) {
+                                for (size_t pos = 0; pos < start[0] + count[0] - start_read + 1; pos++) {
+                                    double number;
+                                    memcpy(&number, mem_buffer + header_size + pos * read_type_size, read_type_size);
+                                    ((double *) buf)[start_read + pos] = number;
+                                }
+                            } else {
+                                /*xxxxxxxx*/
+                                for (size_t pos = 0; pos < count_read; pos++) {
+                                    double number;
+                                    memcpy(&number, mem_buffer + header_size + pos * read_type_size, read_type_size);
+                                    ((double *) buf)[start_read + pos] = number;
+                                }
+                            }
+                        } else if (av->adios_type == adios2_type_int32_t && read_type == adios2_type_uint8_t) {
+                            /* 0000xxx00*/
+                            /*single adios block*/
+                            size_t read_type_size = av->adios_type_size;
+                            if ((start_read <= start[0] && start[0] < start_read + count_read) &&
+                                (start_read <= count[0] && start[0] + count[0] < start_read + count_read)) {
+                                for (size_t pos = start[0]; pos < start[0] + count[0]; pos++) {
+                                    int number;
+                                    memcpy(&number, mem_buffer + header_size + pos * read_type_size, read_type_size);
+                                    ((int *) buf)[pos] = number;
+                                }
+                                /* adios block contains start[0] */
+                                /* 0000xxxxx*/
+                            } else if (start_read <= start[0] && start[0] < start_read + count_read) {
+                                for (size_t pos = start[0] - start_read; pos < count_read; pos++) {
+                                    int number;
+                                    memcpy(&number, mem_buffer + header_size + pos * read_type_size, read_type_size);
+                                    ((int *) buf)[start_read + pos] = number;
+                                }
+                                /* xxxxx000*/
+                            } else if (start[0] + count[0] < start_read + count_read) {
+                                for (size_t pos = 0; pos < start[0] + count[0] - start_read + 1; pos++) {
+                                    int number;
+                                    memcpy(&number, mem_buffer + header_size + pos * read_type_size, read_type_size);
+                                    ((int *) buf)[start_read + pos] = number;
+                                }
+                            } else {
+                                /*xxxxxxxx*/
+                                for (size_t pos = 0; pos < count_read; pos++) {
+                                    int number;
+                                    memcpy(&number, mem_buffer + header_size + pos * read_type_size, read_type_size);
+                                    ((int *) buf)[start_read + pos] = number;
+                                }
+                            }
+                        } else if (av->adios_type == adios2_type_int8_t && xtype == NC_CHAR) {
+                            /*text type, block reading*/
+                            /*assuming a string variable in one block*/
+                            memcpy((char *) buf, mem_buffer + header_size, count_read);
+                        }
+                        free(mem_buffer);
+                        mem_buffer = NULL;
+                    }
+                }
+            }
+        }
+        adiosErr = adios2_end_step(file->engineH);
+        if (adiosErr != adios2_error_none)
+        {
+            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "adios2_end_step failed (adios2_error=%s) for file (%s)",
+                           adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
+        }
+        adios2_error err = adios2_close(file->engineH);
+        LOG((2, "adios2_close(%s) : fd = %d", file->fname));
+    }
+#endif
 
     ierr = check_netcdf(NULL, file, ierr, __FILE__, __LINE__);
     if(ierr != PIO_NOERR){

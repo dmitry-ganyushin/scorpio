@@ -2373,6 +2373,7 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
     int ierr = PIO_NOERR, mpierr = MPI_SUCCESS;           /* Return code. */
     int fndims = 0;
 
+    adios_var_desc_t *vdesc_adios2; /* Info about the variable from the adios stricture */
     GPTLstart("PIO:PIOc_read_darray");
     /* Get the file info. */
     if ((ierr = pio_get_file(ncid, &file)))
@@ -2407,7 +2408,12 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
               "unknown rearranger", __FILE__, __LINE__);
 
     /* Get var description. */
-    vdesc = &(file->varlist[varid]);
+    if (file->iotype == PIO_IOTYPE_ADIOS){
+        vdesc_adios2 = &(file->adios_vars[varid]);
+    }else{
+        vdesc = &(file->varlist[varid]);
+    }
+
 
     /* Run these on all tasks if async is not in use, but only on
      * non-IO tasks if async is in use. */
@@ -2419,55 +2425,77 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
 
         /* Find out PIO data type of var. */
-        if (vdesc->pio_type == PIO_NAT)
-        {
-            if ((ierr = PIOc_inq_vartype(ncid, varid, &vdesc->pio_type)))
+        if (file->iotype == PIO_IOTYPE_ADIOS){
+            if (vdesc_adios2->nc_type == PIO_NAT)
             {
-                GPTLstop("PIO:PIOc_read_darray");
-                return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                                "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Inquiring variable data type failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+                if ((ierr = PIOc_inq_vartype(ncid, varid, &vdesc_adios2->adios_type)))
+                {
+                    GPTLstop("PIO:PIOc_read_darray");
+                    return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Inquiring variable data type failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+                }
             }
+            //darrays do not have adiostype in bp file
+            //assert(vdesc_adios2->adios_type != adios2_type_unknown);
+        }else{
+            if (vdesc->pio_type == PIO_NAT)
+            {
+                if ((ierr = PIOc_inq_vartype(ncid, varid, &vdesc->pio_type)))
+                {
+                    GPTLstop("PIO:PIOc_read_darray");
+                    return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Inquiring variable data type failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+                }
+            }
+            assert(vdesc->pio_type != PIO_NAT);
         }
-
-        assert(vdesc->pio_type != PIO_NAT);
 
         /* Find out length of type. */
-        if (vdesc->type_size == 0)
+        if (file->iotype == PIO_IOTYPE_ADIOS)
         {
-            if ((ierr = PIOc_inq_type(ncid, vdesc->pio_type, NULL, &vdesc->type_size)))
+            if (vdesc_adios2->adios_type_size == 0)
             {
-                GPTLstop("PIO:PIOc_read_darray");
-                return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                                "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Inquiring variable data type length failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+                MPI_Offset offset = vdesc_adios2->adios_type_size;
+                if ((ierr = PIOc_inq_type(ncid, vdesc_adios2->adios_type, NULL, &offset)))
+                {
+                    GPTLstop("PIO:PIOc_read_darray");
+                    return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Inquiring variable data type length failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+                }
             }
+            assert(vdesc_adios2->adios_type_size > adios2_type_unknown);
+        }else{
+            if (vdesc->type_size == 0)
+            {
+                if ((ierr = PIOc_inq_type(ncid, vdesc->pio_type, NULL, &vdesc->type_size)))
+                {
+                    GPTLstop("PIO:PIOc_read_darray");
+                    return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Inquiring variable data type length failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
+                }
+            }
+
+            assert(vdesc->type_size > 0);
         }
 
-        assert(vdesc->type_size > 0);
 
         spio_ltimer_start(ios->io_fstats->rd_timer_name);
         spio_ltimer_start(ios->io_fstats->tot_timer_name);
         spio_ltimer_start(file->io_fstats->rd_timer_name);
         spio_ltimer_start(file->io_fstats->tot_timer_name);
     }
+    if (file->iotype == PIO_IOTYPE_ADIOS)
+    {
+        ios->io_fstats->rb += vdesc_adios2->adios_type_size * iodesc->llen;
+        file->io_fstats->rb += vdesc_adios2->adios_type_size * iodesc->llen;
+    }else{
+        ios->io_fstats->rb += vdesc->type_size * iodesc->llen;
+        file->io_fstats->rb += vdesc->type_size * iodesc->llen;
+    }
 
-    ios->io_fstats->rb += vdesc->type_size * iodesc->llen;
-    file->io_fstats->rb += vdesc->type_size * iodesc->llen;
 
 #ifdef PIO_MICRO_TIMING
     mtimer_start(file->varlist[varid].rd_mtimer);
-#endif
-
-#ifdef _ADIOS2
-    if (file->iotype == PIO_IOTYPE_ADIOS)
-    {
-        GPTLstop("PIO:PIOc_read_darray");
-        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-        spio_ltimer_stop(file->io_fstats->rd_timer_name);
-        spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        return pio_err(ios, file, PIO_EADIOSREAD, __FILE__, __LINE__,
-                        "Reading variable (%s, varid=%d) from file (%s, ncid=%d)failed . ADIOS currently does not support reading variables", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
-    }
 #endif
 
     /* Run these on all tasks if async is not in use, but only on
@@ -2481,6 +2509,8 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
         spio_ltimer_stop(file->io_fstats->rd_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
         ierr = PIOc_inq_varndims(file->pio_ncid, varid, &fndims);
+        //TOTODG debug
+        fndims = 1;
         if(ierr != PIO_NOERR){
             GPTLstop("PIO:PIOc_read_darray");
             return pio_err(ios, file, ierr, __FILE__, __LINE__,
@@ -2621,6 +2651,20 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
                                 "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed . Reading variable in parallel (iotype=%s) failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype));
             }
             break;
+#ifdef _ADIOS2
+            case PIO_IOTYPE_ADIOS:
+                if ((ierr = pio_read_darray_adios2(file, fndims, iodesc, varid, iobuf)))
+            {
+                GPTLstop("PIO:PIOc_read_darray");
+                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                               "Reading variable (%s, varid=%d) from file (%s, ncid=%d)failed . Reading variable in parallel (iotype=%s) failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype));
+            }
+                break;
+#endif
         default:
             GPTLstop("PIO:PIOc_read_darray");
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);

@@ -783,6 +783,8 @@ int PIOc_inq_dim(int ncid, int dimid, char *name, PIO_Offset *lenp)
                 *lenp = 0;
 
             ierr = PIO_EBADDIM;
+            /* TODODG for ADIOS2 we do not really know the lenght of arrays?*/
+            ierr = PIO_NOERR;
         }
 
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -1722,7 +1724,9 @@ int PIOc_inq_att(int ncid, int varid, const char *name, nc_type *xtypep,
             {
                 ierr = PIO_NOERR;
                 *xtypep = (nc_type) (file->adios_attrs[i].att_type);
-                *lenp = (PIO_Offset) (file->adios_attrs[i].att_len);
+                if (lenp != NULL){
+                    *lenp = (PIO_Offset) (file->adios_attrs[i].att_len);
+                }
                 i = file->num_attrs + 1;
             }
         }
