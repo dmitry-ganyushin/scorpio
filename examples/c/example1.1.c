@@ -339,7 +339,6 @@ int main(int argc, char* argv[])
 
     /* Get varid of the int variable with time steps. */
     ret = PIOc_inq_varid(ncid_read, "dummy_time_var_int", &varid_dummy_time_var_int); ERR
-
     /* Read from int variable with time steps, frame 2 */
     PIOc_setframe(ncid_read, varid_dummy_time_var_int, 2);
     ret = PIOc_read_darray(ncid_read, varid_dummy_time_var_int, ioid_int, ELEMENTS_PER_PE, read_time_var_buffer_int[2]); ERR
@@ -347,7 +346,6 @@ int main(int argc, char* argv[])
     /* Read from int variable with time steps, frame 1 */
     PIOc_setframe(ncid_read, varid_dummy_time_var_int, 1);
     ret = PIOc_read_darray(ncid_read, varid_dummy_time_var_int, ioid_int, ELEMENTS_PER_PE, read_time_var_buffer_int[1]); ERR
-
     /* Read from int variable with time steps, frame 0 */
     PIOc_setframe(ncid_read, varid_dummy_time_var_int, 0);
     ret = PIOc_read_darray(ncid_read, varid_dummy_time_var_int, ioid_int, ELEMENTS_PER_PE, read_time_var_buffer_int[0]); ERR
@@ -394,7 +392,9 @@ int main(int argc, char* argv[])
     /* Partial get: excluding the first and the last elements */
     start[0] = 1;
     count[0] = PUT_GET_VAR_LEN - 2;
-    ret = PIOc_get_vars_int(ncid_read, varid_dummy_put_get_var_int, start, count, NULL, get_var_buffer_int + 1); ERR
+    //TODODG
+    ret = PIOc_get_vars_int(ncid_read, varid_dummy_put_get_var_int, start, count, NULL, get_var_buffer_int ); ERR
+    //ret = PIOc_get_vars_int(ncid_read, varid_dummy_put_get_var_int, start, count, NULL, get_var_buffer_int + 1); ERR
     for (int i = 1; i < PUT_GET_VAR_LEN - 1; i++) {
       if (get_var_buffer_int[i] != put_var_buffer_int[i]) {
           printf("rank = %d, get wrong data for dummy_put_get_var_int at index %d\n", my_rank, i);
@@ -407,7 +407,9 @@ int main(int argc, char* argv[])
     /* Partial get: excluding the first and the last elements */
     start[0] = 1;
     count[0] = PUT_GET_VAR_LEN - 2;
-    ret = PIOc_get_vars_double(ncid_read, varid_dummy_put_get_var_float, start, count, NULL, get_var_buffer_double + 1); ERR
+    //TODODG
+    //ret = PIOc_get_vars_double(ncid_read, varid_dummy_put_get_var_float, start, count, NULL, get_var_buffer_double + 1); ERR
+    ret = PIOc_get_vars_double(ncid_read, varid_dummy_put_get_var_float, start, count, NULL, get_var_buffer_double); ERR
     for (int i = 1; i < PUT_GET_VAR_LEN - 1; i++) {
       diff_double = get_var_buffer_double[i] - put_var_buffer_double[i];
       if (fabs(diff_double) > 1E-5) {

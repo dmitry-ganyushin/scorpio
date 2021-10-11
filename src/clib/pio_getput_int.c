@@ -772,6 +772,7 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
                                adios2_error_to_string(adiosStepErr), pio_get_fname_from_file(file));
             }
             adios2_error err = adios2_close(file->engineH);
+            file->engineH = NULL;
             LOG((2, "adios2_close(%s) : fd = %d", file->fname));
 #endif
         }
@@ -1402,6 +1403,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     uint64_t time_step = 0;
                     adios2_varinfo *data_blocks = adios2_inquire_blockinfo(file->engineH, av->adios_varid, time_step);
                     int32_t data_blocks_size = data_blocks->nblocks;
+                    free(data_blocks);
                     adios2_type read_type;
                     adios2_variable_type(&read_type, av->adios_varid);
                     size_t var_size = 0;
@@ -1540,6 +1542,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                            adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
         }
         adios2_error err = adios2_close(file->engineH);
+        file->engineH = NULL;
         LOG((2, "adios2_close(%s) : fd = %d", file->fname));
     }
 #endif

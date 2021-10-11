@@ -2509,8 +2509,6 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
         spio_ltimer_stop(file->io_fstats->rd_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
         ierr = PIOc_inq_varndims(file->pio_ncid, varid, &fndims);
-        //TOTODG debug
-        fndims = 1;
         if(ierr != PIO_NOERR){
             GPTLstop("PIO:PIOc_read_darray");
             return pio_err(ios, file, ierr, __FILE__, __LINE__,

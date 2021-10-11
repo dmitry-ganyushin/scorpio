@@ -626,6 +626,7 @@ int PIOc_closefile(int ncid)
                 return ierr;
 
             adios2_error adiosErr = adios2_close(file->engineH);
+            file->engineH = NULL;
             if (adiosErr != adios2_error_none)
             {
                 if (file->iotype == PIO_IOTYPE_ADIOS)
@@ -745,8 +746,13 @@ int PIOc_closefile(int ncid)
             }
         }
 
-        MPI_Comm_free(&(file->node_comm));
-        MPI_Comm_free(&(file->block_comm));
+        if (file->node_comm != 0){
+            MPI_Comm_free(&(file->node_comm));
+        }
+        if (file->block_comm != 0 ){
+            MPI_Comm_free(&(file->block_comm));
+        }
+
 
 #ifdef _ADIOS_BP2NC_TEST /* Comment out for large scale run */
 #ifdef _PNETCDF
@@ -756,7 +762,8 @@ int PIOc_closefile(int ncid)
 #endif
 
         int rearr_type = PIO_REARR_SUBSET;
-
+        //TODODG
+#if 0
         /* Convert XXXX.nc.bp to XXXX.nc */
         len = strlen(file->filename);
         assert(len > 6 && len <= PIO_MAX_NAME);
@@ -791,6 +798,7 @@ int PIOc_closefile(int ncid)
             return pio_err(ios, file, ierr, __FILE__, __LINE__,
                             "C_API_ConvertBPToNC(infile = %s, outfile = %s, piotype = %s) failed", file->filename, outfilename, conv_iotype);
         }
+#endif
 #endif
 
         free(file->filename);

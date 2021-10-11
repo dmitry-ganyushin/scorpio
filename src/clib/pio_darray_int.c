@@ -1178,7 +1178,11 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
  *  for future development
  */
 int get_adios_step(int frame_id) {
-    return frame_id;
+    if (frame_id != -1 ) {
+        return frame_id;
+    }else {
+        return 0;
+    }
 }
 
 /**
@@ -1226,12 +1230,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     /* get frame_id */
     int frame_id = file->varlist[vid].record;
     /*magically obtain the relevant adios step*/
-    int required_adios_step = 0;
-    if (frame_id != -1 ) {
-        required_adios_step = frame_id;
-    }
-    char str[16];
-    sprintf(str,"%d", required_adios_step);
+    int required_adios_step = get_adios_step(frame_id);
     file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
     if (file->engineH == NULL) {
         return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -1239,52 +1238,13 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
                        pio_get_fname_from_file(file));
     }
     LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
-    adios2_set_parameter(file->ioH, file->fname, str);
-    //all this should be done previously
+
+    //reading some bookkeeping variables at step 0
     uint64_t time_step = 0;
 
     adios2_step_status status;
     adios2_error step_err = adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
                       &status);
-
-    /**************************get block_list **************************************/
-    adios2_variable *blockList = adios2_inquire_variable(file->ioH, "/__pio__/info/block_list");
-    int32_t **block_list_int32_t = NULL;
-    int16_t **block_list_int16_t = NULL;
-    size_t v_blocks_size = 0;
-    if (blockList) {
-        adios2_varinfo *v_blocks = adios2_inquire_blockinfo(file->engineH, blockList, time_step);
-        v_blocks_size = v_blocks->nblocks;
-        adios2_type type;
-        adios2_variable_type(&type, blockList);
-        if (type == adios2_type_int32_t) {
-            block_list_int32_t = (int32_t **) malloc(v_blocks_size * sizeof(int32_t *));
-        } else if (type == adios2_type_int16_t) {
-            block_list_int16_t = (int16_t **) malloc(v_blocks_size * sizeof(int16_t *));
-        }
-        for (size_t i = 0; i < v_blocks_size; i++) {
-            adios2_set_block_selection(blockList, i);
-            size_t var_size;
-            adios2_error err = adios2_selection_size(&var_size, blockList);
-            if (type == adios2_type_int32_t) {
-                block_list_int32_t[i] = (int32_t *) malloc(var_size * sizeof(int32_t));
-                adios2_get(file->engineH, blockList, block_list_int32_t[i], adios2_mode_sync);
-            } else if (type == adios2_type_int16_t) {
-                block_list_int16_t[i] = (int16_t *) malloc(var_size * sizeof(int16_t));
-                adios2_get(file->engineH, blockList, block_list_int16_t[i], adios2_mode_sync);
-            }
-        }
-    } else {
-        printf("ERROR: /__pio__/info/block_list is missing.\n");
-        return pio_err(NULL, file, ierr, __FILE__, __LINE__,
-                       "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed with iotype=%s. The underlying I/O library (%s) call, nc*_get_var*, failed.",
-                       pio_get_vname_from_file(file, vid), vid, pio_get_fname_from_file(file), file->pio_ncid,
-                       pio_iotype_to_string(file->iotype),
-                       "ADIOS2");
-    }
-
-
-/************************* end get block_list*******************************/
 
 /************************* get decomp info *********************************/
     int start_decomp = iodesc->map[0];
@@ -1332,6 +1292,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     if (decomp) {
         adios2_varinfo *decomp_blocks = adios2_inquire_blockinfo(file->engineH, decomp, time_step);
         int32_t decomp_blocks_size = decomp_blocks->nblocks;
+        free(decomp_blocks);
         adios2_type type;
         adios2_variable_type(&type, decomp);
         if (type == adios2_type_int64_t) {
@@ -1381,6 +1342,30 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
                        "ADIOS2");
     }
 /************************* get decomp**************************************/
+if (required_adios_step != 0) {
+    adios2_end_step(file->engineH);
+    adios2_close(file->engineH);
+    char str[16];
+    sprintf(str, "%d", required_adios_step);
+    //adios2_set_parameter(file->ioH, file->fname, str);
+
+    file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
+    if (file->engineH == NULL) {
+        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Opening (ADIOS) file (%s) failed",
+                       pio_get_fname_from_file(file));
+    }
+    LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+    for (int step = 0; step < required_adios_step; step++) {
+        step_err = adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
+                                     &status);
+        adios2_end_step(file->engineH);
+
+    }
+    step_err = adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
+                                 &status);
+    time_step = required_adios_step;
+}
 /************************* actual reading**********************************/
     char *var_name = malloc(strlen(prefix_var_name) + strlen(adios_vdesc->name) + 1);
     if (var_name == NULL) {
@@ -1402,6 +1387,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     if (data) {
         adios2_varinfo *data_blocks = adios2_inquire_blockinfo(file->engineH, data, time_step);
         int32_t data_blocks_size = data_blocks->nblocks;
+        free(data_blocks);
         adios2_type type;
         adios2_variable_type(&type, data);
         if (type == adios2_type_int32_t) {
@@ -1514,6 +1500,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
                        adios2_error_to_string(step_err), pio_get_fname_from_file(file));
     }
     err = adios2_close(file->engineH);
+    file->engineH = NULL;
     LOG((2, "adios2_close(%s) : fd = %d", file->fname));
 
     /* Stop timing this function. */

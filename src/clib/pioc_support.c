@@ -3427,8 +3427,10 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                     int32_t attr_data;
                                     size_t size_attr;
                                     adios2_attribute *attr = adios2_inquire_attribute(file->ioH, attr_name);
-                                    adios2_error err = adios2_attribute_data(&attr_data, &size_attr, attr);
-                                    file->adios_vars[current_var_cnt].nc_type = attr_data;
+                                    if (attr){
+                                        adios2_error err = adios2_attribute_data(&attr_data, &size_attr, attr);
+                                        file->adios_vars[current_var_cnt].nc_type = attr_data;
+                                    }
                                     free(attr_name);
                                 }
 
@@ -3447,8 +3449,10 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                     int32_t attr_data = adios2_type_unknown;
                                     size_t size_attr;
                                     adios2_attribute *attr = adios2_inquire_attribute(file->ioH, attr_name);
-                                    adios2_error err = adios2_attribute_data(&attr_data, &size_attr, attr);
-                                    file->adios_vars[current_var_cnt].adios_type = attr_data;
+                                    if (attr){
+                                        adios2_error err = adios2_attribute_data(&attr_data, &size_attr, attr);
+                                        file->adios_vars[current_var_cnt].adios_type = attr_data;
+                                    }
                                     free(attr_name);
                                 }
 
@@ -3466,8 +3470,11 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                     int32_t attr_data;
                                     size_t size_attr;
                                     adios2_attribute *ndims_attr = adios2_inquire_attribute(file->ioH, ndims_attr_name);
-                                    adios2_error err = adios2_attribute_data(&attr_data, &size_attr, ndims_attr);
-                                    file->adios_vars[current_var_cnt].ndims = attr_data;
+                                    if (ndims_attr){
+                                        adios2_error err = adios2_attribute_data(&attr_data, &size_attr, ndims_attr);
+                                        file->adios_vars[current_var_cnt].ndims = attr_data;
+                                    }
+
                                     free(ndims_attr_name);
                                 }
                                 /*end get ndims*/
@@ -3501,15 +3508,17 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                                                                                  gdims_var_name);
                                             free(gdims_var_name);
                                             free(attr_data);
-                                            adios2_type type;
-                                            adios2_variable_type(&type, gdims_var);
-                                            if (type == adios2_type_uint64_t) {
-                                                uint64_t data;
-                                                adios2_get(file->engineH, gdims_var, &data, adios2_mode_sync);
-                                                //gdims denotes as a scalar in bp file
-                                                file->adios_vars[current_var_cnt].gdimids[0] = data;
-                                            } else {
-                                                /*not implemented*/
+                                            if(gdims_var){
+                                                adios2_type type;
+                                                adios2_variable_type(&type, gdims_var);
+                                                if (type == adios2_type_uint64_t) {
+                                                    uint64_t data;
+                                                    adios2_get(file->engineH, gdims_var, &data, adios2_mode_sync);
+                                                    //gdims denotes as a scalar in bp file
+                                                    file->adios_vars[current_var_cnt].gdimids[0] = data;
+                                                } else {
+                                                    /*not implemented*/
+                                                }
                                             }
                                         }else if (size_attr == 2){
 
@@ -3585,6 +3594,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                 }
                 /*close file */
                 adios2_error err = adios2_close(file->engineH);
+                file->engineH = NULL;
                 LOG((2, "adios2_close(%s) : fd = %d", file->fname));
                 //open it again
                 file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
@@ -3714,6 +3724,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             }
 
                 adios2_error err = adios2_close(file->engineH);
+                file->engineH = NULL;
                 LOG((2, "adios2_close(%s) : fd = %d", file->fname));
 
 
