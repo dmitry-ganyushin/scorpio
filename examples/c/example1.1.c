@@ -392,9 +392,7 @@ int main(int argc, char* argv[])
     /* Partial get: excluding the first and the last elements */
     start[0] = 1;
     count[0] = PUT_GET_VAR_LEN - 2;
-    //TODODG
-    ret = PIOc_get_vars_int(ncid_read, varid_dummy_put_get_var_int, start, count, NULL, get_var_buffer_int ); ERR
-    //ret = PIOc_get_vars_int(ncid_read, varid_dummy_put_get_var_int, start, count, NULL, get_var_buffer_int + 1); ERR
+    ret = PIOc_get_vars_int(ncid_read, varid_dummy_put_get_var_int, start, count, NULL, get_var_buffer_int + 1); ERR
     for (int i = 1; i < PUT_GET_VAR_LEN - 1; i++) {
       if (get_var_buffer_int[i] != put_var_buffer_int[i]) {
           printf("rank = %d, get wrong data for dummy_put_get_var_int at index %d\n", my_rank, i);
@@ -407,9 +405,7 @@ int main(int argc, char* argv[])
     /* Partial get: excluding the first and the last elements */
     start[0] = 1;
     count[0] = PUT_GET_VAR_LEN - 2;
-    //TODODG
-    //ret = PIOc_get_vars_double(ncid_read, varid_dummy_put_get_var_float, start, count, NULL, get_var_buffer_double + 1); ERR
-    ret = PIOc_get_vars_double(ncid_read, varid_dummy_put_get_var_float, start, count, NULL, get_var_buffer_double); ERR
+    ret = PIOc_get_vars_double(ncid_read, varid_dummy_put_get_var_float, start, count, NULL, get_var_buffer_double + 1); ERR
     for (int i = 1; i < PUT_GET_VAR_LEN - 1; i++) {
       diff_double = get_var_buffer_double[i] - put_var_buffer_double[i];
       if (fabs(diff_double) > 1E-5) {

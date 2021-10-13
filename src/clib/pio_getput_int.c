@@ -1464,7 +1464,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                 for (size_t pos = start[0]; pos < start[0] + count[0]; pos++) {
                                     double number;
                                     memcpy(&number, mem_buffer + header_size + pos * read_type_size, read_type_size);
-                                    ((double *) buf)[pos] = number;
+                                    ((double *) buf)[pos - start[0]] = number;
                                 }
                                 /* adios block contains start[0] */
                                 /* 0000xxxxx*/
@@ -1472,14 +1472,14 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                 for (size_t pos = start[0] - start_read; pos < count_read; pos++) {
                                     double number;
                                     memcpy(&number, mem_buffer + header_size + pos * read_type_size, read_type_size);
-                                    ((double *) buf)[start_read + pos] = number;
+                                    ((double *) buf)[start_read + pos - start[0]] = number;
                                 }
                                 /* xxxxx000*/
                             } else if (start[0] + count[0] < start_read + count_read) {
                                 for (size_t pos = 0; pos < start[0] + count[0] - start_read + 1; pos++) {
                                     double number;
                                     memcpy(&number, mem_buffer + header_size + pos * read_type_size, read_type_size);
-                                    ((double *) buf)[start_read + pos] = number;
+                                    ((double *) buf)[start_read + pos -1] = number;
                                 }
                             } else {
                                 /*xxxxxxxx*/
@@ -1498,7 +1498,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                 for (size_t pos = start[0]; pos < start[0] + count[0]; pos++) {
                                     int number;
                                     memcpy(&number, mem_buffer + header_size + pos * read_type_size, read_type_size);
-                                    ((int *) buf)[pos] = number;
+                                    ((int *) buf)[pos - start[0]] = number;
                                 }
                                 /* adios block contains start[0] */
                                 /* 0000xxxxx*/
@@ -1506,14 +1506,14 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                 for (size_t pos = start[0] - start_read; pos < count_read; pos++) {
                                     int number;
                                     memcpy(&number, mem_buffer + header_size + pos * read_type_size, read_type_size);
-                                    ((int *) buf)[start_read + pos] = number;
+                                    ((int *) buf)[start_read + pos - start[0]] = number;
                                 }
                                 /* xxxxx000*/
                             } else if (start[0] + count[0] < start_read + count_read) {
                                 for (size_t pos = 0; pos < start[0] + count[0] - start_read + 1; pos++) {
                                     int number;
                                     memcpy(&number, mem_buffer + header_size + pos * read_type_size, read_type_size);
-                                    ((int *) buf)[start_read + pos] = number;
+                                    ((int *) buf)[start_read + pos - 1] = number;
                                 }
                             } else {
                                 /*xxxxxxxx*/

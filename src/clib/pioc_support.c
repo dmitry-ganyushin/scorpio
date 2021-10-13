@@ -3542,16 +3542,19 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                                                                                      gdims_var_name);
                                                 free(gdims_var_name);
                                                 free(attr_data[0]);
-                                                adios2_type type;
-                                                adios2_variable_type(&type, gdims_var);
-                                                if (type == adios2_type_uint64_t) {
-                                                    uint64_t data;
-                                                    adios2_get(file->engineH, gdims_var, &data, adios2_mode_sync);
-                                                    //gdims denotes as a scalar in bp file
-                                                    file->adios_vars[current_var_cnt].gdimids[0] = data;
-                                                } else {
-                                                    /*not implemented*/
+                                                if (gdims_var){
+                                                    adios2_type type;
+                                                    adios2_variable_type(&type, gdims_var);
+                                                    if (type == adios2_type_uint64_t) {
+                                                        uint64_t data;
+                                                        adios2_get(file->engineH, gdims_var, &data, adios2_mode_sync);
+                                                        //gdims denotes as a scalar in bp file
+                                                        file->adios_vars[current_var_cnt].gdimids[0] = data;
+                                                    } else {
+                                                        /*not implemented*/
+                                                    }
                                                 }
+
                                             }
                                             /*second dimension */
                                             {
@@ -3566,15 +3569,17 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                                                                                      gdims_var_name);
                                                 free(gdims_var_name);
                                                 free(attr_data[1]);
-                                                adios2_type type;
-                                                adios2_variable_type(&type, gdims_var);
-                                                if (type == adios2_type_uint64_t) {
-                                                    uint64_t data;
-                                                    adios2_get(file->engineH, gdims_var, &data, adios2_mode_sync);
-                                                    //gdims denotes as a scalar in bp file
-                                                    file->adios_vars[current_var_cnt].gdimids[1] = data;
-                                                } else {
-                                                    /*not implemented*/
+                                                if(gdims_var){
+                                                    adios2_type type;
+                                                    adios2_variable_type(&type, gdims_var);
+                                                    if (type == adios2_type_uint64_t) {
+                                                        uint64_t data;
+                                                        adios2_get(file->engineH, gdims_var, &data, adios2_mode_sync);
+                                                        //gdims denotes as a scalar in bp file
+                                                        file->adios_vars[current_var_cnt].gdimids[1] = data;
+                                                    } else {
+                                                        /*not implemented*/
+                                                    }
                                                 }
                                             }
                                             free(attr_data);

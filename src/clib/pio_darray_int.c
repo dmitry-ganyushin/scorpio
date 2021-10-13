@@ -1288,51 +1288,45 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     strcat(decomp_name, attr_data);
     adios2_variable *decomp = adios2_inquire_variable(file->ioH, decomp_name);
     free(decomp_name);
-    int64_t **decomp_int64_t = NULL;
+    int64_t *decomp_int64_t = NULL;
     if (decomp) {
         adios2_varinfo *decomp_blocks = adios2_inquire_blockinfo(file->engineH, decomp, time_step);
         int32_t decomp_blocks_size = decomp_blocks->nblocks;
         free(decomp_blocks);
         adios2_type type;
         adios2_variable_type(&type, decomp);
-        if (type == adios2_type_int64_t) {
-            decomp_int64_t = (int64_t **) malloc(decomp_blocks_size * sizeof(int64_t *));
-        } else {
-            /*not implemented*/
-        }
+
         for (size_t i = 0; i < decomp_blocks_size; i++) {
             adios2_set_block_selection(decomp, i);
             size_t var_size;
-            adios2_error err = adios2_selection_size(&var_size, decomp);
+            adios2_error err_sel = adios2_selection_size(&var_size, decomp);
             if (type == adios2_type_int64_t) {
-                decomp_int64_t[i] = (int64_t *) malloc(var_size * sizeof(int64_t));
-                adios2_get(file->engineH, decomp, decomp_int64_t[i], adios2_mode_sync);
+                decomp_int64_t = (int64_t *) malloc(var_size * sizeof(int64_t));
+                adios2_get(file->engineH, decomp, decomp_int64_t, adios2_mode_sync);
             } else {
                 /*not implemented*/
             }
             /*search for the start block*/
             for (size_t j = 0; j < var_size; j++) {
-                if (!start_block_found && decomp_int64_t[i][j] == start_decomp) {
+                if (!start_block_found && decomp_int64_t[j] == start_decomp) {
                     start_block = i;
                     start_idx_in_start_block = j;
                     start_block_found = true;
                 };
-                if (!end_block_found && decomp_int64_t[i][j] == end_decomp) {
+                if (!end_block_found && decomp_int64_t[j] == end_decomp) {
                     end_block = i;
                     end_idx_in_end_block = j;
                     end_block_found = true;
                 };
 
             }
+            /* free recourses */
+            if (decomp_int64_t != NULL){
+                free(decomp_int64_t);
+            }
             if (end_block_found) break;
         }
-        /*free decomp memory*/
-        if (decomp_int64_t != NULL){
-            for (size_t i = 0; i < decomp_blocks_size; i++) {
-                free(decomp_int64_t[i]);
-            }
-            free(decomp_int64_t);
-        }
+
     } else {
         printf("ERROR: /__pio__/decomp/512 is missing.\n");
         return pio_err(NULL, file, ierr, __FILE__, __LINE__,
@@ -1401,7 +1395,7 @@ if (required_adios_step != 0) {
         for (size_t curr_block = start_block; curr_block <= end_block; curr_block++) {
             adios2_set_block_selection(data, curr_block);
             size_t var_size;/* size of the block*/
-            adios2_error err = adios2_selection_size(&var_size, data);
+            adios2_error err_sel = adios2_selection_size(&var_size, data);
             if (type == adios2_type_int32_t) {
                 data_int32_t[curr_block] = (int32_t *) malloc(var_size * sizeof(int32_t));
                 adios2_get(file->engineH, data, data_int32_t[curr_block], adios2_mode_sync);
