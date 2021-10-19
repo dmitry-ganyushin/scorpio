@@ -1297,7 +1297,8 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                         ((float *) buf)[0] = mem_buf;
 
                     }else {
-                        /*not implemented*/
+                        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Not implemented");
                     }
 
                     if (adiosErr != adios2_error_none) {

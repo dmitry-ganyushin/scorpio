@@ -3517,7 +3517,8 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                                     //gdims denotes as a scalar in bp file
                                                     file->adios_vars[current_var_cnt].gdimids[0] = data;
                                                 } else {
-                                                    /*not implemented*/
+                                                    return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                                                   "Not implemented");
                                                 }
                                             }
                                         }else if (size_attr == 2){
@@ -3551,7 +3552,8 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                                         //gdims denotes as a scalar in bp file
                                                         file->adios_vars[current_var_cnt].gdimids[0] = data;
                                                     } else {
-                                                        /*not implemented*/
+                                                        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                                                       "Not implemented");
                                                     }
                                                 }
 
@@ -3578,7 +3580,8 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                                         //gdims denotes as a scalar in bp file
                                                         file->adios_vars[current_var_cnt].gdimids[1] = data;
                                                     } else {
-                                                        /*not implemented*/
+                                                        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                                                       "Not implemented");
                                                     }
                                                 }
                                             }

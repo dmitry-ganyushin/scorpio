@@ -1249,16 +1249,6 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
 /************************* get decomp info *********************************/
     int start_decomp = iodesc->map[0];
     int end_decomp = iodesc->map[iodesc->maplen - 1];
-/* output
- * length of decomp 8
-    1 2 3 4 5 6 7 8
-    length of decomp 8
-    9 10 11 12 13 14 15 16
-    length of decomp 8
-    25 26 27 28 29 30 31 32
-    length of decomp 8
-    17 18 19 20 21 22 23 24
-    */
 /************************* end get decomp info *********************************/
 /************************* get decomp info from file *********************************/
     int start_block = -1;
@@ -1281,7 +1271,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     memset(attr_data, 0, PIO_MAX_NAME);
     adios2_error err = adios2_attribute_data(attr_data, &size_attr, attributeH);
 
-    /* /__pio__/var/dummy_darray_var_int/def/decomp*/
+    /* reading /__pio__/var/dummy_darray_var_int/def/decomp */
     char prefix_decomp_name[] = "/__pio__/decomp/";
     char *decomp_name = malloc(strlen(prefix_decomp_name) + strlen(attr_data) + 1);
     strcpy(decomp_name, prefix_decomp_name);
@@ -1304,7 +1294,8 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
                 decomp_int64_t = (int64_t *) malloc(var_size * sizeof(int64_t));
                 adios2_get(file->engineH, decomp, decomp_int64_t, adios2_mode_sync);
             } else {
-                /*not implemented*/
+                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Not implemented");
             }
             /*search for the start block*/
             for (size_t j = 0; j < var_size; j++) {
@@ -1328,9 +1319,8 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
         }
 
     } else {
-        printf("ERROR: /__pio__/decomp/512 is missing.\n");
         return pio_err(NULL, file, ierr, __FILE__, __LINE__,
-                       "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed with iotype=%s. The underlying I/O library (%s) call, nc*_get_var*, failed.",
+                       "Reading decomposition array for variable (%s, varid=%d) from file (%s, ncid=%d) failed with iotype=%s. The underlying I/O library (%s) call, adios2_inquire_variable, failed.",
                        pio_get_vname_from_file(file, vid), vid, pio_get_fname_from_file(file), file->pio_ncid,
                        pio_iotype_to_string(file->iotype),
                        "ADIOS2");
@@ -1364,10 +1354,9 @@ if (required_adios_step != 0) {
     char *var_name = malloc(strlen(prefix_var_name) + strlen(adios_vdesc->name) + 1);
     if (var_name == NULL) {
         return pio_err(NULL, file, ierr, __FILE__, __LINE__,
-                       "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed with iotype=%s. The underlying I/O library (%s) call, nc*_get_var*, failed.",
+                       "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed with iotype=%s. The underlying memory allocation failed.",
                        pio_get_vname_from_file(file, vid), vid, pio_get_fname_from_file(file), file->pio_ncid,
-                       pio_iotype_to_string(file->iotype),
-                       "ADIOS2");
+                       pio_iotype_to_string(file->iotype));
     }
     strcpy(var_name, prefix_var_name);
     strcat(var_name, adios_vdesc->name);
@@ -1375,60 +1364,56 @@ if (required_adios_step != 0) {
     free(var_name);
     adios2_variable *data = adios_vdesc->adios_varid;
 
-    int32_t **data_int32_t = NULL;
-    float **data_float = NULL;
-    double **data_double = NULL;
+    int32_t *data_int32_t = NULL;
+    float *data_float = NULL;
+    double *data_double = NULL;
     if (data) {
         adios2_varinfo *data_blocks = adios2_inquire_blockinfo(file->engineH, data, time_step);
         int32_t data_blocks_size = data_blocks->nblocks;
         free(data_blocks);
         adios2_type type;
         adios2_variable_type(&type, data);
-        if (type == adios2_type_int32_t) {
-            data_int32_t = (int32_t **) malloc(data_blocks_size * sizeof(int32_t *));
-        } else if (type == adios2_type_float) {
-            data_float = (float **) malloc(data_blocks_size * sizeof(float *));
-            /*for type conversion*/
-            data_double = (double **) malloc(data_blocks_size * sizeof(double *));
-        }
         size_t run_idx = 0;
         for (size_t curr_block = start_block; curr_block <= end_block; curr_block++) {
             adios2_set_block_selection(data, curr_block);
             size_t var_size;/* size of the block*/
             adios2_error err_sel = adios2_selection_size(&var_size, data);
             if (type == adios2_type_int32_t) {
-                data_int32_t[curr_block] = (int32_t *) malloc(var_size * sizeof(int32_t));
-                adios2_get(file->engineH, data, data_int32_t[curr_block], adios2_mode_sync);
+                data_int32_t = (int32_t *) malloc(var_size * sizeof(int32_t));
+                adios2_get(file->engineH, data, data_int32_t, adios2_mode_sync);
             } else if (type == adios2_type_float) {
-                data_float[curr_block] = (float *) malloc(var_size * sizeof(float));
+                data_float = (float *) malloc(var_size * sizeof(float));
                 /* type conversion*/
-                data_double[curr_block] = (double *) malloc(var_size * sizeof(double));
-                adios2_get(file->engineH, data, data_float[curr_block], adios2_mode_sync);
+                data_double = (double *) malloc(var_size * sizeof(double));
+                adios2_get(file->engineH, data, data_float, adios2_mode_sync);
                 /*type conversion*/
                 for (int i = 0; i < var_size; i++) {
-                    data_double[curr_block][i] = data_float[curr_block][i];
+                    data_double[i] = data_float[i];
                     //TODODG write derectrly like this
-                    //((double *) iobuf)[i] = data_float[curr_block][i];
+                    // check what is faster of summit = or memcopy
+                    //((double *) iobuf)[i] = data_float[i];
                 }
-                free(data_float[curr_block]);
+                free(data_float);
             } else {
-                /* not implemented */
+                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Not implemented");
             }
             /*inside one block*/
             /* |000xxx00|  */
             if (curr_block == start_block && curr_block == end_block) {
                 if (type == adios2_type_int32_t) {
-                    memcpy((char *) iobuf, &data_int32_t[curr_block][start_idx_in_start_block],
+                    memcpy((char *) iobuf, &data_int32_t[start_idx_in_start_block],
                            (end_idx_in_end_block - start_idx_in_start_block + 1) * sizeof(int32_t));
-                    free(data_int32_t[curr_block]);
+                    free(data_int32_t);
                 } else if (type == adios2_type_float) {
                     //TODODG
                     //write into iobuf like above
-                    memcpy((char *) iobuf, &data_double[curr_block][start_idx_in_start_block],
+                    memcpy((char *) iobuf, &data_double[start_idx_in_start_block],
                            (end_idx_in_end_block - start_idx_in_start_block + 1) * sizeof(double));
-                    free(data_double[curr_block]);
+                    free(data_double);
                 } else {
-                    /* not implemented */
+                    return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Not implemented");
                 }
             } else {
                 /*different block*/
@@ -1438,48 +1423,52 @@ if (required_adios_step != 0) {
                 /*|xxxxxxxx|xxxxxxxx|xxxxxxxx|*/
                 if (curr_block == start_block) {
                     if (type == adios2_type_int32_t) {
-                        memcpy((char *) iobuf, &data_int32_t[curr_block][start_idx_in_start_block],
+                        memcpy((char *) iobuf, &data_int32_t[start_idx_in_start_block],
                                (var_size - start_idx_in_start_block + 1) * sizeof(int32_t));
-                        free(data_int32_t[curr_block]);
+                        free(data_int32_t);
                     } else if (type == adios2_type_float) {
-                        memcpy((char *) iobuf, &data_double[curr_block][start_idx_in_start_block],
+                        memcpy((char *) iobuf, &data_double[start_idx_in_start_block],
                                (var_size - start_idx_in_start_block + 1) * sizeof(double));
-                        free(data_double[curr_block]);
+                        free(data_double);
                     } else {
-                        /* not implemented */
+                        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Not implemented");
                     }
                 }
                 if (curr_block == end_block) {
 
                     if (type == adios2_type_int32_t) {
-                        memcpy((char *) iobuf, &data_int32_t[curr_block][0],
+                        memcpy((char *) iobuf, &data_int32_t[0],
                                (var_size - end_idx_in_end_block + 1) * sizeof(int32_t));
-                        free(data_int32_t[curr_block]);
+                        free(data_int32_t);
                     } else if (type == adios2_type_float) {
-                        memcpy((char *) iobuf, &data_double[curr_block][0],
+                        memcpy((char *) iobuf, &data_double[0],
                                (var_size - end_idx_in_end_block + 1) * sizeof(double));
-                        free(data_double[curr_block]);
+                        free(data_double);
+                    }else {
+                        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Not implemented");
                     }
                 }
                 /* copy full block */
                 if (start_block < curr_block && curr_block < end_block) {
                     if (type == adios2_type_int32_t) {
-                        memcpy((char *) iobuf, &data_int32_t[curr_block][0], var_size * sizeof(int32_t));
-                        free(data_int32_t[curr_block]);
+                        memcpy((char *) iobuf, &data_int32_t[0], var_size * sizeof(int32_t));
+                        free(data_int32_t);
                     } else if (type == adios2_type_float) {
-                        memcpy((char *) iobuf, &data_double[curr_block][0], var_size * sizeof(double));
-                        free(data_double[curr_block]);
+                        memcpy((char *) iobuf, &data_double[0], var_size * sizeof(double));
+                        free(data_double);
+                    }else {
+                        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Not implemented");
                     }
                 }
             }
         }
-        if (data_int32_t != NULL) free(data_int32_t);
-        if (data_float != NULL) free(data_float);
-        if (data_double != NULL) free(data_double);
     } else {
-        printf("ERROR: /__pio__/var/dummy_array_var_int is missing.\n");
         return pio_err(NULL, file, ierr, __FILE__, __LINE__,
-                       "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed with iotype=%s. The underlying I/O library (%s) call, nc*_get_var*, failed.",
+                       "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed with iotype=%s. "
+                       "The underlying I/O library (%s) call, adios2_inquire_variable, failed.",
                        pio_get_vname_from_file(file, vid), vid, pio_get_fname_from_file(file), file->pio_ncid,
                        pio_iotype_to_string(file->iotype),
                        "ADIOS2");
@@ -1487,13 +1476,19 @@ if (required_adios_step != 0) {
 /************************* end actual reading**********************************/
 
     step_err = adios2_end_step(file->engineH);
-    if (err != adios2_error_none)
+    if (step_err != adios2_error_none)
     {
         return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                        "adios2_end_step failed (adios2_error=%s) for file (%s)",
                        adios2_error_to_string(step_err), pio_get_fname_from_file(file));
     }
     err = adios2_close(file->engineH);
+    if (err != adios2_error_none)
+    {
+        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "adios2_end_step failed (adios2_error=%s) for file (%s)",
+                       adios2_error_to_string(err), pio_get_fname_from_file(file));
+    }
     file->engineH = NULL;
     LOG((2, "adios2_close(%s) : fd = %d", file->fname));
 

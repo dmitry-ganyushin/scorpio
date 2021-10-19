@@ -284,7 +284,7 @@ int main(int argc, char* argv[])
 
   /* Read support is not implemented for ADIOS type yet: change to "fmt < 2" for testing this new feature later.
      Currently, ADIOS type in SCORPIO simply changes actual type to PnetCDF or NetCDF for reading. */
-  for (int fmt = 1; fmt < 2; fmt++) {
+  for (int fmt = 0; fmt < 2; fmt++) {
     /* Note: for ADIOS type, the actual file name on disk is a BP directory named example1_1.nc.bp.dir (BP3 format)
        or xample1_1.nc.bp (BP4 format)
        client code like E3SM still assumes example1_1.nc as the file name to be read.  */
