@@ -1452,82 +1452,112 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                            (long long int) (av_size * sizeof(unsigned char)), av->name);
                         }
                         /* find out start and count */
-                        int64_t start_read = *((int64_t *) mem_buffer);
-                        int64_t count_read = *((int64_t *) (mem_buffer + sizeof(int64_t)));
+                        int64_t global_start[PIO_MAX_DIMS];
+                        int64_t global_count[PIO_MAX_DIMS];
+                        for (int cnt = 0; cnt < av->ndims; cnt++ ){
+                            global_start[cnt] = *((int64_t *) (mem_buffer + cnt * sizeof(int64_t)));
+                        }
+                        for (int cnt = 0; cnt < av->ndims; cnt++ ){
+                            global_count[cnt] = *((int64_t *) (mem_buffer + (cnt + av->ndims) * sizeof(int64_t)));
+                        }
                         /* check that we are inside the required single adios block */
-
-                        if (av->adios_type == adios2_type_double && read_type == adios2_type_uint8_t) {
-                            /* 0000xxx00*/
-                            /*single adios block*/
-                            size_t read_type_size = av->adios_type_size;
-                            if ((start_read <= start[0] && start[0] < start_read + count_read) &&
-                                (start_read <= count[0] && start[0] + count[0] < start_read + count_read)) {
-                                for (size_t pos = start[0]; pos < start[0] + count[0]; pos++) {
-                                    double number;
-                                    memcpy(&number, mem_buffer + header_size + pos * read_type_size, read_type_size);
-                                    ((double *) buf)[pos - start[0]] = number;
-                                }
-                                /* adios block contains start[0] */
-                                /* 0000xxxxx*/
-                            } else if (start_read <= start[0] && start[0] < start_read + count_read) {
-                                for (size_t pos = start[0] - start_read; pos < count_read; pos++) {
-                                    double number;
-                                    memcpy(&number, mem_buffer + header_size + pos * read_type_size, read_type_size);
-                                    ((double *) buf)[start_read + pos - start[0]] = number;
-                                }
-                                /* xxxxx000*/
-                            } else if (start[0] + count[0] < start_read + count_read) {
-                                for (size_t pos = 0; pos < start[0] + count[0] - start_read + 1; pos++) {
-                                    double number;
-                                    memcpy(&number, mem_buffer + header_size + pos * read_type_size, read_type_size);
-                                    ((double *) buf)[start_read + pos -1] = number;
-                                }
-                            } else {
-                                /*xxxxxxxx*/
-                                for (size_t pos = 0; pos < count_read; pos++) {
-                                    double number;
-                                    memcpy(&number, mem_buffer + header_size + pos * read_type_size, read_type_size);
-                                    ((double *) buf)[start_read + pos] = number;
-                                }
-                            }
-                        } else if (av->adios_type == adios2_type_int32_t && read_type == adios2_type_uint8_t) {
-                            /* 0000xxx00*/
-                            /*single adios block*/
-                            size_t read_type_size = av->adios_type_size;
-                            if ((start_read <= start[0] && start[0] < start_read + count_read) &&
-                                (start_read <= count[0] && start[0] + count[0] < start_read + count_read)) {
-                                for (size_t pos = start[0]; pos < start[0] + count[0]; pos++) {
-                                    int number;
-                                    memcpy(&number, mem_buffer + header_size + pos * read_type_size, read_type_size);
-                                    ((int *) buf)[pos - start[0]] = number;
-                                }
-                                /* adios block contains start[0] */
-                                /* 0000xxxxx*/
-                            } else if (start_read <= start[0] && start[0] < start_read + count_read) {
-                                for (size_t pos = start[0] - start_read; pos < count_read; pos++) {
-                                    int number;
-                                    memcpy(&number, mem_buffer + header_size + pos * read_type_size, read_type_size);
-                                    ((int *) buf)[start_read + pos - start[0]] = number;
-                                }
-                                /* xxxxx000*/
-                            } else if (start[0] + count[0] < start_read + count_read) {
-                                for (size_t pos = 0; pos < start[0] + count[0] - start_read + 1; pos++) {
-                                    int number;
-                                    memcpy(&number, mem_buffer + header_size + pos * read_type_size, read_type_size);
-                                    ((int *) buf)[start_read + pos - 1] = number;
-                                }
-                            } else {
-                                /*xxxxxxxx*/
-                                for (size_t pos = 0; pos < count_read; pos++) {
-                                    int number;
-                                    memcpy(&number, mem_buffer + header_size + pos * read_type_size, read_type_size);
-                                    ((int *) buf)[start_read + pos] = number;
-                                }
-                            }
-                        } else if (av->adios_type == adios2_type_int8_t && xtype == NC_CHAR) {
+                        if (av->adios_type == adios2_type_int8_t && xtype == NC_CHAR) {
                             /*text type, block reading*/
                             /*assuming a string variable in one block*/
-                            memcpy((char *) buf, mem_buffer + header_size, count_read);
+                            memcpy((char *) buf, mem_buffer + header_size, global_count[0]);
+                        } else if (av->ndims == 1 && read_type == adios2_type_uint8_t) {
+                            /* data layout */
+                            /*  |adios data block 1 | adios data block2 |*/
+                            /*  |header|     data   | header|   data    |*/
+                            /* 0000xxx00*/
+                            size_t read_type_size = av->adios_type_size;
+                            //index in a block
+                            int start_idx = -1;
+                            int end_idx = -1;
+                            /* |0000xxxxxx|xxxxxxxxxx|xxxxxxxxxx|xxxxx0000| */
+                            /* find beginning of the block */
+                            /* case |0000xxxxxx| */
+                            if ( start[0] >= global_start[0]  && start[0] < global_start[0] + global_count[0]){
+                                start_idx = start[0] - global_start[0];
+                                /* case |xxxxxxxxx| */
+                            } else if (start[0] < global_start[0]){
+                                start_idx = 0;
+                            }
+                            /* find end of the block */
+                            /*  case |xxxxx0000| */
+                            if (start[0] + count[0] >= global_start[0] && start[0] + count[0] < global_start[0] + global_count[0] ){
+                                end_idx = start[0] + count[0] - global_start[0];
+                                /*  case |xxxxxxxxx| */
+                            }else if ( global_start[0] + global_count[0] < start[0] +count[0]){
+                                end_idx = global_count[0];
+                            }
+
+                            if (start_idx != -1 && end_idx != -1){
+                                for(int idx = start_idx; idx < end_idx; idx++){
+                                    if (av->adios_type == adios2_type_double)
+                                        ((double *) buf)[idx + global_start[0]  -  start[0]] = *((double*)(mem_buffer + header_size + (idx) * read_type_size));
+                                    else if (av->adios_type == adios2_type_int32_t)
+                                        ((int32_t *) buf)[idx + global_start[0] - start[0]] = *((int32_t *)(mem_buffer + header_size + (idx) * read_type_size));
+                                    else
+                                        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                                       "Not implemented");
+                                }
+                            }
+                        }else if (av->ndims == 2 && read_type == adios2_type_uint8_t) {
+                            /* data layout */
+                            /*  |adios data block 1 | adios data block2 |*/
+                            /*  |header|     data   | header|   data    |*/
+                            /* 0000xxx00*/
+                            size_t read_type_size = av->adios_type_size;
+                            //index in a block
+                            int start_idx_x = -1;
+                            int end_idx_x = -1;
+                            int start_idx_y = -1;
+                            int end_idx_y = -1;
+                            /* |0000xxxxxx|xxxxxxxxxx|xxxxxxxxxx|xxxxx0000| */
+                            /* find beginning of the block */
+                            /* case |0000xxxxxx| */
+                            if ( start[1] >= global_start[1]  && start[1] < global_start[1] + global_count[1]){
+                                start_idx_y = start[1] - global_start[1];
+                                /* case |xxxxxxxxx| */
+                            } else if (start[1] < global_start[1]){
+                                start_idx_y = 0;
+                            }
+                            /* find end of the block */
+                            /*  case |xxxxx0000| */
+                            if (start[1] + count[1] >= global_start[1] && start[1] + count[1] < global_start[1] + global_count[1] ){
+                                end_idx_y = start[1] + count[1] - global_start[1];
+                                /*  case |xxxxxxxxx| */
+                            }else if ( global_start[1] + global_count[1] < start[1] +count[1]){
+                                end_idx_y = global_count[1];
+                            }
+
+                            if (start_idx_x != -1 && end_idx_x != -1 && start_idx_y != -1 && end_idx_y != -1) {
+                                for (int idx_y = start_idx_y; idx_y < end_idx_y; idx_y++) {
+                                    for (int idx_x = start_idx_x; idx_x < end_idx_x; idx_x++) {
+                                        if (av->adios_type == adios2_type_double)
+                                            ((double *) buf)[idx_x + idx_y * global_count[0] + global_start[1] *
+                                                                                               global_count[0] +
+                                                             global_start[0] - start[0] - start[1] * global_count[0]] =
+                                                    *((double *) (mem_buffer + header_size +
+                                                                  (idx_x + idx_y * global_count[0]) * read_type_size));
+                                        else if (av->adios_type == adios2_type_int32_t)
+                                            ((int32_t *) buf)[idx_x + idx_y * global_count[0] + global_start[1] *
+                                                                                                global_count[0] +
+                                                              global_start[0] - start[0] -
+                                                              start[1] * global_count[0]] = *((int32_t *) (
+                                                    mem_buffer + header_size +
+                                                    (idx_x + idx_y * global_count[0]) * read_type_size));
+                                        else
+                                            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                                           "Not implemented");
+                                    }
+                                }
+                            }
+
+                        } else {
+                            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                           "Not implemented");
                         }
                         free(mem_buffer);
                         mem_buffer = NULL;
