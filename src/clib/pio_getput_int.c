@@ -1194,7 +1194,10 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                            pio_get_fname_from_file(file), ncid, varid, file->num_vars);
         }
 
-
+        /* get frame_id */
+        int frame_id = file->varlist[varid].record;
+        /*magically obtain the relevant adios step*/
+        int required_adios_step = get_adios_step(frame_id);
 
         file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
         if (file->engineH == NULL) {
@@ -1400,8 +1403,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
                 } else {
                     /*reading adios block */
-                    //TODODG
-                    uint64_t time_step = 0;
+                    uint64_t time_step = required_adios_step;
                     adios2_varinfo *data_blocks = adios2_inquire_blockinfo(file->engineH, av->adios_varid, time_step);
                     int32_t data_blocks_size = data_blocks->nblocks;
                     free(data_blocks);
