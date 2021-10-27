@@ -1389,9 +1389,6 @@ if (required_adios_step != 0) {
                 /*type conversion*/
                 for (int i = 0; i < var_size; i++) {
                     data_double[i] = data_float[i];
-                    //TODODG write derectrly like this
-                    // check what is faster of summit = or memcopy
-                    //((double *) iobuf)[i] = data_float[i];
                 }
                 free(data_float);
             } else {
@@ -1406,8 +1403,6 @@ if (required_adios_step != 0) {
                            (end_idx_in_end_block - start_idx_in_start_block + 1) * sizeof(int32_t));
                     free(data_int32_t);
                 } else if (type == adios2_type_float) {
-                    //TODODG
-                    //write into iobuf like above
                     memcpy((char *) iobuf, &data_double[start_idx_in_start_block],
                            (end_idx_in_end_block - start_idx_in_start_block + 1) * sizeof(double));
                     free(data_double);

@@ -762,43 +762,6 @@ int PIOc_closefile(int ncid)
 #endif
 
         int rearr_type = PIO_REARR_SUBSET;
-        //TODODG
-#if 0
-        /* Convert XXXX.nc.bp to XXXX.nc */
-        len = strlen(file->filename);
-        assert(len > 6 && len <= PIO_MAX_NAME);
-        strncpy(outfilename, file->filename, len - 3);
-        outfilename[len - 3] = '\0';
-        LOG((1, "CONVERTING: %s", file->filename));
-        MPI_Barrier(ios->union_comm);
-        ierr = C_API_ConvertBPToNC(file->filename, outfilename, conv_iotype, rearr_type, ios->union_comm);
-        MPI_Barrier(ios->union_comm);
-        LOG((1, "DONE CONVERTING: %s", file->filename));
-        if (ierr != PIO_NOERR)
-        {
-            if (file->iotype == PIO_IOTYPE_ADIOS)
-            {
-                GPTLstop("PIO:PIOc_closefile_adios");
-                GPTLstop("PIO:write_total_adios");
-            }
-            else
-            {
-                GPTLstop("PIO:PIOc_closefile");
-
-                if (file->mode & PIO_WRITE)
-                {
-                    GPTLstop("PIO:PIOc_closefile_write_mode");
-                    GPTLstop("PIO:write_total");
-                    spio_ltimer_stop(ios->io_fstats->wr_timer_name);
-                    spio_ltimer_stop(file->io_fstats->wr_timer_name);
-                }
-                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                spio_ltimer_stop(file->io_fstats->tot_timer_name);
-            }
-            return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                            "C_API_ConvertBPToNC(infile = %s, outfile = %s, piotype = %s) failed", file->filename, outfilename, conv_iotype);
-        }
-#endif
 #endif
 
         free(file->filename);

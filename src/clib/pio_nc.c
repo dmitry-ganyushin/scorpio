@@ -782,8 +782,6 @@ int PIOc_inq_dim(int ncid, int dimid, char *name, PIO_Offset *lenp)
             if (lenp)
                 *lenp = 0;
 
-            ierr = PIO_EBADDIM;
-            /* TODODG for ADIOS2 we do not really know the lenght of arrays?*/
             ierr = PIO_NOERR;
         }
 

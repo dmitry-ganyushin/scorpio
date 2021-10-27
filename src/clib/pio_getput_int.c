@@ -700,14 +700,12 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
                 strcat(full_name, name);
             }else{
                 char prefix_att_name[] = "/__pio__/var/";
-                /*sprintf(full_name, "/__pio__/var/%s/%s", file->adios_vars[varid].name, name);*/
                 full_name = malloc(strlen(prefix_att_name) + strlen(file->adios_vars[varid].name) + strlen("/") + strlen(name) + 1);
                 strcpy(full_name, prefix_att_name);
                 strcat(full_name, file->adios_vars[varid].name);
                 strcat(full_name, "/");
                 strcat(full_name, name);
             }
-            //TODODG I copied the pnetcdf part, but check correctness
             file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
             if (file->engineH == NULL) {
                 return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
