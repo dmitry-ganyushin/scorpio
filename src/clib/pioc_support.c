@@ -3197,7 +3197,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
     spio_ltimer_start(file->io_fstats->tot_timer_name);
 
     file->iotype = *iotype;
-
+#if 0
 #ifdef _ADIOS2
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
@@ -3214,7 +3214,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
 #endif
     }
 #endif
-
+#endif
     file->iosystem = ios;
     file->mode = mode;
 
