@@ -3599,6 +3599,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                     }
                     free(var_names);
                     file->num_vars = current_var_cnt;
+                    adios2_end_step(file->engineH);
                 }
                 /*close file */
                 adios2_error err = adios2_close(file->engineH);
