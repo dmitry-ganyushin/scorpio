@@ -3342,8 +3342,8 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
 #endif
 #ifdef _ADIOS2
             case PIO_IOTYPE_ADIOS: {
-                char declare_name[PIO_MAX_NAME];
-                char bpname[PIO_MAX_NAME];
+                char declare_name[PIO_MAX_NAME] = {'\0'};
+                char bpname[PIO_MAX_NAME]  = {'\0'};
                 strcat(bpname, filename);
                 strcat(bpname, ".bp");
                 strncpy(file->fname, bpname, PIO_MAX_NAME);
@@ -3378,6 +3378,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                    "Setting (ADIOS) engine (type=FileStream) failed (adios2_error=%s) for file (%s)",
                                    adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
                 }
+                adios2_set_parameter(file->ioH, "OpenTimeSecs", "1");
 
                 LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
                 file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
