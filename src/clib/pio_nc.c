@@ -768,14 +768,6 @@ int PIOc_inq_dim(int ncid, int dimid, char *name, PIO_Offset *lenp)
         }
         else
         {
-            for (int i = 0; i < file->num_dim_vars; i++)
-            {
-                printf("%s", file->dim_names[i]);
-                if (i < file->num_dim_vars - 1)
-                    printf(", ");
-            }
-            printf("\n");
-
             if (name)
                 name[0] = '\0';
 
