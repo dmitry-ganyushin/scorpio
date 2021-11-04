@@ -3521,8 +3521,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                                 }
                                             }
                                         }else if (size_attr == 2){
-
-                                                char **attr_data = malloc(2);
+                                                char **attr_data = malloc(2 * sizeof(char*));
                                                 attr_data[0] = calloc(PIO_MAX_NAME, sizeof(char));
                                                 attr_data[1] = calloc(PIO_MAX_NAME, sizeof(char));
                                                 err = adios2_attribute_data(attr_data, &size_attr, attr);
