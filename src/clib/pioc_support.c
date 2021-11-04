@@ -3652,10 +3652,10 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                     }
                                     if (type == adios2_type_int32_t) {
                                         file->adios_attrs[current_var_cnt].att_type = NC_INT;
-                                        file->adios_attrs[current_var_cnt].att_len = (PIO_Offset) sizeof(int32_t);
+                                        file->adios_attrs[current_var_cnt].att_len = (PIO_Offset) 1;
                                     } else if (type == adios2_type_float) {
                                         file->adios_attrs[current_var_cnt].att_type = NC_FLOAT;
-                                        file->adios_attrs[current_var_cnt].att_len = (PIO_Offset) sizeof(float);
+                                        file->adios_attrs[current_var_cnt].att_len = (PIO_Offset) 1;
                                     } else if (type == adios2_type_string) {
                                         file->adios_attrs[current_var_cnt].att_type = NC_CHAR;
                                         size_t size_attr;
@@ -3712,11 +3712,11 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                         if (type == adios2_type_int32_t) {
                                             file->adios_attrs[current_var_cnt].att_type = NC_INT;
                                             file->adios_attrs[current_var_cnt].adios_type = adios2_type_int32_t;
-                                            file->adios_attrs[current_var_cnt].att_len = (PIO_Offset) sizeof(int32_t);
+                                            file->adios_attrs[current_var_cnt].att_len = (PIO_Offset) 1;
                                         } else if (type == adios2_type_float) {
                                             file->adios_attrs[current_var_cnt].att_type = NC_FLOAT;
                                             file->adios_attrs[current_var_cnt].adios_type = adios2_type_float;
-                                            file->adios_attrs[current_var_cnt].att_len = (PIO_Offset) sizeof(float);
+                                            file->adios_attrs[current_var_cnt].att_len = (PIO_Offset) 1;
                                         } else if (type == adios2_type_string) {
                                             file->adios_attrs[current_var_cnt].att_type = NC_CHAR;
                                             file->adios_attrs[current_var_cnt].adios_type = adios2_type_string;
