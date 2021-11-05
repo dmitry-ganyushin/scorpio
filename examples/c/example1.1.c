@@ -43,6 +43,7 @@ int main(int argc, char* argv[])
   int dimid_text_var_len;
   int dimid_darray_var_len;
   int dimid_put_get_var_len;
+  int dimids_put_get_var_len_2D[2];
   int dimids_time_var[2];
 
   /* This simple example uses one-dimensional data. */
@@ -73,6 +74,7 @@ int main(int argc, char* argv[])
   int varid_dummy_darray_var_float;
   int varid_dummy_time_var_int;
   int varid_dummy_put_get_var_int;
+  int varid_dummy_put_get_var_int_2D;
   int varid_dummy_put_get_var_float;
 
   /* start/count arrays for get/put var */
@@ -123,6 +125,8 @@ int main(int argc, char* argv[])
   /* Buffers for sample put/get var data. */
   int put_var_buffer_int[PUT_GET_VAR_LEN];
   int get_var_buffer_int[PUT_GET_VAR_LEN];
+  int put_var_buffer_int_2D[PUT_GET_VAR_LEN][ELEMENTS_PER_PE];
+  int get_var_buffer_int_2D[PUT_GET_VAR_LEN][ELEMENTS_PER_PE];
   double put_var_buffer_double[PUT_GET_VAR_LEN];
   double get_var_buffer_double[PUT_GET_VAR_LEN];
 
@@ -189,6 +193,12 @@ int main(int argc, char* argv[])
     get_var_buffer_double[i] = 0.0;
   }
 
+  for (int i = 0; i < PUT_GET_VAR_LEN; i++) {
+      for (int j = 0; j < ELEMENTS_PER_PE; j++) {
+          put_var_buffer_int_2D[i][j] = my_rank * ELEMENTS_PER_PE + i + 1 + j * 1000;
+      }
+  }
+
   for (int fmt = 0; fmt < 2; fmt++) {
     /* Create a filename to write. */
     sprintf(filename, "example1_%d.nc", fmt);
@@ -221,6 +231,13 @@ int main(int argc, char* argv[])
     /* Define some variables for PIOc_put_vars. */
     ret = PIOc_def_dim(ncid_write, "put_get_var_len", PUT_GET_VAR_LEN, &dimid_put_get_var_len); ERR
     ret = PIOc_def_var(ncid_write, "dummy_put_get_var_int", PIO_INT, NDIMS, &dimid_put_get_var_len, &varid_dummy_put_get_var_int); ERR
+
+    ret = PIOc_def_dim(ncid_write, "dim1", PUT_GET_VAR_LEN, &dimids_put_get_var_len_2D[0]); ERR
+    ret = PIOc_def_dim(ncid_write, "dim2", (PIO_Offset)ELEMENTS_PER_PE, &dimids_put_get_var_len_2D[1]); ERR
+
+    ret = PIOc_def_var(ncid_write, "dummy_put_get_var_int_2D", PIO_INT, NDIMS + 1, dimids_put_get_var_len_2D, &varid_dummy_put_get_var_int_2D); ERR
+
+
     ret = PIOc_def_var(ncid_write, "dummy_put_get_var_float", PIO_FLOAT, NDIMS, &dimid_put_get_var_len, &varid_dummy_put_get_var_float); ERR
 
     /* Define an int variable with time steps. */
@@ -256,7 +273,14 @@ int main(int argc, char* argv[])
     start[0] = 0;
     count[0] = PUT_GET_VAR_LEN / 2;
     ret = PIOc_put_vars_double(ncid_write, varid_dummy_put_get_var_float, start, count, NULL, put_var_buffer_double); ERR
-
+    /* 2D in array */
+      start[0] = 0;
+      count[0] = PUT_GET_VAR_LEN;
+      start[1] = 0;
+      count[1] = ELEMENTS_PER_PE;
+      ret = PIOc_put_vars_int(ncid_write, varid_dummy_put_get_var_int_2D, start, count, NULL,
+                              (const int *) put_var_buffer_int_2D); ERR
+      /* end */
     /* Write to int type variable with int type decomposition, type conversions will not be performed. */
     ret = PIOc_write_darray(ncid_write, varid_dummy_darray_var_int, ioid_int, ELEMENTS_PER_PE, write_darray_buffer_int, NULL); ERR
 
@@ -413,6 +437,24 @@ int main(int argc, char* argv[])
           break;
       }
     }
+
+      /* Get int type variable with int type decomposition, type conversions will not be performed. */
+      ret = PIOc_inq_varid(ncid_read, "dummy_put_get_var_int_2D", &varid_dummy_put_get_var_int_2D); ERR
+      /* Partial get: excluding the first and the last elements */
+      /* 2D in array */
+      start[0] = 0;
+      count[0] = PUT_GET_VAR_LEN;
+      start[1] = 0;
+      count[1] = ELEMENTS_PER_PE;
+      ret = PIOc_get_vars_int(ncid_read, varid_dummy_put_get_var_int_2D, start, count, NULL, get_var_buffer_int_2D); ERR
+      for (int i = 0; i < PUT_GET_VAR_LEN; i++) {
+          for (int j = 0; j < ELEMENTS_PER_PE; i++) {
+              if (get_var_buffer_int_2D[i][j] != put_var_buffer_int_2D[i][j]) {
+                  printf("rank = %d, get wrong data for dummy_put_get_var_int at index %d\n", my_rank, i);
+                  break;
+              }
+          }
+      }
 
     ret = PIOc_closefile(ncid_read); ERR
   }
