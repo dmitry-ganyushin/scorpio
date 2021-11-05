@@ -3689,7 +3689,10 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                 int sub_length = strlen(attr_names[i]) - strlen(attr_full_prefix);
                                 int full_length = strlen(attr_names[i]);
                                 int prefix_length = strlen(attr_full_prefix);
-                                if (strrchr(attr_names[i], '/') > &attr_names[i][prefix_length]) continue;
+                                if (strrchr(attr_names[i], '/') > &attr_names[i][prefix_length]){
+                                    free(attr_full_prefix);
+                                    continue;
+                                }
                                 file->adios_attrs[current_var_cnt].att_name = (char *) malloc(sub_length + 1);
                                 if (file->adios_attrs[current_var_cnt].att_name) {
                                     for (int c = 0; c < sub_length + 1; c++) {
