@@ -82,6 +82,8 @@ int main(int argc, char* argv[])
   /* start/count arrays for get/put var */
   PIO_Offset start[NDIMS];
   PIO_Offset count[NDIMS];
+  PIO_Offset start2D[2];
+  PIO_Offset count2D[2];
 
   /* The I/O description IDs as passed back by PIOc_InitDecomp()
      and freed in PIOc_freedecomp(). */
@@ -198,6 +200,7 @@ int main(int argc, char* argv[])
   for (int i = 0; i < PUT_GET_VAR_LEN_X; i++) {
       for (int j = 0; j < PUT_GET_VAR_LEN_Y; j++) {
           put_var_buffer_int_2D[i][j] = my_rank * ELEMENTS_PER_PE + i + 1 + j * 1000;
+          get_var_buffer_int_2D[i][j] = 0;
       }
   }
 
@@ -276,10 +279,10 @@ int main(int argc, char* argv[])
     count[0] = PUT_GET_VAR_LEN / 2;
     ret = PIOc_put_vars_double(ncid_write, varid_dummy_put_get_var_float, start, count, NULL, put_var_buffer_double); ERR
     /* 2D in array */
-      start[0] = 0;
-      count[0] = PUT_GET_VAR_LEN_X;
-      start[1] = 0;
-      count[1] = PUT_GET_VAR_LEN_Y;
+      start2D[0] = 0;
+      count2D[0] = PUT_GET_VAR_LEN_X;
+      start2D[1] = 0;
+      count2D[1] = PUT_GET_VAR_LEN_Y;
       ret = PIOc_put_vars_int(ncid_write, varid_dummy_put_get_var_int_2D, start, count, NULL,
                               (const int *) put_var_buffer_int_2D); ERR
       /* end */
@@ -444,14 +447,14 @@ int main(int argc, char* argv[])
       ret = PIOc_inq_varid(ncid_read, "dummy_put_get_var_int_2D", &varid_dummy_put_get_var_int_2D); ERR
       /* Partial get: excluding the first and the last elements */
       /* 2D in array */
-      start[0] = 0;
-      count[0] = PUT_GET_VAR_LEN_X;
-      start[1] = 0;
-      count[1] = PUT_GET_VAR_LEN_Y;
+      start2D[0] = 0;
+      count2D[0] = PUT_GET_VAR_LEN_X;
+      start2D[1] = 0;
+      count2D[1] = PUT_GET_VAR_LEN_Y;
       ret = PIOc_get_vars_int(ncid_read, varid_dummy_put_get_var_int_2D, start, count, NULL,
                               (int *) get_var_buffer_int_2D); ERR
       for (int i = 0; i < PUT_GET_VAR_LEN_X; i++) {
-          for (int j = 0; j < PUT_GET_VAR_LEN_Y; i++) {
+          for (int j = 0; j < PUT_GET_VAR_LEN_Y; j++) {
               if (get_var_buffer_int_2D[i][j] != put_var_buffer_int_2D[i][j]) {
                   printf("rank = %d, get wrong data for dummy_put_get_var_int_2D at index x = %d y = %d\n", my_rank, i, j);
                   break;
