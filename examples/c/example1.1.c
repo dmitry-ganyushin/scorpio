@@ -199,7 +199,7 @@ int main(int argc, char* argv[])
 
   for (int i = 0; i < PUT_GET_VAR_LEN_X; i++) {
       for (int j = 0; j < PUT_GET_VAR_LEN_Y; j++) {
-          put_var_buffer_int_2D[i][j] = my_rank * ELEMENTS_PER_PE + i + 1 + j * 1000;
+          put_var_buffer_int_2D[i][j] = i + 1 + j * 1000;
           get_var_buffer_int_2D[i][j] = 0;
       }
   }
