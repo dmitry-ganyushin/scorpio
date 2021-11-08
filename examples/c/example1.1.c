@@ -278,6 +278,7 @@ int main(int argc, char* argv[])
     start[0] = 0;
     count[0] = PUT_GET_VAR_LEN / 2;
     ret = PIOc_put_vars_double(ncid_write, varid_dummy_put_get_var_float, start, count, NULL, put_var_buffer_double); ERR
+#if 0
     /* 2D in array */
       start2D[0] = 0;
       count2D[0] = PUT_GET_VAR_LEN_X;
@@ -286,6 +287,7 @@ int main(int argc, char* argv[])
       ret = PIOc_put_vars_int(ncid_write, varid_dummy_put_get_var_int_2D, start, count, NULL,
                               (const int *) put_var_buffer_int_2D); ERR
       /* end */
+#endif
     /* Write to int type variable with int type decomposition, type conversions will not be performed. */
     ret = PIOc_write_darray(ncid_write, varid_dummy_darray_var_int, ioid_int, ELEMENTS_PER_PE, write_darray_buffer_int, NULL); ERR
 
@@ -442,7 +444,7 @@ int main(int argc, char* argv[])
           break;
       }
     }
-
+#if 0
       /* Get int type variable with int type decomposition, type conversions will not be performed. */
       ret = PIOc_inq_varid(ncid_read, "dummy_put_get_var_int_2D", &varid_dummy_put_get_var_int_2D); ERR
       /* Partial get: excluding the first and the last elements */
@@ -461,7 +463,7 @@ int main(int argc, char* argv[])
               }
           }
       }
-
+#endif
     ret = PIOc_closefile(ncid_read); ERR
   }
 
