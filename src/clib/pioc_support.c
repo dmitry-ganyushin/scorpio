@@ -3378,9 +3378,9 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                    "Setting (ADIOS) engine (type=FileStream) failed (adios2_error=%s) for file (%s)",
                                    adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
                 }
-                adios2_set_parameter(file->ioH, "OpenTimeSecs", "1");
 
                 LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+                adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
                 file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
                 if (file->engineH == NULL) {
                     return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
