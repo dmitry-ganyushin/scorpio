@@ -1282,6 +1282,12 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     if (decomp) {
         adios2_varinfo *decomp_blocks = adios2_inquire_blockinfo(file->engineH, decomp, time_step);
         int32_t decomp_blocks_size = decomp_blocks->nblocks;
+        /* free memeory */
+        for (size_t i = 0; i < decomp_blocks->nblocks; ++i) {
+            free(decomp_blocks->BlocksInfo[i].Start);
+            free(decomp_blocks->BlocksInfo[i].Count);
+        }
+        free(decomp_blocks->BlocksInfo);
         free(decomp_blocks);
         adios2_type type;
         adios2_variable_type(&type, decomp);
@@ -1370,6 +1376,12 @@ if (required_adios_step != 0) {
     if (data) {
         adios2_varinfo *data_blocks = adios2_inquire_blockinfo(file->engineH, data, time_step);
         int32_t data_blocks_size = data_blocks->nblocks;
+        /* free memeory */
+        for (size_t i = 0; i < data_blocks->nblocks; ++i) {
+            free(data_blocks->BlocksInfo[i].Start);
+            free(data_blocks->BlocksInfo[i].Count);
+        }
+        free(data_blocks->BlocksInfo);
         free(data_blocks);
         adios2_type type;
         adios2_variable_type(&type, data);

@@ -1404,6 +1404,12 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     uint64_t time_step = required_adios_step;
                     adios2_varinfo *data_blocks = adios2_inquire_blockinfo(file->engineH, av->adios_varid, time_step);
                     int32_t data_blocks_size = data_blocks->nblocks;
+                    /* free memeory */
+                    for (size_t i = 0; i < data_blocks->nblocks; ++i) {
+                        free(data_blocks->BlocksInfo[i].Start);
+                        free(data_blocks->BlocksInfo[i].Count);
+                    }
+                    free(data_blocks->BlocksInfo);
                     free(data_blocks);
                     adios2_type read_type;
                     adios2_variable_type(&read_type, av->adios_varid);
