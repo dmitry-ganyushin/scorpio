@@ -3205,8 +3205,8 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         char bpname[PIO_MAX_NAME]  = {'\0'};
         strcat(bpname, filename);
         strcat(bpname, ".bp");
-        strncpy(file->fname, bpname, PIO_MAX_NAME);
-        snprintf(declare_name, PIO_MAX_NAME, "%s%lu", file->fname, get_adios2_io_cnt());
+
+        snprintf(declare_name, PIO_MAX_NAME, "%s%lu", bpname, get_adios2_io_cnt());
         file->ioH = adios2_declare_io(ios->adiosH, (const char *) declare_name);
         if (file->ioH == NULL) {
             return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -3223,12 +3223,14 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
 
         LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
         adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
-        file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
+        file->engineH = adios2_open(file->ioH, bpname, adios2_mode_read);
         adios2_file_exist = true;
         /*failed to open with adios2 trying pnetcdf */
         if (file->engineH == NULL) {
             adios2_file_exist = false;
             LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+        }else{
+            strncpy(file->fname, bpname, PIO_MAX_NAME);
         }
 #endif
     }
