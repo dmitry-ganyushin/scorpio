@@ -2530,6 +2530,9 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
    else
        rlen = iodesc->llen;
 
+   if (file->iotype == PIO_IOTYPE_ADIOS)
+       rlen = 0;
+
     if(!ios->async || !ios->ioproc)
     {
         if(file->varlist[varid].vrsize == 0)
@@ -2651,17 +2654,22 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
             break;
 #ifdef _ADIOS2
             case PIO_IOTYPE_ADIOS:
-                if ((ierr = pio_read_darray_adios2(file, fndims, iodesc, varid, iobuf)))
-            {
+                if ((ierr = pio_read_darray_adios2(file, fndims, iodesc, varid, array)))
+                {
+                    GPTLstop("PIO:PIOc_read_darray");
+                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d)failed . Reading variable in parallel (iotype=%s) failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype));
+                }
                 GPTLstop("PIO:PIOc_read_darray");
                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
                 spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                return pio_err(ios, file, ierr, __FILE__, __LINE__,
-                               "Reading variable (%s, varid=%d) from file (%s, ncid=%d)failed . Reading variable in parallel (iotype=%s) failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype));
-            }
-                break;
+                return PIO_NOERR;
 #endif
         default:
             GPTLstop("PIO:PIOc_read_darray");
