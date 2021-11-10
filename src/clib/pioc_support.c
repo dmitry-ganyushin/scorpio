@@ -3205,32 +3205,34 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         char bpname[PIO_MAX_NAME]  = {'\0'};
         strcat(bpname, filename);
         strcat(bpname, ".bp");
+        struct stat sd;
+        if (0 == stat(bpname, &sd)) {
+            snprintf(declare_name, PIO_MAX_NAME, "%s%lu", bpname, get_adios2_io_cnt());
+            file->ioH = adios2_declare_io(ios->adiosH, (const char *) declare_name);
+            if (file->ioH == NULL) {
+                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Declaring (ADIOS) IO (name=%s) failed for file (%s)",
+                               declare_name, pio_get_fname_from_file(file));
+            }
 
-        snprintf(declare_name, PIO_MAX_NAME, "%s%lu", bpname, get_adios2_io_cnt());
-        file->ioH = adios2_declare_io(ios->adiosH, (const char *) declare_name);
-        if (file->ioH == NULL) {
-            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                           "Declaring (ADIOS) IO (name=%s) failed for file (%s)",
-                           declare_name, pio_get_fname_from_file(file));
-        }
+            adios2_error adiosErr = adios2_set_engine(file->ioH, "FileStream");
+            if (adiosErr != adios2_error_none) {
+                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Setting (ADIOS) engine (type=FileStream) failed (adios2_error=%s) for file (%s)",
+                               adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
+            }
 
-        adios2_error adiosErr = adios2_set_engine(file->ioH, "FileStream");
-        if (adiosErr != adios2_error_none) {
-            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                           "Setting (ADIOS) engine (type=FileStream) failed (adios2_error=%s) for file (%s)",
-                           adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
-        }
-
-        LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
-        adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
-        file->engineH = adios2_open(file->ioH, bpname, adios2_mode_read);
-        adios2_file_exist = true;
-        /*failed to open with adios2 trying pnetcdf */
-        if (file->engineH == NULL) {
-            adios2_file_exist = false;
             LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
-        }else{
-            strncpy(file->fname, bpname, PIO_MAX_NAME);
+            adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
+            file->engineH = adios2_open(file->ioH, bpname, adios2_mode_read);
+            adios2_file_exist = true;
+            /*failed to open with adios2 trying pnetcdf */
+            if (file->engineH == NULL) {
+                adios2_file_exist = false;
+                LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+            } else {
+                strncpy(file->fname, bpname, PIO_MAX_NAME);
+            }
         }
 #endif
     }
