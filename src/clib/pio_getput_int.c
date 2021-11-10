@@ -588,106 +588,105 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
     file->io_fstats->rb += attlen * atttype_len;
 
     /* If this is an IO task, then call the netCDF function. */
-    if (ios->ioproc)
-    {
+    if (ios->ioproc) {
         LOG((2, "calling pnetcdf/netcdf"));
 #ifdef _PNETCDF
-        if (file->iotype == PIO_IOTYPE_PNETCDF)
-        {
-            switch(memtype)
-            {
-            case NC_BYTE:
-                ierr = ncmpi_get_att_schar(file->fh, varid, name, ip);
-                break;
-            case NC_CHAR:
-                ierr = ncmpi_get_att_text(file->fh, varid, name, ip);
-                break;
-            case NC_SHORT:
-                ierr = ncmpi_get_att_short(file->fh, varid, name, ip);
-                break;
-            case NC_INT:
-                ierr = ncmpi_get_att_int(file->fh, varid, name, ip);
-                break;
-            case PIO_LONG_INTERNAL:
-                ierr = ncmpi_get_att_long(file->fh, varid, name, ip);
-                break;
-            case NC_FLOAT:
-                ierr = ncmpi_get_att_float(file->fh, varid, name, ip);
-                break;
-            case NC_DOUBLE:
-                ierr = ncmpi_get_att_double(file->fh, varid, name, ip);
-                break;
-            default:
-                GPTLstop("PIO:PIOc_get_att_tc");
-                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                return pio_err(ios, file, PIO_EBADTYPE, __FILE__, __LINE__,
-                                "Reading variable (%s, varid=%d) attribute (%s) failed. Unsupported PnetCDF attribute type (type = %x)", (varid != PIO_GLOBAL) ? file->varlist[varid].vname : "PIO_GLOBAL", varid, name, memtype);
+        if (file->iotype == PIO_IOTYPE_PNETCDF) {
+            switch (memtype) {
+                case NC_BYTE:
+                    ierr = ncmpi_get_att_schar(file->fh, varid, name, ip);
+                    break;
+                case NC_CHAR:
+                    ierr = ncmpi_get_att_text(file->fh, varid, name, ip);
+                    break;
+                case NC_SHORT:
+                    ierr = ncmpi_get_att_short(file->fh, varid, name, ip);
+                    break;
+                case NC_INT:
+                    ierr = ncmpi_get_att_int(file->fh, varid, name, ip);
+                    break;
+                case PIO_LONG_INTERNAL:
+                    ierr = ncmpi_get_att_long(file->fh, varid, name, ip);
+                    break;
+                case NC_FLOAT:
+                    ierr = ncmpi_get_att_float(file->fh, varid, name, ip);
+                    break;
+                case NC_DOUBLE:
+                    ierr = ncmpi_get_att_double(file->fh, varid, name, ip);
+                    break;
+                default:
+                    GPTLstop("PIO:PIOc_get_att_tc");
+                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    return pio_err(ios, file, PIO_EBADTYPE, __FILE__, __LINE__,
+                                   "Reading variable (%s, varid=%d) attribute (%s) failed. Unsupported PnetCDF attribute type (type = %x)",
+                                   (varid != PIO_GLOBAL) ? file->varlist[varid].vname : "PIO_GLOBAL", varid, name,
+                                   memtype);
             }
         }
 #endif /* _PNETCDF */
 
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
-        {
-            switch(memtype)
-            {
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io) {
+            switch (memtype) {
 #ifdef _NETCDF
-            case NC_CHAR:
-                ierr = nc_get_att_text(file->fh, varid, name, ip);
-                break;
-            case NC_BYTE:
-                ierr = nc_get_att_schar(file->fh, varid, name, ip);
-                break;
-            case NC_SHORT:
-                ierr = nc_get_att_short(file->fh, varid, name, ip);
-                break;
-            case NC_INT:
-                ierr = nc_get_att_int(file->fh, varid, name, ip);
-                break;
-            case PIO_LONG_INTERNAL:
-                ierr = nc_get_att_long(file->fh, varid, name, ip);
-                break;
-            case NC_FLOAT:
-                ierr = nc_get_att_float(file->fh, varid, name, ip);
-                break;
-            case NC_DOUBLE:
-                ierr = nc_get_att_double(file->fh, varid, name, ip);
-                break;
+                case NC_CHAR:
+                    ierr = nc_get_att_text(file->fh, varid, name, ip);
+                    break;
+                case NC_BYTE:
+                    ierr = nc_get_att_schar(file->fh, varid, name, ip);
+                    break;
+                case NC_SHORT:
+                    ierr = nc_get_att_short(file->fh, varid, name, ip);
+                    break;
+                case NC_INT:
+                    ierr = nc_get_att_int(file->fh, varid, name, ip);
+                    break;
+                case PIO_LONG_INTERNAL:
+                    ierr = nc_get_att_long(file->fh, varid, name, ip);
+                    break;
+                case NC_FLOAT:
+                    ierr = nc_get_att_float(file->fh, varid, name, ip);
+                    break;
+                case NC_DOUBLE:
+                    ierr = nc_get_att_double(file->fh, varid, name, ip);
+                    break;
 #endif /* _NETCDF */
 #ifdef _NETCDF4
-            case NC_UBYTE:
-                ierr = nc_get_att_uchar(file->fh, varid, name, ip);
-                break;
-            case NC_USHORT:
-                ierr = nc_get_att_ushort(file->fh, varid, name, ip);
-                break;
-            case NC_UINT:
-                ierr = nc_get_att_uint(file->fh, varid, name, ip);
-                break;
-            case NC_INT64:
-                LOG((3, "about to call nc_get_att_longlong"));
-                ierr = nc_get_att_longlong(file->fh, varid, name, ip);
-                break;
-            case NC_UINT64:
-                ierr = nc_get_att_ulonglong(file->fh, varid, name, ip);
-                break;
-                /* case NC_STRING: */
-                /*      ierr = nc_get_att_string(file->fh, varid, name, ip); */
-                /*      break; */
+                case NC_UBYTE:
+                    ierr = nc_get_att_uchar(file->fh, varid, name, ip);
+                    break;
+                case NC_USHORT:
+                    ierr = nc_get_att_ushort(file->fh, varid, name, ip);
+                    break;
+                case NC_UINT:
+                    ierr = nc_get_att_uint(file->fh, varid, name, ip);
+                    break;
+                case NC_INT64:
+                    LOG((3, "about to call nc_get_att_longlong"));
+                    ierr = nc_get_att_longlong(file->fh, varid, name, ip);
+                    break;
+                case NC_UINT64:
+                    ierr = nc_get_att_ulonglong(file->fh, varid, name, ip);
+                    break;
+                    /* case NC_STRING: */
+                    /*      ierr = nc_get_att_string(file->fh, varid, name, ip); */
+                    /*      break; */
 #endif /* _NETCDF4 */
-            default:
-                GPTLstop("PIO:PIOc_get_att_tc");
-                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                return pio_err(ios, file, PIO_EBADTYPE, __FILE__, __LINE__,
-                                "Reading variable (%s, varid=%d) attribute (%s) failed. Unsupported attribute type (type = %x)", (varid != PIO_GLOBAL) ? file->varlist[varid].vname : "PIO_GLOBAL", varid, name, memtype);
+                default:
+                    GPTLstop("PIO:PIOc_get_att_tc");
+                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    return pio_err(ios, file, PIO_EBADTYPE, __FILE__, __LINE__,
+                                   "Reading variable (%s, varid=%d) attribute (%s) failed. Unsupported attribute type (type = %x)",
+                                   (varid != PIO_GLOBAL) ? file->varlist[varid].vname : "PIO_GLOBAL", varid, name,
+                                   memtype);
             }
         }
-
+    }
         if (file->iotype == PIO_IOTYPE_ADIOS)
         {
 #ifdef _ADIOS2
@@ -716,11 +715,9 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
             adios2_step_status step_status;
             adios2_error adiosStepErr = adios2_begin_step(file->engineH, adios2_step_mode_read, 10.0, &step_status);
 
-#endif
 
             switch(memtype)
             {
-#ifdef _ADIOS2
                 case NC_FLOAT:
                {
                    adios2_attribute *attr = adios2_inquire_attribute(file->ioH, full_name);
@@ -774,7 +771,7 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
             LOG((2, "adios2_close(%s) : fd = %d", file->fname));
 #endif
         }
-    }
+
 
     ierr = check_netcdf(NULL, file, ierr, __FILE__, __LINE__);
     if(ierr != PIO_NOERR){
