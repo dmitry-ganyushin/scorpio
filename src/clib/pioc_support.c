@@ -3881,21 +3881,23 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         free(file);
         return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
     }
-
-    ierr = check_netcdf(ios, file, ierr, __FILE__, __LINE__);
-    /* If there was an error, free allocated memory and deal with the error. */
-    if(ierr != PIO_NOERR){
-        int tmp_iotype = file->iotype;
-        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-        spio_ltimer_stop(file->io_fstats->rd_timer_name);
-        spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        free(file->io_fstats);
-        free(file);
-        LOG((1, "PIOc_openfile_retry failed, ierr = %d", ierr));
-        return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                        "Opening file (%s) with iotype %d (%s) failed. The low level I/O library call failed", filename, tmp_iotype, pio_iotype_to_string(tmp_iotype));;
+    if (file->iotype != PIO_IOTYPE_ADIOS){
+        ierr = check_netcdf(ios, file, ierr, __FILE__, __LINE__);
+        /* If there was an error, free allocated memory and deal with the error. */
+        if(ierr != PIO_NOERR){
+            int tmp_iotype = file->iotype;
+            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->rd_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            free(file->io_fstats);
+            free(file);
+            LOG((1, "PIOc_openfile_retry failed, ierr = %d", ierr));
+            return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
+                           "Opening file (%s) with iotype %d (%s) failed. The low level I/O library call failed", filename, tmp_iotype, pio_iotype_to_string(tmp_iotype));;
+        }
     }
+
 
 
     /* Check if the file has unlimited dimensions */
