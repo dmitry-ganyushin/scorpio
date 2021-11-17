@@ -326,19 +326,17 @@ int main(int argc, char* argv[])
     sprintf(filename, "example1_%d.nc", fmt);
 
     ret = PIOc_openfile(iosysid, &ncid_read, &(formats[fmt]), filename, PIO_NOWRITE); ERR
-#if 0
-      dimid_darray_var_len_inq = -1;
-      ret = PIOc_inq_dimid(ncid_read, "darray_var_len", &dimid_darray_var_len_inq);
-      ERR
-      if (dimid_darray_var_len_inq != dimid_darray_var_len)
-          printf("rank = %d, read wrong ID for dimension darray_var_len\n", my_rank);
 
-      dimlen_darray_var_len_inq = -1;
-      ret = PIOc_inq_dimlen(ncid_read, dimid_darray_var_len_inq, &dimlen_darray_var_len_inq);
-      ERR
-      if (dimlen_darray_var_len_inq != (PIO_Offset) gdimlen[0])
-          printf("rank = %d, read wrong length for dimension darray_var_len\n", my_rank);
-#endif
+    dimid_darray_var_len_inq = -1;
+    ret = PIOc_inq_dimid(ncid_read, "darray_var_len", &dimid_darray_var_len_inq);
+    ERR
+    if (dimid_darray_var_len_inq == -1)
+          printf("rank = %d, read wrong ID for dimension darray_var_len\n", my_rank);
+    dimlen_darray_var_len_inq = -1;
+    ret = PIOc_inq_dimlen(ncid_read, dimid_darray_var_len_inq, &dimlen_darray_var_len_inq);
+    ERR
+    if (dimlen_darray_var_len_inq != (PIO_Offset) gdimlen[0])
+        printf("rank = %d, read wrong length for dimension darray_var_len\n", my_rank);
       /* Get int type global attribute. */
     ret = PIOc_get_att(ncid_read, PIO_GLOBAL, "dummy_global_att_int", &get_global_att_int_data); ERR
     if (get_global_att_int_data != put_global_att_int_data)

@@ -3350,6 +3350,8 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             char **var_names = adios2_available_variables(file->ioH, &var_size);
             size_t current_var_cnt = 0;
             char const var_prefix[] = "/__pio__/var/";
+            file->num_dim_vars = 0;
+            char const dim_prefix[] = "/__pio__/dim/";
             for (size_t i = 0; i < var_size; i++) {
                 /* strings that start with /__pio__/var/ are variables */
                 if (strstr(var_names[i], var_prefix) != NULL) {
@@ -3507,7 +3509,6 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                                                "Not implemented");
                                             }
                                         }
-
                                     }
                                     /*second dimension */
                                     {
@@ -3544,7 +3545,28 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                     }
                     current_var_cnt++;
                 }
-                free(var_names[i]);
+                if (strstr(var_names[i], dim_prefix) != NULL) {
+                    int sub_length = strlen(var_names[i]) - strlen(dim_prefix);
+                    int full_length = strlen(var_names[i]);
+                    int prefix_length = strlen(var_prefix);
+                    file->dim_names[file->num_dim_vars] = (char *) malloc(sub_length + 1);
+                    if (file->dim_names[file->num_dim_vars]) {
+                        for (int c = 0; c < sub_length + 1; c++) {
+                            file->dim_names[file->num_dim_vars][c] = var_names[i][prefix_length + c];
+                        }
+                    }
+                    adios2_variable *variableH = adios2_inquire_variable(file->ioH, var_names[i]);
+                    if (variableH != NULL) {
+                        int len = 0;
+                        adios2_error adiosErr = adios2_get(file->engineH, variableH, &len, adios2_mode_sync);
+                        if (adiosErr == adios2_error_none){
+                            file->dim_values[file->num_dim_vars] = len;
+                        }
+                    }
+                    file->num_dim_vars++;
+                }
+
+                        free(var_names[i]);
             }
             free(var_names);
             file->num_vars = current_var_cnt;
