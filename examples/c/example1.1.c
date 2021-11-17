@@ -35,8 +35,6 @@ int main(int argc, char* argv[])
      will do IO from all processors. */
   int niotasks;
 
-  /* Stride in the MPI rank between IO tasks.  */
-  const int ioproc_stride = 2;
 
   /* Zero based rank of first processor to be used for I/O. */
   const int ioproc_start = 0;
@@ -162,6 +160,9 @@ int main(int argc, char* argv[])
   gdimlen[0] = ELEMENTS_PER_PE * ntasks;
 
   /* Keep things simple - 1 IO task per MPI process */
+  /* Stride in the MPI rank between IO tasks.  */
+  int ioproc_stride = 2;
+  if (ntasks == 1) ioproc_stride = 1;
   niotasks = ntasks / ioproc_stride;
 
   /* Initialize the PIO IO system. This specifies how
