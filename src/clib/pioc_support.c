@@ -3201,6 +3201,12 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
     if (file->iotype == PIO_IOTYPE_ADIOS) {
         /* trying to open a file with adios */
 #ifdef _ADIOS2
+        ios->adiosH = adios2_init(ios->union_comm, adios2_debug_mode_on);
+        if (ios->adiosH == NULL)
+        {
+            GPTLstop("PIO:PIOc_Init_Intracomm");
+            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Initializing ADIOS failed");
+        }
         char declare_name[PIO_MAX_NAME] = {'\0'};
         char bpname[PIO_MAX_NAME]  = {'\0'};
         strcat(bpname, filename);
