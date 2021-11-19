@@ -3201,6 +3201,17 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
     if (file->iotype == PIO_IOTYPE_ADIOS) {
         /* trying to open a file with adios */
 #ifdef _ADIOS2
+        if (ios->adiosH != NULL)
+        {
+            adios2_error adiosErr = adios2_finalize(ios->adiosH);
+            if (adiosErr != adios2_error_none)
+            {
+                GPTLstop("PIO:PIOc_finalize");
+                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Finalizing ADIOS failed (adios2_error=%s) on iosystem (%d)", adios2_error_to_string(adiosErr), iosysid);
+            }
+
+            ios->adiosH = NULL;
+        }
         ios->adiosH = adios2_init(ios->union_comm, adios2_debug_mode_on);
         if (ios->adiosH == NULL)
         {
