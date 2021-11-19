@@ -328,10 +328,13 @@ int main(int argc, char* argv[])
 
     ret = PIOc_openfile(iosysid, &ncid_read, &(formats[fmt]), filename, PIO_NOWRITE); ERR
 
+    int total_dims = -1;
+    ret = PIOc_inq_ndims(ncid_read, &total_dims);
+
     dimid_darray_var_len_inq = -1;
     ret = PIOc_inq_dimid(ncid_read, "darray_var_len", &dimid_darray_var_len_inq);
     ERR
-    if (dimid_darray_var_len_inq == -1)
+    if (dimid_darray_var_len_inq < 0 || dimid_darray_var_len_inq > total_dims)
           printf("rank = %d, read wrong ID for dimension darray_var_len\n", my_rank);
     dimlen_darray_var_len_inq = -1;
     ret = PIOc_inq_dimlen(ncid_read, dimid_darray_var_len_inq, &dimlen_darray_var_len_inq);
