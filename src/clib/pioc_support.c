@@ -3503,8 +3503,12 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                     file->adios_vars[current_var_cnt].gdimids = malloc(
                                             file->adios_vars[current_var_cnt].ndims * sizeof(int));
                                     int gdimid = get_dim_id(file, attr_data);
-                                    if (gdimid != -1)
+                                    if (gdimid != -1){
                                         file->adios_vars[current_var_cnt].gdimids[0] = gdimid;
+                                    }else{
+                                        LOG((2, "cannot determing dim id for variable %d", attr_data));
+                                    }
+
                                     free(attr_data);
                                 } else if (size_attr == 2) {
                                     char **attr_data = malloc(2 * sizeof(char *));
@@ -3520,12 +3524,20 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                     file->adios_vars[current_var_cnt].gdimids = malloc(
                                             file->adios_vars[current_var_cnt].ndims * sizeof(int));
                                     int gdimid = get_dim_id(file, attr_data[0]);
-                                    if (gdimid != -1)
+                                    if (gdimid != -1){
                                         file->adios_vars[current_var_cnt].gdimids[0] = gdimid;
+                                    }else{
+                                        LOG((2, "cannot determing dim id for variable %d", attr_data[0]));
+                                    }
+
                                     /* second dimension */
                                     gdimid = get_dim_id(file, attr_data[1]);
-                                    if (gdimid != -1)
-                                        file->adios_vars[current_var_cnt].gdimids[0] = gdimid;
+                                    if (gdimid != -1){
+                                        file->adios_vars[current_var_cnt].gdimids[1] = gdimid;
+                                    }else{
+                                        LOG((2, "cannot determing dim id for variable %d", attr_data[0]));
+                                    }
+
                                     free(attr_data[0]);
                                     free(attr_data[1]);
                                     free(attr_data);
