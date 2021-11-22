@@ -3497,49 +3497,29 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                             if (attr) {
                                 size_t size_attr;
                                 adios2_error err = adios2_attribute_size(&size_attr, attr);
-                                if (size_attr == 1) {
-                                    char *attr_data = calloc(PIO_MAX_NAME, sizeof(char));
-                                    err = adios2_attribute_data(&attr_data, &size_attr, attr);
-                                    file->adios_vars[current_var_cnt].gdimids = malloc(
-                                            file->adios_vars[current_var_cnt].ndims * sizeof(int));
-                                    int gdimid = get_dim_id(file, attr_data);
-                                    if (gdimid != -1){
-                                        file->adios_vars[current_var_cnt].gdimids[0] = gdimid;
-                                    }else{
-                                        LOG((2, "cannot determing dim id for variable %d", attr_data));
+                                if (size_attr > 0) {
+                                    char **attr_data = malloc(size_attr * sizeof(char *));
+                                    for (size_t a = 0; a < size_attr; a++){
+                                        attr_data[a] = calloc(PIO_MAX_NAME, sizeof(char));
                                     }
-
-                                    free(attr_data);
-                                } else if (size_attr == 2) {
-                                    char **attr_data = malloc(2 * sizeof(char *));
-                                    attr_data[0] = calloc(PIO_MAX_NAME, sizeof(char));
-                                    attr_data[1] = calloc(PIO_MAX_NAME, sizeof(char));
                                     err = adios2_attribute_data(attr_data, &size_attr, attr);
                                     if (err != adios2_error_none) {
                                         return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                                        "Reading attribute in (ADIOS) file (%s) failed",
                                                        pio_get_fname_from_file(file));
                                     }
-                                    /* first dimension */
                                     file->adios_vars[current_var_cnt].gdimids = malloc(
                                             file->adios_vars[current_var_cnt].ndims * sizeof(int));
-                                    int gdimid = get_dim_id(file, attr_data[0]);
-                                    if (gdimid != -1){
-                                        file->adios_vars[current_var_cnt].gdimids[0] = gdimid;
-                                    }else{
-                                        LOG((2, "cannot determing dim id for variable %d", attr_data[0]));
-                                    }
 
-                                    /* second dimension */
-                                    gdimid = get_dim_id(file, attr_data[1]);
-                                    if (gdimid != -1){
-                                        file->adios_vars[current_var_cnt].gdimids[1] = gdimid;
-                                    }else{
-                                        LOG((2, "cannot determing dim id for variable %d", attr_data[0]));
+                                    for (size_t a = 0; a < size_attr; a++) {
+                                        int gdimid = get_dim_id(file, attr_data[a]);
+                                        if (gdimid != -1) {
+                                            file->adios_vars[current_var_cnt].gdimids[a] = gdimid;
+                                        } else {
+                                            LOG((2, "cannot determing dim id for variable %d", attr_data[a]));
+                                        }
+                                        free(attr_data[a]);
                                     }
-
-                                    free(attr_data[0]);
-                                    free(attr_data[1]);
                                     free(attr_data);
                                 }
                             }
@@ -3550,7 +3530,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                 }
 
 
-                        free(var_names[i]);
+                free(var_names[i]);
             }
             free(var_names);
             file->num_vars = current_var_cnt;
