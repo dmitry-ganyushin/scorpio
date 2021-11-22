@@ -49,6 +49,8 @@ int main(int argc, char* argv[])
     int dimid_darray_var_len_inq;
     PIO_Offset dimlen_darray_var_len_inq;
 
+    int dimids_put_get_var_len_2D_inq[2];
+    PIO_Offset dimlens_put_get_var_len_2D_inq[2];
 
     /* This simple example uses one-dimensional data. */
   const int NDIMS = 1;
@@ -386,7 +388,15 @@ int main(int argc, char* argv[])
       }
     }
 
-    /* Get varid of the int variable with time steps. */
+    dimid_darray_var_len_inq = -1;
+    ret = PIOc_inq_vardimid(ncid_read, varid_dummy_darray_var_int, &dimid_darray_var_len_inq); ERR
+    dimlen_darray_var_len_inq = -1;
+    ret = PIOc_inq_dimlen(ncid_read, dimid_darray_var_len_inq, &dimlen_darray_var_len_inq); ERR
+    if (dimlen_darray_var_len_inq != (PIO_Offset) gdimlen[0])
+          printf("rank = %d, read wrong length for dimension darray_var_len\n", my_rank);
+
+
+      /* Get varid of the int variable with time steps. */
     ret = PIOc_inq_varid(ncid_read, "dummy_time_var_int", &varid_dummy_time_var_int); ERR
     /* Read from int variable with time steps, frame 2 */
     PIOc_setframe(ncid_read, varid_dummy_time_var_int, 2);
@@ -481,8 +491,23 @@ int main(int argc, char* argv[])
               }
           }
       }
+
+      varid_dummy_put_get_var_int_2D = -1;
+      ret = PIOc_inq_varid(ncid_read, "dummy_put_get_var_int_2D", &varid_dummy_put_get_var_int_2D); ERR
+
+      dimids_put_get_var_len_2D_inq[0] = -1;
+      dimids_put_get_var_len_2D_inq[1] = -1;
+      ret = PIOc_inq_vardimid(ncid_read, varid_dummy_put_get_var_int_2D, dimids_put_get_var_len_2D_inq); ERR
+      dimlens_put_get_var_len_2D_inq[0] = -1;
+      ret = PIOc_inq_dimlen(ncid_read, dimids_put_get_var_len_2D_inq[0], &dimlens_put_get_var_len_2D_inq[0]); ERR
+      if (dimlens_put_get_var_len_2D_inq[0] != PUT_GET_VAR_LEN_X)
+                  printf("rank = %d, read wrong length for dimension put_get_var_len_x\n", my_rank);
+      dimlens_put_get_var_len_2D_inq[1] = -1;
+      ret = PIOc_inq_dimlen(ncid_read, dimids_put_get_var_len_2D_inq[1], &dimlens_put_get_var_len_2D_inq[1]); ERR
+      if (dimlens_put_get_var_len_2D_inq[1] != PUT_GET_VAR_LEN_Y)
+                  printf("rank = %d, read wrong length for dimension put_get_var_len_y\n", my_rank);
 #endif
-    ret = PIOc_closefile(ncid_read); ERR
+      ret = PIOc_closefile(ncid_read); ERR
   }
 
   ret = PIOc_freedecomp(iosysid, ioid_int); ERR

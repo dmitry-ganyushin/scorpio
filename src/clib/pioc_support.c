@@ -3093,7 +3093,14 @@ int check_unlim_use(int ncid)
     
     return PIO_NOERR;
 }
-
+int get_dim_id(file_desc_t * file, char *dim_name){
+    for (int i = 0; i <  file->num_dim_vars; i++){
+        if (strcmp(file->dim_names[i], dim_name) == 0){
+            return i;
+        }
+    }
+    return -1;
+}
 /**
  * Open an existing file using PIO library. This is an internal
  * function. Depending on the value of the retry parameter, a failed
@@ -3273,6 +3280,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
 
     file->num_unlim_dimids = 0;
     file->unlim_dimids = NULL;
+    file->num_dim_vars = 0;
 
     for (int i = 0; i < PIO_MAX_VARS; i++)
     {
@@ -3367,8 +3375,38 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             char **var_names = adios2_available_variables(file->ioH, &var_size);
             size_t current_var_cnt = 0;
             char const var_prefix[] = "/__pio__/var/";
-            file->num_dim_vars = 0;
             char const dim_prefix[] = "/__pio__/dim/";
+            /* read global dimensions to match them later variables to dimemsional ids */
+            /* move to a separate function */
+            for (size_t i = 0; i < var_size; i++) {
+                if (strstr(var_names[i], dim_prefix) != NULL) {
+                    int sub_length = strlen(var_names[i]) - strlen(dim_prefix);
+                    int full_length = strlen(var_names[i]);
+                    int prefix_length = strlen(var_prefix);
+                    file->dim_names[file->num_dim_vars] = (char *) malloc(sub_length + 1);
+                    if (file->dim_names[file->num_dim_vars]) {
+                        for (int c = 0; c < sub_length + 1; c++) {
+                            file->dim_names[file->num_dim_vars][c] = var_names[i][prefix_length + c];
+                        }
+                    }
+                    adios2_variable *variableH = adios2_inquire_variable(file->ioH, var_names[i]);
+                    if (variableH != NULL) {
+                        adios2_type type;
+                        adios2_variable_type(&type, variableH);
+                        if (type == adios2_type_uint64_t) {
+                            uint64_t len;
+                            adios2_error adiosErr = adios2_get(file->engineH, variableH, &len, adios2_mode_sync);
+                            if (adiosErr == adios2_error_none) {
+                                file->dim_values[file->num_dim_vars] = len;
+                            }
+                        }else{
+                            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                           "Not implemented");
+                        }
+                    }
+                    file->num_dim_vars++;
+                }
+            }
             for (size_t i = 0; i < var_size; i++) {
                 /* strings that start with /__pio__/var/ are variables */
                 if (strstr(var_names[i], var_prefix) != NULL) {
@@ -3464,30 +3502,10 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                     err = adios2_attribute_data(&attr_data, &size_attr, attr);
                                     file->adios_vars[current_var_cnt].gdimids = malloc(
                                             file->adios_vars[current_var_cnt].ndims * sizeof(int));
-                                    char prefix_gdim_name[] = "/__pio__/dim/";
-                                    char *gdims_var_name = malloc(
-                                            strlen(prefix_var_name) + strlen(attr_data) + 1);
-                                    strcpy(gdims_var_name, prefix_gdim_name);
-                                    strcat(gdims_var_name, attr_data);
-                                    uint64_t attr_gdims;
-                                    size_t size_gdims;
-                                    adios2_variable *gdims_var = adios2_inquire_variable(file->ioH,
-                                                                                         gdims_var_name);
-                                    free(gdims_var_name);
+                                    int gdimid = get_dim_id(file, attr_data);
+                                    if (gdimid != -1)
+                                        file->adios_vars[current_var_cnt].gdimids[0] = gdimid;
                                     free(attr_data);
-                                    if (gdims_var) {
-                                        adios2_type type;
-                                        adios2_variable_type(&type, gdims_var);
-                                        if (type == adios2_type_uint64_t) {
-                                            uint64_t data;
-                                            adios2_get(file->engineH, gdims_var, &data, adios2_mode_sync);
-                                            //gdims denotes as a scalar in bp file
-                                            file->adios_vars[current_var_cnt].gdimids[0] = data;
-                                        } else {
-                                            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                                           "Not implemented");
-                                        }
-                                    }
                                 } else if (size_attr == 2) {
                                     char **attr_data = malloc(2 * sizeof(char *));
                                     attr_data[0] = calloc(PIO_MAX_NAME, sizeof(char));
@@ -3501,59 +3519,15 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                     /* first dimension */
                                     file->adios_vars[current_var_cnt].gdimids = malloc(
                                             file->adios_vars[current_var_cnt].ndims * sizeof(int));
-                                    {
-                                        char prefix_gdim_name[] = "/__pio__/dim/";
-                                        char *gdims_var_name = malloc(
-                                                strlen(prefix_var_name) + strlen(attr_data[0]) + 1);
-                                        strcpy(gdims_var_name, prefix_gdim_name);
-                                        strcat(gdims_var_name, attr_data[0]);
-                                        uint64_t attr_gdims;
-                                        size_t size_gdims;
-                                        adios2_variable *gdims_var = adios2_inquire_variable(file->ioH,
-                                                                                             gdims_var_name);
-                                        free(gdims_var_name);
-                                        free(attr_data[0]);
-                                        if (gdims_var) {
-                                            adios2_type type;
-                                            adios2_variable_type(&type, gdims_var);
-                                            if (type == adios2_type_uint64_t) {
-                                                uint64_t data;
-                                                adios2_get(file->engineH, gdims_var, &data, adios2_mode_sync);
-                                                //gdims denotes as a scalar in bp file
-                                                file->adios_vars[current_var_cnt].gdimids[0] = data;
-                                            } else {
-                                                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                                               "Not implemented");
-                                            }
-                                        }
-                                    }
-                                    /*second dimension */
-                                    {
-                                        char prefix_gdim_name[] = "/__pio__/dim/";
-                                        char *gdims_var_name = malloc(
-                                                strlen(prefix_var_name) + strlen(attr_data[1]) + 1);
-                                        strcpy(gdims_var_name, prefix_gdim_name);
-                                        strcat(gdims_var_name, attr_data[1]);
-                                        uint64_t attr_gdims;
-                                        size_t size_gdims;
-                                        adios2_variable *gdims_var = adios2_inquire_variable(file->ioH,
-                                                                                             gdims_var_name);
-                                        free(gdims_var_name);
-                                        free(attr_data[1]);
-                                        if (gdims_var) {
-                                            adios2_type type;
-                                            adios2_variable_type(&type, gdims_var);
-                                            if (type == adios2_type_uint64_t) {
-                                                uint64_t data;
-                                                adios2_get(file->engineH, gdims_var, &data, adios2_mode_sync);
-                                                //gdims denotes as a scalar in bp file
-                                                file->adios_vars[current_var_cnt].gdimids[1] = data;
-                                            } else {
-                                                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                                               "Not implemented");
-                                            }
-                                        }
-                                    }
+                                    int gdimid = get_dim_id(file, attr_data[0]);
+                                    if (gdimid != -1)
+                                        file->adios_vars[current_var_cnt].gdimids[0] = gdimid;
+                                    /* second dimension */
+                                    gdimid = get_dim_id(file, attr_data[1]);
+                                    if (gdimid != -1)
+                                        file->adios_vars[current_var_cnt].gdimids[0] = gdimid;
+                                    free(attr_data[0]);
+                                    free(attr_data[1]);
                                     free(attr_data);
                                 }
                             }
@@ -3562,26 +3536,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                     }
                     current_var_cnt++;
                 }
-                if (strstr(var_names[i], dim_prefix) != NULL) {
-                    int sub_length = strlen(var_names[i]) - strlen(dim_prefix);
-                    int full_length = strlen(var_names[i]);
-                    int prefix_length = strlen(var_prefix);
-                    file->dim_names[file->num_dim_vars] = (char *) malloc(sub_length + 1);
-                    if (file->dim_names[file->num_dim_vars]) {
-                        for (int c = 0; c < sub_length + 1; c++) {
-                            file->dim_names[file->num_dim_vars][c] = var_names[i][prefix_length + c];
-                        }
-                    }
-                    adios2_variable *variableH = adios2_inquire_variable(file->ioH, var_names[i]);
-                    if (variableH != NULL) {
-                        int len = 0;
-                        adios2_error adiosErr = adios2_get(file->engineH, variableH, &len, adios2_mode_sync);
-                        if (adiosErr == adios2_error_none){
-                            file->dim_values[file->num_dim_vars] = len;
-                        }
-                    }
-                    file->num_dim_vars++;
-                }
+
 
                         free(var_names[i]);
             }
