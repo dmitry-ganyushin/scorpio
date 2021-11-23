@@ -3150,7 +3150,7 @@ int adios_read_global_dimensions(iosystem_desc_t *ios, file_desc_t * file, char 
     }
     return 0;
 }
-char*  adios_name(char* prefix, char* root, char *suffix){
+char*  adios_name(const char* prefix, char* root, const char *suffix){
     char *name = malloc(
             strlen(prefix) + strlen(root) +
             strlen(suffix) + 1);
