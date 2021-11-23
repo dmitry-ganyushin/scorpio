@@ -3107,6 +3107,8 @@ void adios_get_adios_type(file_desc_t *file, size_t current_var_cnt);
 void adios_get_ndims(file_desc_t *file, size_t current_var_cnt);
 int adios_get_dim_ids(file_desc_t *file, size_t current_var_cnt);
 int adios_get_attrs(file_desc_t *file, int current_var_cnt, char *const *attr_names, size_t i);
+size_t adios_read_vars_vars(file_desc_t *file, size_t var_size, char *const *var_names);
+size_t adios_read_vars_attr(file_desc_t *file, size_t attr_size, char *const *attr_names, size_t current_var_cnt);
 
 int get_dim_id(file_desc_t * file, char *dim_name){
     for (int i = 0; i <  file->num_dim_vars; i++){
@@ -3551,33 +3553,29 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             step++;
             size_t var_size;
             char **var_names = adios2_available_variables(file->ioH, &var_size);
-            size_t current_var_cnt = 0;
 
             adios_read_global_dimensions(ios, file, var_names, var_size);
-
-            for (size_t i = 0; i < var_size; i++) {
-                /* strings that start with /__pio__/var/ are variables */
-                if (strstr(var_names[i], adios_pio_var_prefix) != NULL) {
-                    int sub_length = strlen(var_names[i]) - strlen(adios_pio_var_prefix);
-                    int full_length = strlen(var_names[i]);
-                    int prefix_length = strlen(adios_pio_var_prefix);
-                    file->adios_vars[current_var_cnt].name = (char *) malloc(sub_length + 1);
-                    if (file->adios_vars[current_var_cnt].name) {
-                        for (int c = 0; c < sub_length + 1; c++) {
-                            file->adios_vars[current_var_cnt].name[c] = var_names[i][prefix_length + c];
-
-                        }
-                        adios_get_nc_type(file, current_var_cnt);
-                        adios_get_adios_type(file, current_var_cnt);
-                        adios_get_ndims(file, current_var_cnt);
-                        adios_get_dim_ids(file, current_var_cnt);
-                    }
-                    current_var_cnt++;
-                }
-                free(var_names[i]);
-            }
+            /* read names of variables from variables */
+            file->num_vars = adios_read_vars_vars(file, var_size, var_names);
+            for (size_t i = 0; i < var_size; i++)  free(var_names[i]);
             free(var_names);
+            /* additionally read variables from atrributes like
+             * /__pio__/var/dummy_scalar_var_int/def/ndims */
+            size_t attr_size;
+            char **attr_names = adios2_available_attributes(file->ioH, &attr_size);
+            size_t current_var_cnt = file->num_vars;
+            current_var_cnt = adios_read_vars_attr(file, attr_size, attr_names, current_var_cnt);
             file->num_vars = current_var_cnt;
+            for (size_t i = 0; i < attr_size; i++) free(attr_names[i]);
+            free(attr_names);
+
+            /* init variables */
+            for (size_t i = 0; i < file->num_vars; i++) {
+                adios_get_nc_type(file, i);
+                adios_get_adios_type(file, i);
+                adios_get_ndims(file, i);
+                adios_get_dim_ids(file, i);
+            }
             adios2_end_step(file->engineH);
         }
         /*close file */
@@ -3887,6 +3885,65 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
     spio_ltimer_stop(file->io_fstats->rd_timer_name);
     spio_ltimer_stop(file->io_fstats->tot_timer_name);
     return ierr;
+}
+
+size_t
+adios_read_vars_attr(file_desc_t *file, size_t attr_size, char *const *attr_names, size_t current_var_cnt) {
+     size_t max_varid = current_var_cnt;
+    for (size_t i = 0; i < attr_size; i++){
+        if (strstr(attr_names[i], adios_pio_var_prefix) != NULL && strstr(attr_names[i], adios_def_ndims_suffix)) {
+
+            int full_length = strlen(attr_names[i]);
+            int prefix_length = strlen(adios_pio_var_prefix);
+            int suffix_length = strlen(adios_def_ndims_suffix);
+            int sub_length = full_length - prefix_length - suffix_length;
+
+            char *name_tmp = (char *) malloc(sub_length + 1);
+            for (int j = 0; j < sub_length + 1; j++ ) name_tmp[j] = 0;
+
+            if (name_tmp) {
+                char* pos = attr_names[i] + prefix_length;
+                strncpy(name_tmp, pos, sub_length);
+            }
+            /* check that we do not have it already */
+            bool found = false;
+            for (int varid = 0; varid < max_varid; varid++){
+                if (strcmp(name_tmp, file->adios_vars[varid].name) == 0) {
+                    found = true;
+                    break;
+                }
+            }
+            if (found){
+                free(name_tmp);
+                continue;
+            }
+            file->adios_vars[current_var_cnt].name = (char *) malloc(sub_length + 1);
+            strcpy(file->adios_vars[current_var_cnt].name, name_tmp);
+            free(name_tmp);
+            current_var_cnt++;
+        }
+    }
+    return current_var_cnt;
+}
+
+size_t adios_read_vars_vars(file_desc_t *file, size_t var_size, char *const *var_names) {
+    size_t current_var_cnt = 0;
+    for (size_t i = 0; i < var_size; i++) {
+        /* strings that start with /__pio__/var/ are variables */
+        if (strstr(var_names[i], adios_pio_var_prefix) != NULL) {
+            int sub_length = strlen(var_names[i]) - strlen(adios_pio_var_prefix);
+            int full_length = strlen(var_names[i]);
+            int prefix_length = strlen(adios_pio_var_prefix);
+            file->adios_vars[current_var_cnt].name = (char *) malloc(sub_length + 1);
+            if (file->adios_vars[current_var_cnt].name) {
+                for (int c = 0; c < sub_length + 1; c++) {
+                    file->adios_vars[current_var_cnt].name[c] = var_names[i][prefix_length + c];
+                }
+            }
+            current_var_cnt++;
+        }
+    }
+    return current_var_cnt;
 }
 
 /**
