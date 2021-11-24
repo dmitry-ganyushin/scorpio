@@ -1393,6 +1393,9 @@ if (required_adios_step != 0) {
             if (type == adios2_type_int32_t) {
                 data_int32_t = (int32_t *) malloc(var_size * sizeof(int32_t));
                 adios2_get(file->engineH, data, data_int32_t, adios2_mode_sync);
+            }else if (type == adios2_type_double) {
+                data_double = (double *) malloc(var_size * sizeof(double));
+                adios2_get(file->engineH, data, data_double, adios2_mode_sync);
             } else if (type == adios2_type_float) {
                 data_float = (float *) malloc(var_size * sizeof(float));
                 /* type conversion*/
@@ -1414,7 +1417,7 @@ if (required_adios_step != 0) {
                     memcpy((char *) iobuf, &data_int32_t[start_idx_in_start_block],
                            (end_idx_in_end_block - start_idx_in_start_block + 1) * sizeof(int32_t));
                     free(data_int32_t);
-                } else if (type == adios2_type_float) {
+                } else if (type == adios2_type_float || type == adios2_type_double) {
                     memcpy((char *) iobuf, &data_double[start_idx_in_start_block],
                            (end_idx_in_end_block - start_idx_in_start_block + 1) * sizeof(double));
                     free(data_double);
@@ -1433,7 +1436,7 @@ if (required_adios_step != 0) {
                         memcpy((char *) iobuf, &data_int32_t[start_idx_in_start_block],
                                (var_size - start_idx_in_start_block + 1) * sizeof(int32_t));
                         free(data_int32_t);
-                    } else if (type == adios2_type_float) {
+                    } else if (type == adios2_type_float ||  type == adios2_type_double) {
                         memcpy((char *) iobuf, &data_double[start_idx_in_start_block],
                                (var_size - start_idx_in_start_block + 1) * sizeof(double));
                         free(data_double);
@@ -1448,7 +1451,7 @@ if (required_adios_step != 0) {
                         memcpy((char *) iobuf, &data_int32_t[0],
                                (var_size - end_idx_in_end_block + 1) * sizeof(int32_t));
                         free(data_int32_t);
-                    } else if (type == adios2_type_float) {
+                    } else if (type == adios2_type_float || type == adios2_type_double) {
                         memcpy((char *) iobuf, &data_double[0],
                                (var_size - end_idx_in_end_block + 1) * sizeof(double));
                         free(data_double);
@@ -1462,7 +1465,7 @@ if (required_adios_step != 0) {
                     if (type == adios2_type_int32_t) {
                         memcpy((char *) iobuf, &data_int32_t[0], var_size * sizeof(int32_t));
                         free(data_int32_t);
-                    } else if (type == adios2_type_float) {
+                    } else if (type == adios2_type_float || type == adios2_type_double) {
                         memcpy((char *) iobuf, &data_double[0], var_size * sizeof(double));
                         free(data_double);
                     }else {
