@@ -1414,7 +1414,8 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     size_t header_size = 2 * (av->ndims * sizeof(int64_t));
                     size_t block_size = 0;
                     /* blocks structure
-                     * block1: |start| count| data |     block2: |start|count|data| */
+                     * single block
+                     * block1: |start| count| data |  */
                     /* 2D */
                     /* |start[0],start[1]|count[0], count[1]| data| */
                     for (size_t i = 0; i < data_blocks_size; i++) {
@@ -1464,7 +1465,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             global_count[cnt] = *((int64_t *) (mem_buffer + (cnt + av->ndims) * sizeof(int64_t)));
                         }
                         /* check that we are inside the required single adios block */
-                        if (av->adios_type == adios2_type_int8_t && xtype == NC_CHAR) {
+                        if (false && av->adios_type == adios2_type_int8_t && xtype == NC_CHAR) {
                             /*text type, block reading*/
                             /*assuming a string variable in one block*/
                             memcpy((char *) buf, mem_buffer + header_size, global_count[0]);
@@ -1491,20 +1492,25 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             if (start[0] + count[0] >= global_start[0] && start[0] + count[0] < global_start[0] + global_count[0] ){
                                 end_idx = start[0] + count[0] - global_start[0];
                                 /*  case |xxxxxxxxx| */
-                            }else if ( global_start[0] + global_count[0] < start[0] +count[0]){
+                            }else if ( global_start[0] + global_count[0] <= start[0] +count[0]){
                                 end_idx = global_count[0];
                             }
 
                             if (start_idx != -1 && end_idx != -1){
-                                for(int idx = start_idx; idx < end_idx; idx++){
+
                                     if (av->adios_type == adios2_type_double)
+                                        for(int idx = start_idx; idx < end_idx; idx++)
                                         ((double *) buf)[idx + global_start[0]  -  start[0]] = *((double*)(mem_buffer + header_size + (idx) * read_type_size));
                                     else if (av->adios_type == adios2_type_int32_t)
+                                        for(int idx = start_idx; idx < end_idx; idx++)
                                         ((int32_t *) buf)[idx + global_start[0] - start[0]] = *((int32_t *)(mem_buffer + header_size + (idx) * read_type_size));
+                                    else if (av->adios_type == adios2_type_int8_t)
+                                        for(int idx = start_idx; idx < end_idx; idx++)
+                                            ((char *) buf)[idx + global_start[0] - start[0]] = *((char *)(mem_buffer + header_size + (idx) * read_type_size));
                                     else
                                         return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                                        "Not implemented");
-                                }
+
                             }
                         }else if (av->ndims == 2 && read_type == adios2_type_uint8_t) {
                             /* data layout */
@@ -1517,6 +1523,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             int end_idx_x = -1;
                             int start_idx_y = -1;
                             int end_idx_y = -1;
+
                             /* |0000xxxxxx|xxxxxxxxxx|xxxxxxxxxx|xxxxx0000| */
                             /* find beginning of the block */
                             /* case |0000xxxxxx| */
@@ -1531,31 +1538,43 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             if (start[1] + count[1] >= global_start[1] && start[1] + count[1] < global_start[1] + global_count[1] ){
                                 end_idx_y = start[1] + count[1] - global_start[1];
                                 /*  case |xxxxxxxxx| */
-                            }else if ( global_start[1] + global_count[1] < start[1] +count[1]){
+                            }else if ( global_start[1] + global_count[1] <= start[1] +count[1]){
                                 end_idx_y = global_count[1];
                             }
+                            start_idx_x = start[0];
+                            end_idx_x = start[0] + count[0];
+
 
                             if (start_idx_x != -1 && end_idx_x != -1 && start_idx_y != -1 && end_idx_y != -1) {
-                                for (int idx_y = start_idx_y; idx_y < end_idx_y; idx_y++) {
-                                    for (int idx_x = start_idx_x; idx_x < end_idx_x; idx_x++) {
-                                        if (av->adios_type == adios2_type_double)
-                                            ((double *) buf)[idx_x + idx_y * global_count[0] + global_start[1] *
-                                                                                               global_count[0] +
-                                                             global_start[0] - start[0] - start[1] * global_count[0]] =
-                                                    *((double *) (mem_buffer + header_size +
-                                                                  (idx_x + idx_y * global_count[0]) * read_type_size));
-                                        else if (av->adios_type == adios2_type_int32_t)
-                                            ((int32_t *) buf)[idx_x + idx_y * global_count[0] + global_start[1] *
-                                                                                                global_count[0] +
-                                                              global_start[0] - start[0] -
-                                                              start[1] * global_count[0]] = *((int32_t *) (
-                                                    mem_buffer + header_size +
-                                                    (idx_x + idx_y * global_count[0]) * read_type_size));
+
+                                        if (av->adios_type == adios2_type_double){
+                                            for (int idx_y = start_idx_y; idx_y < end_idx_y; idx_y++) {
+                                                for (int idx_x = start_idx_x; idx_x < end_idx_x; idx_x++) {
+                                                    int offset = idx_x * global_count[1];
+                                                    ((double *) buf)[offset + idx_y + global_start[1]  -  start[1]] = *((double*)(offset + mem_buffer + header_size + (idx_y) * read_type_size));
+                                                }
+                                            }
+                                        }
+                                        else if (av->adios_type == adios2_type_int32_t){
+                                            for (int idx_y = start_idx_y; idx_y < end_idx_y; idx_y++) {
+                                                for (int idx_x = start_idx_x; idx_x < end_idx_x; idx_x++) {
+                                                    int offset = idx_x * global_count[1];
+                                                    ((int32_t *) buf)[offset + idx_y + global_start[1]  -  start[1]] = *((int32_t*)(offset + mem_buffer + header_size + (idx_y) * read_type_size));
+                                                }
+                                            }
+                                        }else if (av->adios_type == adios2_type_uint8_t || av->adios_type == adios2_type_int8_t){
+                                            for (int idx_y = start_idx_y; idx_y < end_idx_y; idx_y++) {
+                                                for (int idx_x = start_idx_x; idx_x < end_idx_x; idx_x++) {
+                                                    int offset = idx_x * global_count[1];
+                                                    ((char *) buf)[offset + idx_y + global_start[1]  -  start[1]] = *((char*)(offset + mem_buffer + header_size + (idx_y) * read_type_size));
+                                                }
+                                            }
+                                        }
                                         else
                                             return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                                            "Not implemented");
-                                    }
-                                }
+
+
                             }
 
                         } else {
@@ -1716,7 +1735,7 @@ int PIOc_get_var_tc(int ncid, int varid, nc_type xtype, void *buf)
     if (ndims)
     {
         /* Find the dimension IDs. */
-        int dimids[ndims];
+        int dimids[PIO_MAX_DIMS];
         if ((ierr = PIOc_inq_vardimid(ncid, varid, dimids)))
         {
             return pio_err(ios, file, ierr, __FILE__, __LINE__,
