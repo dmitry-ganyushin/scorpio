@@ -136,7 +136,7 @@ int main(int argc, char* argv[])
 
   for (int i = 0; i < BUDG_FLUX_LEN; i++) {
     put_var_buffer_1D[i] = (i + 1) * 0.1;
-    get_var_buffer_1D[i] = 0.0;
+    get_var_buffer_1D[i] = -1.0;
   }
 
   for (int fmt = 0; fmt < 2; fmt++) {
@@ -196,12 +196,12 @@ int main(int argc, char* argv[])
 
     /* Empty strings for locfnh */
     memset(put_string_array, 0, sizeof(put_string_array));
-    ret = PIOc_put_vara_text(ncid_write, varid_locfnh, start_2D, count_2D, put_string_array[0]); ERR
+    ret = PIOc_put_vara_text(ncid_write, varid_locfnh, start_2D, count_2D, put_string_array); ERR
 
     /* Non-empty strings for locfnhr */
     for (int t = 0; t < NTAPES; t++)
       snprintf(put_string_array[t], MAX_CHARS, "tape_%d.nc", t);
-    ret = PIOc_put_vara_text(ncid_write, varid_locfnhr, start_2D, count_2D, put_string_array[0]); ERR
+    ret = PIOc_put_vara_text(ncid_write, varid_locfnhr, start_2D, count_2D, put_string_array); ERR
  
     /* Put one 1D double variable. */
     ret = PIOc_put_var_double(ncid_write, varid_budg_fluxG, put_var_buffer_1D); ERR
@@ -236,12 +236,12 @@ int main(int argc, char* argv[])
     ret = PIOc_inq_dimid(ncid_read, "column", &dimid_column); ERR
 
     if (dimid_column < 0 || dimid_column > total_dims)
-        printf("rank = %d, read wrong ID for dimension column\n", my_rank);
+      printf("rank = %d, read wrong ID for dimension column\n", my_rank);
 
     dimlen = -1;
     ret = PIOc_inq_dimlen(ncid_read, dimid_column, &dimlen); ERR
     if (dimlen != COLUMN_LEN)
-        printf("rank = %d, read wrong length for dimension column\n", my_rank);
+      printf("rank = %d, read wrong length for dimension column\n", my_rank);
 
     varid_DZSNO = -1;
     ret = PIOc_inq_varid(ncid_read, "DZSNO", &varid_DZSNO); ERR
@@ -267,10 +267,11 @@ int main(int argc, char* argv[])
           printf("rank = %d, read wrong length for dimension levsno\n", my_rank);
 
     /* Read one 1D double variable. */
+    varid_cols1d_wtxy = -1;
+    ret = PIOc_inq_varid(ncid_read, "cols1d_wtxy", &varid_cols1d_wtxy); ERR
+
     for (int i = 0; i < element_per_pe_1D; i++)
       read_darray_buffer_1D[i] = 0.0;
-
-    ret = PIOc_inq_varid(ncid_read, "cols1d_wtxy", &varid_cols1d_wtxy); ERR
     ret = PIOc_read_darray(ncid_read, varid_cols1d_wtxy, ioid_1D, read_darray_buffer_1D, read_darray_buffer_1D); ERR
 
     for (int i = 0; i < element_per_pe_1D; i++) {
@@ -282,10 +283,11 @@ int main(int argc, char* argv[])
     }
 
     /* Read one 2D double variable. */
+    varid_DZSNO = -1;
+    ret = PIOc_inq_varid(ncid_read, "DZSNO", &varid_DZSNO); ERR
+
     for (int i = 0; i < element_per_pe_2D; i++)
       read_darray_buffer_2D[i] = 0.0;
-
-    ret = PIOc_inq_varid(ncid_read, "DZSNO", &varid_DZSNO); ERR
     ret = PIOc_read_darray(ncid_read, varid_DZSNO, ioid_2D, read_darray_buffer_2D, read_darray_buffer_2D); ERR
 
     for (int i = 0; i < element_per_pe_2D; i++) {
@@ -310,7 +312,7 @@ int main(int argc, char* argv[])
     ret = PIOc_inq_varid(ncid_read, "locfnh", &varid_locfnh); ERR
 
     memset(get_string_array, 0, sizeof(get_string_array));
-    ret = PIOc_get_var_text(ncid_read, varid_locfnh, get_string_array[0]); ERR
+    ret = PIOc_get_var_text(ncid_read, varid_locfnh, get_string_array); ERR
 
     for (int t = 0; t < NTAPES; t++) {
       if (strlen(get_string_array[t]) > 0)
@@ -318,7 +320,7 @@ int main(int argc, char* argv[])
     }
 
     memset(get_string_array, 0, sizeof(get_string_array));
-    ret = PIOc_get_var_text(ncid_read, varid_locfnhr, get_string_array[0]); ERR
+    ret = PIOc_get_var_text(ncid_read, varid_locfnhr, get_string_array); ERR
 
     for (int t = 0; t < NTAPES; t++) {
       if (strncmp(get_string_array[t], put_string_array[t], MAX_CHARS))
@@ -327,9 +329,10 @@ int main(int argc, char* argv[])
 
     /* Get one 1D double variable. */
     varid_budg_fluxG = -1;
-
     ret = PIOc_inq_varid(ncid_read, "budg_fluxG", &varid_budg_fluxG); ERR
-    for (int i = 0; i < BUDG_FLUX_LEN; i++) get_var_buffer_1D[i] = -1;
+
+    for (int i = 0; i < BUDG_FLUX_LEN; i++)
+      get_var_buffer_1D[i] = -1.0;
     ret = PIOc_get_var_double(ncid_read, varid_budg_fluxG, get_var_buffer_1D); ERR
     for (int i = 0; i < BUDG_FLUX_LEN; i++) {
       double diff = get_var_buffer_1D[i] - put_var_buffer_1D[i];
