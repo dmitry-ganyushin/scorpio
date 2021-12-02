@@ -89,7 +89,7 @@ int main(int argc, char* argv[])
     ret = PIOc_closefile(ncid_write); ERR
   }
 
-  for (int fmt = 0; fmt < 1; fmt++) {
+  for (int fmt = 0; fmt < 2; fmt++) {
     sprintf(filename, "test_put_get_strings_%d.nc", fmt);
 
     ret = PIOc_openfile(iosysid, &ncid_read, &(formats[fmt]), filename, PIO_NOWRITE); ERR

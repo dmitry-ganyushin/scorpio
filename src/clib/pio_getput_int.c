@@ -1464,12 +1464,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                         for (int cnt = 0; cnt < av->ndims; cnt++ ){
                             global_count[cnt] = *((int64_t *) (mem_buffer + (cnt + av->ndims) * sizeof(int64_t)));
                         }
-                        /* check that we are inside the required single adios block */
-                        if (false && av->adios_type == adios2_type_int8_t && xtype == NC_CHAR) {
-                            /*text type, block reading*/
-                            /*assuming a string variable in one block*/
-                            memcpy((char *) buf, mem_buffer + header_size, global_count[0]);
-                        } else if (av->ndims == 1 && read_type == adios2_type_uint8_t) {
+                        if (av->ndims == 1 && read_type == adios2_type_uint8_t) {
                             /* data layout */
                             /*  |adios data block 1 | adios data block2 |*/
                             /*  |header|     data   | header|   data    |*/
@@ -1481,100 +1476,142 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             /* |0000xxxxxx|xxxxxxxxxx|xxxxxxxxxx|xxxxx0000| */
                             /* find beginning of the block */
                             /* case |0000xxxxxx| */
-                            if ( start[0] >= global_start[0]  && start[0] < global_start[0] + global_count[0]){
+                            if (start[0] >= global_start[0] && start[0] < global_start[0] + global_count[0]) {
                                 start_idx = start[0] - global_start[0];
                                 /* case |xxxxxxxxx| */
-                            } else if (start[0] < global_start[0]){
+                            } else if (start[0] < global_start[0]) {
                                 start_idx = 0;
                             }
                             /* find end of the block */
                             /*  case |xxxxx0000| */
-                            if (start[0] + count[0] >= global_start[0] && start[0] + count[0] < global_start[0] + global_count[0] ){
+                            if (start[0] + count[0] >= global_start[0] &&
+                                start[0] + count[0] < global_start[0] + global_count[0]) {
                                 end_idx = start[0] + count[0] - global_start[0];
                                 /*  case |xxxxxxxxx| */
-                            }else if ( global_start[0] + global_count[0] <= start[0] +count[0]){
+                            } else if (global_start[0] + global_count[0] <= start[0] + count[0]) {
                                 end_idx = global_count[0];
                             }
 
-                            if (start_idx != -1 && end_idx != -1){
+                            if (start_idx != -1 && end_idx != -1) {
 
-                                    if (av->adios_type == adios2_type_double)
-                                        for(int idx = start_idx; idx < end_idx; idx++)
-                                        ((double *) buf)[idx + global_start[0]  -  start[0]] = *((double*)(mem_buffer + header_size + (idx) * read_type_size));
-                                    else if (av->adios_type == adios2_type_int32_t)
-                                        for(int idx = start_idx; idx < end_idx; idx++)
-                                        ((int32_t *) buf)[idx + global_start[0] - start[0]] = *((int32_t *)(mem_buffer + header_size + (idx) * read_type_size));
-                                    else if (av->adios_type == adios2_type_int8_t)
-                                        for(int idx = start_idx; idx < end_idx; idx++)
-                                            ((char *) buf)[idx + global_start[0] - start[0]] = *((char *)(mem_buffer + header_size + (idx) * read_type_size));
-                                    else
-                                        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                                       "Not implemented");
+                                if (av->adios_type == adios2_type_double)
+                                    for (int idx = start_idx; idx < end_idx; idx++)
+                                        ((double *) buf)[idx + global_start[0] - start[0]] = *((double *) (mem_buffer +
+                                                                                                           header_size +
+                                                                                                           (idx) *
+                                                                                                           read_type_size));
+                                else if (av->adios_type == adios2_type_int32_t)
+                                    for (int idx = start_idx; idx < end_idx; idx++)
+                                        ((int32_t *) buf)[idx + global_start[0] - start[0]] = *((int32_t *) (
+                                                mem_buffer + header_size + (idx) * read_type_size));
+                                else if (av->adios_type == adios2_type_int8_t)
+                                    for (int idx = start_idx; idx < end_idx; idx++)
+                                        ((char *) buf)[idx + global_start[0] - start[0]] = *((char *) (mem_buffer +
+                                                                                                       header_size +
+                                                                                                       (idx) *
+                                                                                                       read_type_size));
+                                else
+                                    return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                                   "Not implemented");
 
                             }
-                        }else if (av->ndims == 2 && read_type == adios2_type_uint8_t) {
+                        } else if (av->ndims == 2 && read_type == adios2_type_uint8_t) {
                             /* data layout */
                             /*  |adios data block 1 | adios data block2 |*/
                             /*  |header|     data   | header|   data    |*/
                             /* 0000xxx00*/
                             size_t read_type_size = av->adios_type_size;
                             //index in a block
-                            int start_idx_x = -1;
-                            int end_idx_x = -1;
-                            int start_idx_y = -1;
-                            int end_idx_y = -1;
+                            int start_idx_0 = -1;
+                            int end_idx_0 = -1;
+                            int start_idx_1 = -1;
+                            int end_idx_1 = -1;
 
                             /* |0000xxxxxx|xxxxxxxxxx|xxxxxxxxxx|xxxxx0000| */
                             /* find beginning of the block */
                             /* case |0000xxxxxx| */
-                            if ( start[1] >= global_start[1]  && start[1] < global_start[1] + global_count[1]){
-                                start_idx_y = start[1] - global_start[1];
+                            if (start[1] >= global_start[1] && start[1] < global_start[1] + global_count[1]) {
+                                start_idx_1 = start[1] - global_start[1];
                                 /* case |xxxxxxxxx| */
-                            } else if (start[1] < global_start[1]){
-                                start_idx_y = 0;
+                            } else if (start[1] < global_start[1]) {
+                                start_idx_1 = 0;
                             }
                             /* find end of the block */
                             /*  case |xxxxx0000| */
-                            if (start[1] + count[1] >= global_start[1] && start[1] + count[1] < global_start[1] + global_count[1] ){
-                                end_idx_y = start[1] + count[1] - global_start[1];
+                            if (start[1] + count[1] >= global_start[1] &&
+                                start[1] + count[1] < global_start[1] + global_count[1]) {
+                                end_idx_1 = start[1] + count[1] - global_start[1];
                                 /*  case |xxxxxxxxx| */
-                            }else if ( global_start[1] + global_count[1] <= start[1] +count[1]){
-                                end_idx_y = global_count[1];
+                            } else if (global_start[1] + global_count[1] <= start[1] + count[1]) {
+                                end_idx_1 = global_count[1];
                             }
-                            start_idx_x = start[0];
-                            end_idx_x = start[0] + count[0];
+                            start_idx_0 = start[0];
+                            end_idx_0 = start[0] + count[0];
 
+                            if (start_idx_0 != -1 && end_idx_0 != -1 && start_idx_1 != -1 && end_idx_1 != -1) {
 
-                            if (start_idx_x != -1 && end_idx_x != -1 && start_idx_y != -1 && end_idx_y != -1) {
-
-                                        if (av->adios_type == adios2_type_double){
-                                            for (int idx_y = start_idx_y; idx_y < end_idx_y; idx_y++) {
-                                                for (int idx_x = start_idx_x; idx_x < end_idx_x; idx_x++) {
-                                                    int offset = idx_x * global_count[1];
-                                                    ((double *) buf)[offset + idx_y + global_start[1]  -  start[1]] = *((double*)(offset + mem_buffer + header_size + (idx_y) * read_type_size));
-                                                }
+                                if (av->adios_type == adios2_type_double) {
+                                    for (int idx_0 = start_idx_0; idx_0 < end_idx_0; idx_0++) {
+                                        int offset = idx_0 * global_count[1];
+                                        if (start[0] != 0) {
+                                            for (int idx_1 = start_idx_1; idx_1 < end_idx_1; idx_1++) {
+                                                ((double *) buf)[idx_1 + global_start[1] -
+                                                                 start[1]] = *((double *) (offset + mem_buffer +
+                                                                                           header_size +
+                                                                                           (idx_1) * read_type_size));
+                                            }
+                                        } else {
+                                            for (int idx_1 = start_idx_1; idx_1 < end_idx_1; idx_1++) {
+                                                ((double *) buf)[offset + idx_1 + global_start[1] -
+                                                                 start[1]] = *((double *) (offset + mem_buffer +
+                                                                                           header_size +
+                                                                                           (idx_1) * read_type_size));
                                             }
                                         }
-                                        else if (av->adios_type == adios2_type_int32_t){
-                                            for (int idx_y = start_idx_y; idx_y < end_idx_y; idx_y++) {
-                                                for (int idx_x = start_idx_x; idx_x < end_idx_x; idx_x++) {
-                                                    int offset = idx_x * global_count[1];
-                                                    ((int32_t *) buf)[offset + idx_y + global_start[1]  -  start[1]] = *((int32_t*)(offset + mem_buffer + header_size + (idx_y) * read_type_size));
-                                                }
+
+                                    }
+                                } else if (av->adios_type == adios2_type_int32_t) {
+                                    for (int idx_0 = start_idx_0; idx_0 < end_idx_0; idx_0++) {
+                                        int offset = idx_0 * global_count[1];
+                                        if (start[0] != 0) {
+                                            for (int idx_1 = start_idx_1; idx_1 < end_idx_1; idx_1++) {
+                                                ((int32_t *) buf)[idx_1 + global_start[1] -
+                                                                  start[1]] = *((int32_t *) (offset + mem_buffer +
+                                                                                             header_size +
+                                                                                             (idx_1) * read_type_size));
                                             }
-                                        }else if (av->adios_type == adios2_type_uint8_t || av->adios_type == adios2_type_int8_t){
-                                            for (int idx_y = start_idx_y; idx_y < end_idx_y; idx_y++) {
-                                                for (int idx_x = start_idx_x; idx_x < end_idx_x; idx_x++) {
-                                                    int offset = idx_x * global_count[1];
-                                                    ((char *) buf)[offset + idx_y + global_start[1]  -  start[1]] = *((char*)(offset + mem_buffer + header_size + (idx_y) * read_type_size));
-                                                }
+                                        } else {
+                                            for (int idx_1 = start_idx_1; idx_1 < end_idx_1; idx_1++) {
+                                                ((int32_t *) buf)[offset + idx_1 + global_start[1] -
+                                                                  start[1]] = *((int32_t *) (offset + mem_buffer +
+                                                                                             header_size +
+                                                                                             (idx_1) * read_type_size));
+
                                             }
                                         }
-                                        else
-                                            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                                           "Not implemented");
+                                    }
+                                } else if (av->adios_type == adios2_type_uint8_t ||
+                                           av->adios_type == adios2_type_int8_t) {
+                                    for (int idx_0 = start_idx_0; idx_0 < end_idx_0; idx_0++) {
+                                        int offset = idx_0 * global_count[1];
+                                        if (start[0] != 0) {
+                                            for (int idx_1 = start_idx_1; idx_1 < end_idx_1; idx_1++) {
+                                                ((char *) buf)[idx_1 + global_start[1] - start[1]] = *((char *) (
+                                                        offset + mem_buffer + header_size + (idx_1) * read_type_size));
+                                            }
+                                        } else {
+                                            for (int idx_1 = start_idx_1; idx_1 < end_idx_1; idx_1++) {
+                                                ((char *) buf)[offset + idx_1 + global_start[1] -
+                                                               start[1]] = *((char *) (offset + mem_buffer +
+                                                                                       header_size +
+                                                                                       (idx_1) * read_type_size));
+                                            }
+                                        }
 
-
+                                    }
+                                } else
+                                    return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                                   "Not implemented");
                             }
 
                         } else {
