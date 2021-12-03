@@ -272,7 +272,7 @@ int main(int argc, char* argv[])
 
     for (int i = 0; i < element_per_pe_1D; i++)
       read_darray_buffer_1D[i] = 0.0;
-    ret = PIOc_read_darray(ncid_read, varid_cols1d_wtxy, ioid_1D, read_darray_buffer_1D, read_darray_buffer_1D); ERR
+    ret = PIOc_read_darray(ncid_read, varid_cols1d_wtxy, ioid_1D, element_per_pe_1D, read_darray_buffer_1D); ERR
 
     for (int i = 0; i < element_per_pe_1D; i++) {
       double diff = read_darray_buffer_1D[i] - write_darray_buffer_1D[i];
@@ -288,7 +288,7 @@ int main(int argc, char* argv[])
 
     for (int i = 0; i < element_per_pe_2D; i++)
       read_darray_buffer_2D[i] = 0.0;
-    ret = PIOc_read_darray(ncid_read, varid_DZSNO, ioid_2D, read_darray_buffer_2D, read_darray_buffer_2D); ERR
+    ret = PIOc_read_darray(ncid_read, varid_DZSNO, ioid_2D, element_per_pe_2D, read_darray_buffer_2D); ERR
 
     for (int i = 0; i < element_per_pe_2D; i++) {
       double diff = read_darray_buffer_2D[i] - write_darray_buffer_2D[i];

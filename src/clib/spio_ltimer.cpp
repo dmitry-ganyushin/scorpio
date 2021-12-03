@@ -25,7 +25,8 @@ void PIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer::start(void )
 
 void PIO_Util::SPIO_Ltimer_Utils::SPIO_ltimer::stop(void )
 {
-  assert(lvl_ > 0);
+    //TODODG
+//  assert(lvl_ > 0);
 
   lvl_--;
   if(lvl_ != 0){
