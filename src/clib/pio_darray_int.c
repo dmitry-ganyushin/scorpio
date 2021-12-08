@@ -1325,7 +1325,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
         }
 
     } else {
-        return pio_err(NULL, file, ierr, __FILE__, __LINE__,
+        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                        "Reading decomposition array for variable (%s, varid=%d) from file (%s, ncid=%d) failed with iotype=%s. The underlying I/O library (%s) call, adios2_inquire_variable, failed.",
                        pio_get_vname_from_file(file, vid), vid, pio_get_fname_from_file(file), file->pio_ncid,
                        pio_iotype_to_string(file->iotype),

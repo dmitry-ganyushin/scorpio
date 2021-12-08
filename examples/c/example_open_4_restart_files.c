@@ -56,7 +56,6 @@ int main(int argc, char* argv[])
   // Max current_var_cnt = 72
   ret = PIOc_openfile(iosysid, &ncid_read, &format, filename_eam_r, PIO_NOWRITE); ERR
   ret = PIOc_closefile(ncid_read); ERR
-
   // Max current_var_cnt = 18214: larger than 8192 which can corrupt struct file_desc_t
   // [Workaround] In pio.h, line 962: struct adios_att_desc_t adios_attrs[4 * PIO_MAX_ATTRS];
   ret = PIOc_openfile(iosysid, &ncid_read, &format, filename_cpl_r, PIO_NOWRITE); ERR

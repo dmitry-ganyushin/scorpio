@@ -3163,7 +3163,7 @@ char*  adios_name(const char* prefix, char* root, const char *suffix){
     strcat(name, suffix);
     return name;
 }
-int adios_get_attrs(file_desc_t *file, int current_var_cnt, char *const *attr_names, size_t i) {
+int adios_get_attrs(file_desc_t *file, int attr_id, char *const *attr_names, size_t i) {
     adios2_attribute *attr = adios2_inquire_attribute(file->ioH, attr_names[i]);
     if (attr) {
         adios2_type type;
@@ -3174,24 +3174,31 @@ int adios_get_attrs(file_desc_t *file, int current_var_cnt, char *const *attr_na
                            pio_get_fname_from_file(file));
         }
         if (type == adios2_type_int32_t) {
-            file->adios_attrs[current_var_cnt].att_type = NC_INT;
-            file->adios_attrs[current_var_cnt].adios_type = adios2_type_int32_t;
-            file->adios_attrs[current_var_cnt].att_len = (PIO_Offset) 1;
+            file->adios_attrs[attr_id].att_type = NC_INT;
+            file->adios_attrs[attr_id].adios_type = adios2_type_int32_t;
+            file->adios_attrs[attr_id].att_len = (PIO_Offset) 1;
         } else if (type == adios2_type_float) {
-            file->adios_attrs[current_var_cnt].att_type = NC_FLOAT;
-            file->adios_attrs[current_var_cnt].adios_type = adios2_type_float;
-            file->adios_attrs[current_var_cnt].att_len = (PIO_Offset) 1;
+            file->adios_attrs[attr_id].att_type = NC_FLOAT;
+            file->adios_attrs[attr_id].adios_type = adios2_type_float;
+            file->adios_attrs[attr_id].att_len = (PIO_Offset) 1;
+        }else if (type == adios2_type_double) {
+                file->adios_attrs[attr_id].att_type = NC_DOUBLE;
+                file->adios_attrs[attr_id].adios_type = adios2_type_double;
+                file->adios_attrs[attr_id].att_len = (PIO_Offset) 1;
         } else if (type == adios2_type_string) {
-            file->adios_attrs[current_var_cnt].att_type = NC_CHAR;
-            file->adios_attrs[current_var_cnt].adios_type = adios2_type_string;
+            file->adios_attrs[attr_id].att_type = NC_CHAR;
+            file->adios_attrs[attr_id].adios_type = adios2_type_string;
             size_t size_attr;
-            char *attr_data = calloc(sizeof(char), 1024);
+            char *attr_data = calloc(sizeof(char), 64 * PIO_MAX_NAME);
             adios2_error attr_err = adios2_attribute_data(attr_data, &size_attr, attr);
             size_t size = strlen(attr_data);
-            file->adios_attrs[current_var_cnt].att_len = (PIO_Offset) (
+            file->adios_attrs[attr_id].att_len = (PIO_Offset) (
                     size * sizeof(char) +
                     1);
             free(attr_data);
+        }else {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Not implemented");
         }
     }
 }
@@ -3624,11 +3631,11 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                     current_var_cnt++;
                 }
             }
-            file->num_gattrs = current_var_cnt;
+            file->num_gattrs += current_var_cnt;
+            file->num_attrs += current_var_cnt;
             /* parse variable attributes*/
             for (size_t i = 0; i < attr_size; i++) {
                 /**************get variable attribute***********/
-
                 char suffix_att_name[] = "/";
 
                 for (size_t var_cnt = 0; var_cnt < file->num_vars; var_cnt++) {
@@ -3663,8 +3670,9 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
 
             // remove memory
             free(attr_names);
-            file->num_attrs = current_var_cnt;
+            file->num_attrs += current_var_cnt;
             adios2_end_step(file->engineH);
+            step++;
         }
         adios2_error err_close = adios2_close(file->engineH);
         if (err_close != adios2_error_none) {
