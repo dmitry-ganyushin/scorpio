@@ -3553,14 +3553,14 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         // get available variables and set structures.
         // restrict to the first step only
         adios2_step_status status;
-        size_t step = 0;
+        size_t nsteps = 0;
 
         while (adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
                                  &status) == adios2_error_none) {
             if (status == adios2_step_status_end_of_stream) {
                 break;
             }
-            step++;
+            nsteps++;
             size_t var_size;
             char **var_names = adios2_available_variables(file->ioH, &var_size);
 
@@ -3601,10 +3601,24 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         }
         LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
         int current_var_cnt = 0;
-        step = 0;
+        size_t step = 0;
+        /* move to the last step */
         while (adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
                                  &status) == adios2_error_none) {
-            if (step > 0 || status == adios2_step_status_end_of_stream) {
+
+            if (status == adios2_step_status_end_of_stream) {
+                break;
+            }
+            if (step == nsteps - 2) {
+                adios2_end_step(file->engineH);
+                break;
+            }
+            step++;
+            adios2_end_step(file->engineH);
+        }
+        while (adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
+                                 &status) == adios2_error_none) {
+            if (status == adios2_step_status_end_of_stream) {
                 break;
             }
 
@@ -3621,9 +3635,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                     int prefix_length = strlen(adios_pio_global_prefix);
                     file->adios_attrs[current_var_cnt].att_name = (char *) malloc(sub_length + 1);
                     if (file->adios_attrs[current_var_cnt].att_name) {
-                        for (int c = 0; c < sub_length + 1; c++) {
-                            file->adios_attrs[current_var_cnt].att_name[c] = attr_names[i][prefix_length + c];
-                        }
+                        strcpy(file->adios_attrs[current_var_cnt].att_name, &attr_names[i][prefix_length]);
                         file->adios_attrs[current_var_cnt].att_varid = -1;
                         file->adios_attrs[current_var_cnt].att_ncid = *ncidp;
                         adios_get_attrs(file, current_var_cnt, attr_names, i);
@@ -3910,7 +3922,7 @@ adios_read_vars_attr(file_desc_t *file, size_t attr_size, char *const *attr_name
             int sub_length = full_length - prefix_length - suffix_length;
 
             char *name_tmp = (char *) malloc(sub_length + 1);
-            for (int j = 0; j < sub_length + 1; j++ ) name_tmp[j] = 0;
+            memset(name_tmp, 0, sub_length + 1);
 
             if (name_tmp) {
                 char* pos = attr_names[i] + prefix_length;
