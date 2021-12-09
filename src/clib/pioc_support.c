@@ -3600,7 +3600,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                            pio_get_fname_from_file(file));
         }
         LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
-        int current_var_cnt = 0;
+
         size_t step = 0;
         /* move to the last step */
         while (adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
@@ -3616,6 +3616,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             step++;
             adios2_end_step(file->engineH);
         }
+        int attr_id = 0;
         while (adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
                                  &status) == adios2_error_none) {
             if (status == adios2_step_status_end_of_stream) {
@@ -3633,18 +3634,19 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                     int sub_length = strlen(attr_names[i]) - strlen(adios_pio_global_prefix);
                     int full_length = strlen(attr_names[i]);
                     int prefix_length = strlen(adios_pio_global_prefix);
-                    file->adios_attrs[current_var_cnt].att_name = (char *) malloc(sub_length + 1);
-                    if (file->adios_attrs[current_var_cnt].att_name) {
-                        strcpy(file->adios_attrs[current_var_cnt].att_name, &attr_names[i][prefix_length]);
-                        file->adios_attrs[current_var_cnt].att_varid = -1;
-                        file->adios_attrs[current_var_cnt].att_ncid = *ncidp;
-                        adios_get_attrs(file, current_var_cnt, attr_names, i);
+                    file->adios_attrs[attr_id].att_name = (char *) malloc(sub_length + 1);
+                    if (file->adios_attrs[attr_id].att_name) {
+                        strcpy(file->adios_attrs[attr_id].att_name, &attr_names[i][prefix_length]);
+                        file->adios_attrs[attr_id].att_varid = -1;
+                        file->adios_attrs[attr_id].att_ncid = *ncidp;
+                        adios_get_attrs(file, attr_id, attr_names, i);
                     }
-                    current_var_cnt++;
+                    attr_id++;
+                    assert(attr_id < PIO_MAX_ATTRS);
                 }
             }
-            file->num_gattrs += current_var_cnt;
-            file->num_attrs += current_var_cnt;
+            file->num_gattrs += attr_id;
+            file->num_attrs += attr_id;
             /* parse variable attributes*/
             for (size_t i = 0; i < attr_size; i++) {
                 /**************get variable attribute***********/
@@ -3661,19 +3663,20 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                             free(attr_full_prefix);
                             continue;
                         }
-                        file->adios_attrs[current_var_cnt].att_name = (char *) malloc(sub_length + 1);
-                        if (file->adios_attrs[current_var_cnt].att_name) {
+                        file->adios_attrs[attr_id].att_name = (char *) malloc(sub_length + 1);
+                        if (file->adios_attrs[attr_id].att_name) {
                             for (int c = 0; c < sub_length + 1; c++) {
-                                file->adios_attrs[current_var_cnt].att_name[c] = attr_names[i][prefix_length +
+                                file->adios_attrs[attr_id].att_name[c] = attr_names[i][prefix_length +
                                                                                                c];
                             }
                             int att_varid = -1;
                             int ret = PIOc_inq_varid(*ncidp, file->adios_vars[var_cnt].name, &att_varid);
-                            file->adios_attrs[current_var_cnt].att_varid = att_varid;
-                            file->adios_attrs[current_var_cnt].att_ncid = *ncidp;
-                            adios_get_attrs(file, current_var_cnt, attr_names, i);
+                            file->adios_attrs[attr_id].att_varid = att_varid;
+                            file->adios_attrs[attr_id].att_ncid = *ncidp;
+                            adios_get_attrs(file, attr_id, attr_names, i);
                         }
-                        current_var_cnt++;
+                        assert(attr_id < PIO_MAX_ATTRS);
+                        attr_id++;
                     }
                     free(attr_full_prefix);
                 }
@@ -3682,7 +3685,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
 
             // remove memory
             free(attr_names);
-            file->num_attrs += current_var_cnt;
+            file->num_attrs += attr_id;
             adios2_end_step(file->engineH);
             step++;
         }
