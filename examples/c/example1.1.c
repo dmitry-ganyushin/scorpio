@@ -83,6 +83,7 @@ int main(int argc, char* argv[])
   int varid_dummy_put_get_var_int;
   int varid_dummy_put_get_var_int_2D;
   int varid_dummy_put_get_var_float;
+  int varid_dummy_put_get_var_double;
 
   /* start/count arrays for get/put var */
   PIO_Offset start[NDIMS];
@@ -253,6 +254,7 @@ int main(int argc, char* argv[])
 
 
     ret = PIOc_def_var(ncid_write, "dummy_put_get_var_float", PIO_FLOAT, NDIMS, &dimid_put_get_var_len, &varid_dummy_put_get_var_float); ERR
+    ret = PIOc_def_var(ncid_write, "dummy_put_get_var_double", PIO_DOUBLE, NDIMS, &dimid_put_get_var_len, &varid_dummy_put_get_var_double); ERR
 
     /* Define an int variable with time steps. */
     ret = PIOc_def_dim(ncid_write, "time", NC_UNLIMITED, &dimids_time_var[0]); ERR
@@ -283,10 +285,12 @@ int main(int argc, char* argv[])
     start[0] = PUT_GET_VAR_LEN / 2;
     count[0] = PUT_GET_VAR_LEN / 2;
     ret = PIOc_put_vars_double(ncid_write, varid_dummy_put_get_var_float, start, count, NULL, put_var_buffer_double + (PUT_GET_VAR_LEN / 2)); ERR
+    ret = PIOc_put_vars_double(ncid_write, varid_dummy_put_get_var_double, start, count, NULL, put_var_buffer_double + (PUT_GET_VAR_LEN / 2)); ERR
     /* Put 1st half data */
     start[0] = 0;
     count[0] = PUT_GET_VAR_LEN / 2;
     ret = PIOc_put_vars_double(ncid_write, varid_dummy_put_get_var_float, start, count, NULL, put_var_buffer_double); ERR
+    ret = PIOc_put_vars_double(ncid_write, varid_dummy_put_get_var_double, start, count, NULL, put_var_buffer_double); ERR
 #if 0
     /* 2D in array */
       start2D[0] = 0;
@@ -490,6 +494,22 @@ int main(int argc, char* argv[])
           break;
       }
     }
+
+      /* Get double type variable with double type decomposition */
+      ret = PIOc_inq_varid(ncid_read, "dummy_put_get_var_double", &varid_dummy_put_get_var_double); ERR
+      /* Partial get: excluding the first and the last elements */
+      start[0] = 1;
+      count[0] = PUT_GET_VAR_LEN - 2;
+      for (int i = 0; i < PUT_GET_VAR_LEN; i++) get_var_buffer_double[i] = 0.0;
+      ret = PIOc_get_vars_double(ncid_read, varid_dummy_put_get_var_double, start, count, NULL, get_var_buffer_double + 1); ERR
+      for (int i = 1; i < PUT_GET_VAR_LEN - 1; i++) {
+          diff_double = get_var_buffer_double[i] - put_var_buffer_double[i];
+          if (fabs(diff_double) > 1E-5) {
+              printf("rank = %d, get wrong data for dummy_put_get_var_double at index %d\n", my_rank, i);
+              break;
+          }
+      }
+
 #if 0
       /* Get int type variable with int type decomposition, type conversions will not be performed. */
       ret = PIOc_inq_varid(ncid_read, "dummy_put_get_var_int_2D", &varid_dummy_put_get_var_int_2D); ERR

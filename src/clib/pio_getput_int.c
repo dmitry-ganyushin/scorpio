@@ -1293,8 +1293,11 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                         float mem_buf;
                         adiosErr = adios2_get(file->engineH, av->adios_varid, &mem_buf, adios2_mode_sync);
                         ((float *) buf)[0] = mem_buf;
-
-                    }else {
+                    }else if (av->adios_type == adios2_type_double){
+                        double mem_buf;
+                        adiosErr = adios2_get(file->engineH, av->adios_varid, &mem_buf, adios2_mode_sync);
+                        ((double *) buf)[0] = mem_buf;
+                    }else{
                         return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                        "Not implemented");
                     }
