@@ -3664,10 +3664,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                         }
                         file->adios_attrs[attr_id].att_name = (char *) malloc(sub_length + 1);
                         if (file->adios_attrs[attr_id].att_name) {
-                            for (int c = 0; c < sub_length + 1; c++) {
-                                file->adios_attrs[attr_id].att_name[c] = attr_names[i][prefix_length +
-                                                                                               c];
-                            }
+                            strcpy(file->adios_attrs[attr_id].att_name, &attr_names[i][prefix_length]);
                             int att_varid = -1;
                             int ret = PIOc_inq_varid(*ncidp, file->adios_vars[var_cnt].name, &att_varid);
                             file->adios_attrs[attr_id].att_varid = att_varid;
