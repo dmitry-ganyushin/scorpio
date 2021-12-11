@@ -3646,7 +3646,6 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                 }
             }
             file->num_gattrs += attr_id;
-            file->num_attrs += attr_id;
             /* parse variable attributes*/
             for (size_t i = 0; i < attr_size; i++) {
                 /**************get variable attribute***********/
