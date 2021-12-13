@@ -847,6 +847,9 @@ typedef struct adios_var_desc_t
 
     /* for merging blocks */
     size_t elem_size;
+    /* simplified version of an interval map implementation
+     * index is a frame_id and the value is the adios_step */
+    int interval_map[PIO_MAX_DIMS];
 } adios_var_desc_t;
 
 /* Track attributes */

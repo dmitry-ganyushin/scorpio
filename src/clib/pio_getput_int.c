@@ -1192,7 +1192,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         /* get frame_id */
         int frame_id = file->varlist[varid].record;
         /*magically obtain the relevant adios step*/
-        int required_adios_step = get_adios_step(frame_id);
+        int required_adios_step = get_adios_step(file, varid, frame_id);
 
         file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
         if (file->engineH == NULL) {
@@ -1202,9 +1202,20 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         }
         LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
         adios2_step_status status;
-        adios2_error adiosErr = adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
-                          &status);
 
+        adios2_error adiosErr = adios2_error_none;
+        int step = 0;
+
+        while (adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
+                                 &status) == adios2_error_none) {
+            if (step == required_adios_step || status == adios2_step_status_end_of_stream) {
+                break;
+            } else {
+                adios2_end_step(file->engineH);
+                step++;
+                continue;
+            }
+        }
         /* First we need to define the variable now that we know it's decomposition */
         adios_var_desc_t *av = &(file->adios_vars[varid]);
 
@@ -1214,8 +1225,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         if (xtype == PIO_NAT)
             xtype = vartype;
 
-        if (xtype == PIO_LONG_INTERNAL)
-        {
+        if (xtype == PIO_LONG_INTERNAL) {
             int typesize = sizeof(long int);
             if (typesize == 4)
                 xtype = PIO_INT;
@@ -1232,34 +1242,32 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         /* Scalars have to be handled differently. */
         /* ndims should be initialized in the Open function*/
 
-        if (av->ndims == 0)
-        {
+        if (av->ndims == 0) {
             /* Only the IO master does the IO, so we are not really
              * getting parallel IO here. */
-            if (file->myrank == 0)
-            {
-                if (start)
-                {
+            if (file->myrank == 0) {
+                if (start) {
                     /* Ignore if user specifies start[0] == 0 */
-                    if (start[0] != 0)
-                    {
-                        printf("PIO: WARNING: Ignoring user-specified start indices while writing the scalar variable (%s) to file (%s, ncid=%d). An invalid start index (start[0] = %lld) provided (%s:%d)\n", av->name, pio_get_fname_from_file(file), file->pio_ncid, (long long int)start[0], __FILE__, __LINE__);
+                    if (start[0] != 0) {
+                        printf("PIO: WARNING: Ignoring user-specified start indices while writing the scalar variable (%s) to file (%s, ncid=%d). An invalid start index (start[0] = %lld) provided (%s:%d)\n",
+                               av->name, pio_get_fname_from_file(file), file->pio_ncid, (long long int) start[0],
+                               __FILE__, __LINE__);
                     }
                 }
-                if (count)
-                {
+                if (count) {
                     /* Ignore if user specifies count[0] == 1 */
-                    if (count[0] != 1)
-                    {
-                        printf("PIO: WARNING: Ignoring user-specified counts while writing the scalar variable (%s) to file (%s, ncid=%d). An invalid count (count[0] = %lld) provided (%s:%d)\n", av->name, pio_get_fname_from_file(file), file->pio_ncid, (long long int)count[0], __FILE__, __LINE__);
+                    if (count[0] != 1) {
+                        printf("PIO: WARNING: Ignoring user-specified counts while writing the scalar variable (%s) to file (%s, ncid=%d). An invalid count (count[0] = %lld) provided (%s:%d)\n",
+                               av->name, pio_get_fname_from_file(file), file->pio_ncid, (long long int) count[0],
+                               __FILE__, __LINE__);
                     }
                 }
-                if (stride)
-                {
+                if (stride) {
                     /* Ignore if user specifies stride[0] == 1 */
-                    if (stride[0] != 1)
-                    {
-                        printf("PIO: WARNING: Ignoring user-specified strides while writing the scalar variable (%s) to file (%s, ncid=%d). An invalid stride (stride[0] = %lld) provided (%s:%d)\n", av->name, pio_get_fname_from_file(file), file->pio_ncid, (long long int)stride[0], __FILE__, __LINE__);
+                    if (stride[0] != 1) {
+                        printf("PIO: WARNING: Ignoring user-specified strides while writing the scalar variable (%s) to file (%s, ncid=%d). An invalid stride (stride[0] = %lld) provided (%s:%d)\n",
+                               av->name, pio_get_fname_from_file(file), file->pio_ncid, (long long int) stride[0],
+                               __FILE__, __LINE__);
                     }
                 }
 
@@ -1269,35 +1277,34 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 assert((strlen("/__pio__/var/") + strlen(av->name)) < PIO_MAX_NAME);
                 snprintf(vname, PIO_MAX_NAME, "/__pio__/var/%s", av->name);
                 av->adios_varid = adios2_inquire_variable(file->ioH, vname);
-                if (av->adios_varid == NULL)
-                {
-                        GPTLstop("PIO:PIOc_put_vars_tc");
-                        GPTLstop("PIO:write_total");
-                        spio_ltimer_stop(ios->io_fstats->wr_timer_name);
-                        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                        spio_ltimer_stop(file->io_fstats->wr_timer_name);
-                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                        GPTLstop("PIO:PIOc_put_vars_tc_adios");
-                        GPTLstop("PIO:write_total_adios");
-                        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                       "Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)",
-                                       vname, pio_get_fname_from_file(file), file->pio_ncid);
+                if (av->adios_varid == NULL) {
+                    GPTLstop("PIO:PIOc_put_vars_tc");
+                    GPTLstop("PIO:write_total");
+                    spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                    spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    GPTLstop("PIO:PIOc_put_vars_tc_adios");
+                    GPTLstop("PIO:write_total_adios");
+                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)",
+                                   vname, pio_get_fname_from_file(file), file->pio_ncid);
 
-                }else {
+                } else {
 
-                    if (av->adios_type == adios2_type_int32_t){
+                    if (av->adios_type == adios2_type_int32_t) {
                         int32_t mem_buf;
                         adiosErr = adios2_get(file->engineH, av->adios_varid, &mem_buf, adios2_mode_sync);
                         ((int32_t *) buf)[0] = mem_buf;
-                    }else if (av->adios_type == adios2_type_float){
+                    } else if (av->adios_type == adios2_type_float) {
                         float mem_buf;
                         adiosErr = adios2_get(file->engineH, av->adios_varid, &mem_buf, adios2_mode_sync);
                         ((float *) buf)[0] = mem_buf;
-                    }else if (av->adios_type == adios2_type_double){
+                    } else if (av->adios_type == adios2_type_double) {
                         double mem_buf;
                         adiosErr = adios2_get(file->engineH, av->adios_varid, &mem_buf, adios2_mode_sync);
                         ((double *) buf)[0] = mem_buf;
-                    }else{
+                    } else {
                         return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                        "Not implemented");
                     }
@@ -1318,7 +1325,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     }
                 }
             }
-        }else {
+        } else {
             /* This is not a scalar var. */
             if (stride_present) {
                 LOG((2, "ADIOS does not support striding %s:%s\n"
@@ -1402,7 +1409,8 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 } else {
                     /*reading adios block */
                     uint64_t time_step = required_adios_step;
-                    adios2_varinfo *data_blocks = adios2_inquire_blockinfo(file->engineH, av->adios_varid, time_step);
+                    adios2_varinfo *data_blocks = adios2_inquire_blockinfo(file->engineH, av->adios_varid,
+                                                                           time_step);
                     int32_t data_blocks_size = data_blocks->nblocks;
                     /* free memeory */
                     for (size_t i = 0; i < data_blocks->nblocks; ++i) {
@@ -1436,7 +1444,8 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             GPTLstop("PIO:write_total_adios");
                             return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                            "Setting (ADIOS) selection to variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
-                                           av->name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file),
+                                           av->name, adios2_error_to_string(adiosErr),
+                                           pio_get_fname_from_file(file),
                                            file->pio_ncid);
                         }
                         size_t data_size = block_size - header_size;
@@ -1461,10 +1470,10 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                         /* find out start and count */
                         int64_t global_start[PIO_MAX_DIMS];
                         int64_t global_count[PIO_MAX_DIMS];
-                        for (int cnt = 0; cnt < av->ndims; cnt++ ){
+                        for (int cnt = 0; cnt < av->ndims; cnt++) {
                             global_start[cnt] = *((int64_t *) (mem_buffer + cnt * sizeof(int64_t)));
                         }
-                        for (int cnt = 0; cnt < av->ndims; cnt++ ){
+                        for (int cnt = 0; cnt < av->ndims; cnt++) {
                             global_count[cnt] = *((int64_t *) (mem_buffer + (cnt + av->ndims) * sizeof(int64_t)));
                         }
                         if (av->ndims == 1 && read_type == adios2_type_uint8_t) {
@@ -1499,10 +1508,11 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
                                 if (av->adios_type == adios2_type_double)
                                     for (int idx = start_idx; idx < end_idx; idx++)
-                                        ((double *) buf)[idx + global_start[0] - start[0]] = *((double *) (mem_buffer +
-                                                                                                           header_size +
-                                                                                                           (idx) *
-                                                                                                           read_type_size));
+                                        ((double *) buf)[idx + global_start[0] - start[0]] = *((double *) (
+                                                mem_buffer +
+                                                header_size +
+                                                (idx) *
+                                                read_type_size));
                                 else if (av->adios_type == adios2_type_int32_t)
                                     for (int idx = start_idx; idx < end_idx; idx++)
                                         ((int32_t *) buf)[idx + global_start[0] - start[0]] = *((int32_t *) (
@@ -1561,14 +1571,16 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                                 ((double *) buf)[idx_1 + global_start[1] -
                                                                  start[1]] = *((double *) (offset + mem_buffer +
                                                                                            header_size +
-                                                                                           (idx_1) * read_type_size));
+                                                                                           (idx_1) *
+                                                                                           read_type_size));
                                             }
                                         } else {
                                             for (int idx_1 = start_idx_1; idx_1 < end_idx_1; idx_1++) {
                                                 ((double *) buf)[offset + idx_1 + global_start[1] -
                                                                  start[1]] = *((double *) (offset + mem_buffer +
                                                                                            header_size +
-                                                                                           (idx_1) * read_type_size));
+                                                                                           (idx_1) *
+                                                                                           read_type_size));
                                             }
                                         }
 
@@ -1581,14 +1593,16 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                                 ((int32_t *) buf)[idx_1 + global_start[1] -
                                                                   start[1]] = *((int32_t *) (offset + mem_buffer +
                                                                                              header_size +
-                                                                                             (idx_1) * read_type_size));
+                                                                                             (idx_1) *
+                                                                                             read_type_size));
                                             }
                                         } else {
                                             for (int idx_1 = start_idx_1; idx_1 < end_idx_1; idx_1++) {
                                                 ((int32_t *) buf)[offset + idx_1 + global_start[1] -
                                                                   start[1]] = *((int32_t *) (offset + mem_buffer +
                                                                                              header_size +
-                                                                                             (idx_1) * read_type_size));
+                                                                                             (idx_1) *
+                                                                                             read_type_size));
 
                                             }
                                         }
@@ -1600,7 +1614,8 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                         if (start[0] != 0) {
                                             for (int idx_1 = start_idx_1; idx_1 < end_idx_1; idx_1++) {
                                                 ((char *) buf)[idx_1 + global_start[1] - start[1]] = *((char *) (
-                                                        offset + mem_buffer + header_size + (idx_1) * read_type_size));
+                                                        offset + mem_buffer + header_size +
+                                                        (idx_1) * read_type_size));
                                             }
                                         } else {
                                             for (int idx_1 = start_idx_1; idx_1 < end_idx_1; idx_1++) {
@@ -1628,8 +1643,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             }
         }
         adiosErr = adios2_end_step(file->engineH);
-        if (adiosErr != adios2_error_none)
-        {
+        if (adiosErr != adios2_error_none) {
             return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                            "adios2_end_step failed (adios2_error=%s) for file (%s)",
                            adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
@@ -2178,7 +2192,7 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                         GPTLstop("PIO:PIOc_put_vars_tc_adios");
                         GPTLstop("PIO:write_total_adios");
                         return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                    "Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)",
+                                    "Inquiring (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)",
                                     vname, pio_get_fname_from_file(file), file->pio_ncid);
                     }
                 }

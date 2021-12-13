@@ -1177,11 +1177,11 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
  *  Map frame id to adios2 step
  *  for future development
  */
-int get_adios_step(int frame_id) {
+int get_adios_step(file_desc_t *file, int var_id, int frame_id) {
     if (frame_id != -1 ) {
-        return frame_id;
+        return file->adios_vars[var_id].interval_map[frame_id];
     }else {
-        return 0;
+        return file->adios_vars[var_id].interval_map[0];
     }
 }
 
@@ -1230,7 +1230,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     /* get frame_id */
     int frame_id = file->varlist[vid].record;
     /*magically obtain the relevant adios step*/
-    int required_adios_step = get_adios_step(frame_id);
+    int required_adios_step = get_adios_step(file, vid, frame_id);
     file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
     if (file->engineH == NULL) {
         return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
