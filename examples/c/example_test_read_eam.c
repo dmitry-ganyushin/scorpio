@@ -18,6 +18,8 @@ int main(int argc, char* argv[])
   int iosysid;
   int ncid_read;
   int varid_static_ener_ac;
+  int varid_tracer_cnst_curr_fname;
+  int varid_fincl;
   int ndims = 0;
   int *gdimlen = NULL;
   PIO_Offset fmaplen = 0;
@@ -25,6 +27,8 @@ int main(int argc, char* argv[])
   int ioid;
 
   double read_darray_buffer[56];
+  double get_att_float_data;
+  char get_text_data[12 * 1000 * 26] = "\0";
   int ret = PIO_NOERR;
 
 #ifdef TIMING
@@ -73,6 +77,17 @@ int main(int argc, char* argv[])
   ret = PIOc_inq_varid(ncid_read, "static_ener_ac", &varid_static_ener_ac); ERR
 
   ret = PIOc_read_darray(ncid_read, varid_static_ener_ac, ioid, fmaplen, read_darray_buffer); ERR
+
+  varid_tracer_cnst_curr_fname = -1;
+  ret = PIOc_inq_varid(ncid_read, "tracer_cnst_curr_fname", &varid_tracer_cnst_curr_fname); ERR
+
+  get_att_float_data = -1.0;
+  ret = PIOc_get_att(ncid_read, varid_tracer_cnst_curr_fname, "offset_time", &get_att_float_data); ERR
+
+  varid_fincl = -1;
+  ret = PIOc_inq_varid(ncid_read, "fincl", &varid_fincl); ERR
+
+  ret = PIOc_get_var_text(ncid_read, varid_fincl, get_text_data); ERR
 
   ret = PIOc_closefile(ncid_read); ERR
 

@@ -1347,9 +1347,6 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
 if (required_adios_step != time_step) {
     adios2_end_step(file->engineH);
     adios2_close(file->engineH);
-    char str[16];
-    sprintf(str, "%d", required_adios_step);
-    //adios2_set_parameter(file->ioH, file->fname, str);
 
     file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
     if (file->engineH == NULL) {
