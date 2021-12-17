@@ -1185,6 +1185,9 @@ int get_adios_step(file_desc_t *file, int var_id, int frame_id) {
     }
 }
 
+
+bool match_decomp_part(int64_t *pInt, size_t pos, long long int *pInt1, long long int *pInt2);
+
 /**
  * Read an array of data from a ADIOS2 bp file to the (parallel) IO library.
  *
@@ -1245,8 +1248,8 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     adios2_step_status status;
 
 /************************* get decomp info *********************************/
-    int start_decomp = iodesc->map[0];
-    int end_decomp = iodesc->map[iodesc->maplen - 1];
+    MPI_Offset *start_decomp = &(iodesc->map[0]);
+    MPI_Offset *end_decomp = &(iodesc->map[iodesc->maplen - 1]);
 /************************* end get decomp info *********************************/
 /************************* get decomp info from file *********************************/
     int start_block = -1;
@@ -1304,8 +1307,8 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
             adios2_type type;
             adios2_variable_type(&type, decomp);
 
-            for (size_t i = 0; i < decomp_blocks_size; i++) {
-                adios2_set_block_selection(decomp, i);
+            for (size_t block = 0; block < decomp_blocks_size; block++) {
+                adios2_set_block_selection(decomp, block);
                 size_t var_size;
                 adios2_error err_sel = adios2_selection_size(&var_size, decomp);
                 if (type == adios2_type_int64_t) {
@@ -1315,19 +1318,18 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
                     return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                    "Not implemented");
                 }
-                /*search for the start block*/
-                for (size_t j = 0; j < var_size; j++) {
-                    if (!start_block_found && decomp_int64_t[j] == start_decomp) {
-                        start_block = i;
-                        start_idx_in_start_block = j;
+                /* search for the start and end index inside one block */
+                /* number if reading processes should be by an integer */
+                /* factor larger than a number of writing processes    */
+                /* example: 4 writing processes 16 reading processes   */
+                for (size_t pos = 0; pos < var_size; pos++) {
+                    if (!start_block_found && match_decomp_part(decomp_int64_t, pos, start_decomp, end_decomp)) {
+                        start_block = block;
+                        start_idx_in_start_block = pos;
                         start_block_found = true;
+                        end_block = block;
+                        end_idx_in_end_block = pos + (end_decomp - start_decomp);
                     };
-                    if (!end_block_found && decomp_int64_t[j] == end_decomp) {
-                        end_block = i;
-                        end_idx_in_end_block = j;
-                        end_block_found = true;
-                    };
-
                 }
                 /* free recourses */
                 if (decomp_int64_t != NULL) {
@@ -1435,7 +1437,8 @@ if (required_adios_step != time_step) {
                     return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                    "Not implemented");
                 }
-            } else {
+            } else if (false){
+                /* matching is not correct */
                 /*different block*/
                 /* |000xxxxx|xxx00000|  */
                 /* |000xxxxx|xxxxxxxx|xxx00000|  */
@@ -1517,6 +1520,15 @@ if (required_adios_step != time_step) {
 
     return PIO_NOERR;
 }
+
+bool match_decomp_part(int64_t *decomp, size_t offset, MPI_Offset *start, MPI_Offset *end) {
+    MPI_Offset len = end - start;
+    for (MPI_Offset idx = 0; idx < len; idx++) {
+        if (decomp[offset + idx] != start[idx]) return 0;
+    }
+    return 1;
+}
+
 
 /**
  * Read an array of data from a file to the (serial) IO library. This
