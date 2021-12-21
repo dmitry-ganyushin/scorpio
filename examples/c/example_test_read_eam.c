@@ -29,6 +29,16 @@ int main(int argc, char* argv[])
   double read_darray_buffer[56];
   double get_att_float_data;
   char get_text_data[12 * 1000 * 26] = "\0";
+
+  int varid_mdimnames;
+  int dimids[2];
+  PIO_Offset dimlen;
+  PIO_Offset start_2D[2];
+  PIO_Offset count_2D[2];
+  char get_mdimnames_1st_str[16] = "\0";
+  char get_mdimnames_2nd_str[16] = "\0";
+  char get_mdimnames_both_strs[2 * 16] = "\0";
+
   int ret = PIO_NOERR;
 
 #ifdef TIMING
@@ -39,7 +49,7 @@ int main(int argc, char* argv[])
 
   MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
   MPI_Comm_size(MPI_COMM_WORLD, &ntasks);
-
+#if 1
   if (ntasks != 16) {
     if (my_rank == 0)
       printf("This example must be run with 16 MPI tasks!\n");
@@ -52,12 +62,12 @@ int main(int argc, char* argv[])
 
     return -1;
   }
-
+#endif
   int ioproc_stride = 4;
   niotasks = ntasks / ioproc_stride;
 
   ret = PIOc_Init_Intracomm(MPI_COMM_WORLD, niotasks, ioproc_stride, ioproc_start, PIO_REARR_SUBSET, &iosysid); ERR
-
+#if 1
   /* Read the decomp file for testing */
   ret = PIOc_readmap("decomp_1D_866_16p.dat", &ndims, &gdimlen, &fmaplen, &compmap, MPI_COMM_WORLD);
   assert(ndims == 1);
@@ -68,16 +78,16 @@ int main(int argc, char* argv[])
   ret = PIOc_InitDecomp(iosysid, PIO_DOUBLE, 1, gdimlen, fmaplen, compmap, &ioid, NULL, NULL, NULL); ERR
   free(compmap);
   free(gdimlen);
-
+#endif
   char filename_eam_r[] = "F2010_ne4_oQU240_ADIOS.eam.r.0001-01-02-00000.nc";
 
   ret = PIOc_openfile(iosysid, &ncid_read, &format, filename_eam_r, PIO_NOWRITE); ERR
-
+#if 1
   varid_static_ener_ac = -1;
   ret = PIOc_inq_varid(ncid_read, "static_ener_ac", &varid_static_ener_ac); ERR
 
   ret = PIOc_read_darray(ncid_read, varid_static_ener_ac, ioid, fmaplen, read_darray_buffer); ERR
-
+#endif
   varid_tracer_cnst_curr_fname = -1;
   ret = PIOc_inq_varid(ncid_read, "tracer_cnst_curr_fname", &varid_tracer_cnst_curr_fname); ERR
 
@@ -88,6 +98,46 @@ int main(int argc, char* argv[])
   ret = PIOc_inq_varid(ncid_read, "fincl", &varid_fincl); ERR
 
   ret = PIOc_get_var_text(ncid_read, varid_fincl, get_text_data); ERR
+
+  varid_mdimnames = -1;
+  ret = PIOc_inq_varid(ncid_read, "mdimnames", &varid_mdimnames); ERR
+
+  dimids[0] = -1;
+  dimids[1] = -1;
+  ret = PIOc_inq_vardimid(ncid_read, varid_mdimnames, dimids); ERR
+
+  dimlen = -1;
+  ret = PIOc_inq_dimlen(ncid_read, dimids[0], &dimlen); ERR
+  assert(dimlen == 2);
+
+  dimlen = -1;
+  ret = PIOc_inq_dimlen(ncid_read, dimids[1], &dimlen); ERR
+  assert(dimlen == 16);
+
+  start_2D[0] = 0;
+  count_2D[0] = 1;
+  start_2D[1] = 0;
+  count_2D[1] = 16;
+#if 1
+  /* Get only 1st string, no heap-buffer-overflow, but the returned string is incorrect (expected: lev, actual: ilev) */
+  ret = PIOc_get_vara_text(ncid_read, varid_mdimnames, start_2D, count_2D, get_mdimnames_1st_str); ERR
+  if (my_rank == 0)
+    printf("get_mdimnames_1st_str = %s\n", get_mdimnames_1st_str);
+#endif
+#if 1
+  start_2D[0] = 1;
+  /* Get only 2nd string failed, AddressSanitizer: heap-buffer-overflow scorpio/src/clib/pio_getput_int.c:1625 in PIOc_get_vars_tc */
+  ret = PIOc_get_vara_text(ncid_read, varid_mdimnames, start_2D, count_2D, get_mdimnames_2nd_str); ERR
+  if (my_rank == 0)
+    printf("get_mdimnames_2nd_str = %s\n", get_mdimnames_2nd_str);
+#endif
+
+#if 1
+  /* Get both strings together failed, AddressSanitizer: heap-buffer-overflow scorpio/src/clib/pio_getput_int.c:1632 in PIOc_get_vars_tc */
+  ret = PIOc_get_var_text(ncid_read, varid_mdimnames, get_mdimnames_both_strs); ERR
+  if (my_rank == 0)
+    printf("get_mdimnames_both_strs = %s\n", get_mdimnames_both_strs);
+#endif
 
   ret = PIOc_closefile(ncid_read); ERR
 

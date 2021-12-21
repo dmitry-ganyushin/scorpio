@@ -1477,13 +1477,13 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                            (long long int) (av_size * sizeof(unsigned char)), av->name);
                         }
                         /* find out start and count */
-                        int64_t global_start[PIO_MAX_DIMS];
-                        int64_t global_count[PIO_MAX_DIMS];
+                        int64_t block_info_start[PIO_MAX_DIMS];
+                        int64_t block_info_count[PIO_MAX_DIMS];
                         for (int cnt = 0; cnt < av->ndims; cnt++) {
-                            global_start[cnt] = *((int64_t *) (mem_buffer + cnt * sizeof(int64_t)));
+                            block_info_start[cnt] = *((int64_t *) (mem_buffer + cnt * sizeof(int64_t)));
                         }
                         for (int cnt = 0; cnt < av->ndims; cnt++) {
-                            global_count[cnt] = *((int64_t *) (mem_buffer + (cnt + av->ndims) * sizeof(int64_t)));
+                            block_info_count[cnt] = *((int64_t *) (mem_buffer + (cnt + av->ndims) * sizeof(int64_t)));
                         }
                         if (av->ndims == 1 && read_type == adios2_type_uint8_t) {
                             /* data layout */
@@ -1497,39 +1497,39 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             /* |0000xxxxxx|xxxxxxxxxx|xxxxxxxxxx|xxxxx0000| */
                             /* find beginning of the block */
                             /* case |0000xxxxxx| */
-                            if (start[0] >= global_start[0] && start[0] < global_start[0] + global_count[0]) {
-                                start_idx = start[0] - global_start[0];
+                            if (start[0] >= block_info_start[0] && start[0] < block_info_start[0] + block_info_count[0]) {
+                                start_idx = start[0] - block_info_start[0];
                                 /* case |xxxxxxxxx| */
-                            } else if (start[0] < global_start[0]) {
+                            } else if (start[0] < block_info_start[0]) {
                                 start_idx = 0;
                             }
                             /* find end of the block */
                             /*  case |xxxxx0000| */
-                            if (start[0] + count[0] >= global_start[0] &&
-                                start[0] + count[0] < global_start[0] + global_count[0]) {
-                                end_idx = start[0] + count[0] - global_start[0];
+                            if (start[0] + count[0] >= block_info_start[0] &&
+                                start[0] + count[0] < block_info_start[0] + block_info_count[0]) {
+                                end_idx = start[0] + count[0] - block_info_start[0];
                                 /*  case |xxxxxxxxx| */
-                            } else if (global_start[0] + global_count[0] <= start[0] + count[0]) {
-                                end_idx = global_count[0];
+                            } else if (block_info_start[0] + block_info_count[0] <= start[0] + count[0]) {
+                                end_idx = block_info_count[0];
                             }
 
                             if (start_idx != -1 && end_idx != -1) {
 
                                 if (av->adios_type == adios2_type_double)
                                     for (int idx = start_idx; idx < end_idx; idx++)
-                                        ((double *) buf)[idx + global_start[0] - start[0]] = *((double *) (
+                                        ((double *) buf)[idx + block_info_start[0] - start[0]] = *((double *) (
                                                 mem_buffer +
                                                 header_size +
                                                 (idx) *
                                                 read_type_size));
                                 else if (av->adios_type == adios2_type_int32_t)
                                     for (int idx = start_idx; idx < end_idx; idx++)
-                                        ((int32_t *) buf)[idx + global_start[0] - start[0]] = *((int32_t *) (
+                                        ((int32_t *) buf)[idx + block_info_start[0] - start[0]] = *((int32_t *) (
                                                 mem_buffer + header_size + (idx) * read_type_size));
                                 else if (av->adios_type == adios2_type_int8_t)
                                     for (int idx = start_idx; idx < end_idx; idx++)
-                                        ((char *) buf)[idx + global_start[0] - start[0]] = *((char *) (mem_buffer +
-                                                                                                       header_size +
+                                        ((char *) buf)[idx + block_info_start[0] - start[0]] = *((char *) (mem_buffer +
+                                                                                                           header_size +
                                                                                                        (idx) *
                                                                                                        read_type_size));
                                 else
@@ -1543,98 +1543,82 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             /*  |header|     data   | header|   data    |*/
                             /* 0000xxx00*/
                             size_t read_type_size = av->adios_type_size;
-                            //index in a block
-                            int start_idx_0 = -1;
-                            int end_idx_0 = -1;
-                            int start_idx_1 = -1;
-                            int end_idx_1 = -1;
+                            /* index in a block with respect tp the block beginning */
+                            int start_in_block_idx_0 = -1;
+                            int end_in_block_idx_0 = -1;
+                            int start_in_block_idx_1 = -1;
+                            int end_in_block_idx_1 = -1;
 
                             /* |0000xxxxxx|xxxxxxxxxx|xxxxxxxxxx|xxxxx0000| */
                             /* find beginning of the block */
                             /* case |0000xxxxxx| */
-                            if (start[1] >= global_start[1] && start[1] < global_start[1] + global_count[1]) {
-                                start_idx_1 = start[1] - global_start[1];
+                            /* fast index */
+                            if (start[1] >= block_info_start[1] && start[1] < block_info_start[1] + block_info_count[1]) {
+                                start_in_block_idx_1 = start[1] - block_info_start[1];
                                 /* case |xxxxxxxxx| */
-                            } else if (start[1] < global_start[1]) {
-                                start_idx_1 = 0;
+                            } else if (start[1] < block_info_start[1]) {
+                                start_in_block_idx_1 = 0;
                             }
                             /* find end of the block */
                             /*  case |xxxxx0000| */
-                            if (start[1] + count[1] >= global_start[1] &&
-                                start[1] + count[1] < global_start[1] + global_count[1]) {
-                                end_idx_1 = start[1] + count[1] - global_start[1];
+                            if (start[1] + count[1] >= block_info_start[1] &&
+                                start[1] + count[1] < block_info_start[1] + block_info_count[1]) {
+                                end_in_block_idx_1 = start[1] + count[1] - block_info_start[1];
                                 /*  case |xxxxxxxxx| */
-                            } else if (global_start[1] + global_count[1] <= start[1] + count[1]) {
-                                end_idx_1 = global_count[1];
+                            } else if (block_info_start[1] + block_info_count[1] <= start[1] + count[1]) {
+                                end_in_block_idx_1 = block_info_count[1];
                             }
-                            start_idx_0 = start[0];
-                            end_idx_0 = start[0] + count[0];
+                            /* slow index */
+                            if (start[0] >= block_info_start[0] && start[0] < block_info_start[0] + block_info_count[0]) {
+                                start_in_block_idx_0 = start[0] - block_info_start[0];
+                                /* case |xxxxxxxxx| */
+                            } else if (start[0] < block_info_start[0]) {
+                                start_in_block_idx_0 = 0;
+                            }
+                            /* find end of the block */
+                            /*  case |xxxxx0000| */
+                            if (start[0] + count[0] >= block_info_start[0] &&
+                                start[0] + count[0] < block_info_start[0] + block_info_count[0]) {
+                                end_in_block_idx_0 = start[0] + count[0] - block_info_start[0];
+                                /*  case |xxxxxxxxx| */
+                            } else if (block_info_start[0] + block_info_count[0] <= start[0] + count[0]) {
+                                end_in_block_idx_0 = block_info_count[0];
+                            }
 
-                            if (start_idx_0 != -1 && end_idx_0 != -1 && start_idx_1 != -1 && end_idx_1 != -1) {
+                            if (start_in_block_idx_0 != -1 && end_in_block_idx_0 != -1 && start_in_block_idx_1 != -1 && end_in_block_idx_1 != -1) {
 
                                 if (av->adios_type == adios2_type_double) {
-                                    for (int idx_0 = start_idx_0; idx_0 < end_idx_0; idx_0++) {
-                                        int offset = idx_0 * global_count[1];
-                                        if (start[0] != 0) {
-                                            for (int idx_1 = start_idx_1; idx_1 < end_idx_1; idx_1++) {
-                                                ((double *) buf)[idx_1 + global_start[1] -
-                                                                 start[1]] = *((double *) (offset + mem_buffer +
+                                    for (int idx_0 = start_in_block_idx_0; idx_0 < end_in_block_idx_0; idx_0++) {
+                                        int offset = idx_0 * block_info_count[1];
+                                        int offset_buf = (idx_0 + block_info_start[0] - start[0]) * block_info_count[1];
+                                            for (int idx_1 = start_in_block_idx_1; idx_1 < end_in_block_idx_1; idx_1++) {
+                                                ((double *) buf)[idx_1 + offset_buf] = *((double *) (offset + mem_buffer +
                                                                                            header_size +
-                                                                                           (idx_1) *
+                                                                                           idx_1 *
                                                                                            read_type_size));
                                             }
-                                        } else {
-                                            for (int idx_1 = start_idx_1; idx_1 < end_idx_1; idx_1++) {
-                                                ((double *) buf)[offset + idx_1 + global_start[1] -
-                                                                 start[1]] = *((double *) (offset + mem_buffer +
-                                                                                           header_size +
-                                                                                           (idx_1) *
-                                                                                           read_type_size));
-                                            }
-                                        }
-
                                     }
                                 } else if (av->adios_type == adios2_type_int32_t) {
-                                    for (int idx_0 = start_idx_0; idx_0 < end_idx_0; idx_0++) {
-                                        int offset = idx_0 * global_count[1];
-                                        if (start[0] != 0) {
-                                            for (int idx_1 = start_idx_1; idx_1 < end_idx_1; idx_1++) {
-                                                ((int32_t *) buf)[idx_1 + global_start[1] -
-                                                                  start[1]] = *((int32_t *) (offset + mem_buffer +
+                                    for (int idx_0 = start_in_block_idx_0; idx_0 < end_in_block_idx_0; idx_0++) {
+                                        int offset = idx_0 * block_info_count[1];
+                                        int offset_buf = (idx_0 + block_info_start[0] - start[0]) * block_info_count[1];
+                                            for (int idx_1 = start_in_block_idx_1; idx_1 < end_in_block_idx_1; idx_1++) {
+                                                ((int32_t *) buf)[idx_1 + offset_buf] = *((int32_t *) (offset + mem_buffer +
                                                                                              header_size +
                                                                                              (idx_1) *
                                                                                              read_type_size));
                                             }
-                                        } else {
-                                            for (int idx_1 = start_idx_1; idx_1 < end_idx_1; idx_1++) {
-                                                ((int32_t *) buf)[offset + idx_1 + global_start[1] -
-                                                                  start[1]] = *((int32_t *) (offset + mem_buffer +
-                                                                                             header_size +
-                                                                                             (idx_1) *
-                                                                                             read_type_size));
-
-                                            }
-                                        }
                                     }
                                 } else if (av->adios_type == adios2_type_uint8_t ||
                                            av->adios_type == adios2_type_int8_t) {
-                                    for (int idx_0 = start_idx_0; idx_0 < end_idx_0; idx_0++) {
-                                        int offset = idx_0 * global_count[1];
-                                        if (start[0] != 0) {
-                                            for (int idx_1 = start_idx_1; idx_1 < end_idx_1; idx_1++) {
-                                                ((char *) buf)[idx_1 + global_start[1] - start[1]] = *((char *) (
-                                                        offset + mem_buffer + header_size +
-                                                        (idx_1) * read_type_size));
-                                            }
-                                        } else {
-                                            for (int idx_1 = start_idx_1; idx_1 < end_idx_1; idx_1++) {
-                                                ((char *) buf)[offset + idx_1 + global_start[1] -
-                                                               start[1]] = *((char *) (offset + mem_buffer +
-                                                                                       header_size +
-                                                                                       (idx_1) * read_type_size));
-                                            }
+                                    for (int idx_0 = start_in_block_idx_0; idx_0 < end_in_block_idx_0; idx_0++) {
+                                        int offset = idx_0 * block_info_count[1];
+                                        int offset_buf = (idx_0 + block_info_start[0] - start[0]) * block_info_count[1];
+                                        for (int idx_1 = start_in_block_idx_1; idx_1 < end_in_block_idx_1; idx_1++) {
+                                            ((char *) buf)[offset_buf + idx_1] = *((char *) (offset + mem_buffer +
+                                                                                   header_size +
+                                                                                   idx_1 * read_type_size));
                                         }
-
                                     }
                                 } else
                                     return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -1647,112 +1631,125 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             /*  |header|     data   | header|   data    |*/
                             /* 0000xxx00*/
                             size_t read_type_size = av->adios_type_size;
-                            //index in a block
-                            //the last index is the fastest
-                            int start_idx_0 = -1;
-                            int end_idx_0 = -1;
-                            int start_idx_1 = -1;
-                            int end_idx_1 = -1;
-                            int start_idx_2 = -1;
-                            int end_idx_2 = -1;
+                            /* index in a block with respect to block beginning */
+                            /* the last index is the fastest */
+                            int start_in_block_idx_0 = -1;
+                            int end_in_block_idx_0 = -1;
+                            int start_in_block_idx_1 = -1;
+                            int end_in_block_idx_1 = -1;
+                            int start_in_block_idx_2 = -1;
+                            int end_in_block_idx_2 = -1;
 
                             /* |0000xxxxxx|xxxxxxxxxx|xxxxxxxxxx|xxxxx0000| */
                             /* find beginning of the block */
                             /* case |0000xxxxxx| */
-                            if (start[2] >= global_start[2] && start[2] < global_start[2] + global_count[2]) {
-                                start_idx_2 = start[2] - global_start[2];
+                            if (start[2] >= block_info_start[2] && start[2] < block_info_start[2] + block_info_count[2]) {
+                                start_in_block_idx_2 = start[2] - block_info_start[2];
                                 /* case |xxxxxxxxx| */
-                            } else if (start[2] < global_start[2]) {
-                                start_idx_2 = 0;
+                            } else if (start[2] < block_info_start[2]) {
+                                start_in_block_idx_2 = 0;
                             }
                             /* find end of the block */
                             /*  case |xxxxx0000| */
-                            if (start[2] + count[2] >= global_start[2] &&
-                                start[2] + count[2] < global_start[2] + global_count[2]) {
-                                end_idx_2 = start[2] + count[2] - global_start[2];
+                            if (start[2] + count[2] >= block_info_start[2] &&
+                                start[2] + count[2] < block_info_start[2] + block_info_count[2]) {
+                                end_in_block_idx_2 = start[2] + count[2] - block_info_start[2];
                                 /*  case |xxxxxxxxx| */
-                            } else if (global_start[2] + global_count[2] <= start[2] + count[2]) {
-                                end_idx_2 = global_count[2];
+                            } else if (block_info_start[2] + block_info_count[2] <= start[2] + count[2]) {
+                                end_in_block_idx_2 = block_info_count[2];
                             }
-                            start_idx_0 = start[0];
-                            end_idx_0 = start[0] + count[0];
+                            if (start[1] >= block_info_start[1] && start[1] < block_info_start[1] + block_info_count[1]) {
+                                start_in_block_idx_1 = start[1] - block_info_start[1];
+                                /* case |xxxxxxxxx| */
+                            } else if (start[1] < block_info_start[1]) {
+                                start_in_block_idx_1 = 0;
+                            }
+                            /* find end of the block */
+                            /*  case |xxxxx0000| */
+                            if (start[1] + count[1] >= block_info_start[1] &&
+                                start[1] + count[1] < block_info_start[1] + block_info_count[1]) {
+                                end_in_block_idx_1 = start[1] + count[1] - block_info_start[1];
+                                /*  case |xxxxxxxxx| */
+                            } else if (block_info_start[1] + block_info_count[1] <= start[1] + count[1]) {
+                                end_in_block_idx_1 = block_info_count[1];
+                            }
+                            /* slow index */
+                            if (start[0] >= block_info_start[0] && start[0] < block_info_start[0] + block_info_count[0]) {
+                                start_in_block_idx_0 = start[0] - block_info_start[0];
+                                /* case |xxxxxxxxx| */
+                            } else if (start[0] < block_info_start[0]) {
+                                start_in_block_idx_0 = 0;
+                            }
+                            /* find end of the block */
+                            /*  case |xxxxx0000| */
+                            if (start[0] + count[0] >= block_info_start[0] &&
+                                start[0] + count[0] < block_info_start[0] + block_info_count[0]) {
+                                end_in_block_idx_0 = start[0] + count[0] - block_info_start[0];
+                                /*  case |xxxxxxxxx| */
+                            } else if (block_info_start[0] + block_info_count[0] <= start[0] + count[0]) {
+                                end_in_block_idx_0 = block_info_count[0];
+                            }
 
-                            start_idx_0 = start[1];
-                            end_idx_0 = start[1] + count[1];
-
-                            if (start_idx_0 != -1 && end_idx_0 != -1 && start_idx_1 != -1 && end_idx_1 != -1) {
+                            if (start_in_block_idx_0 != -1 && end_in_block_idx_0 != -1 && start_in_block_idx_1 != -1 &&
+                                end_in_block_idx_1 != -1) {
 
                                 if (av->adios_type == adios2_type_double) {
-                                    for (int idx_0 = start_idx_0; idx_0 < end_idx_0; idx_0++) {
-                                        int offset = idx_0 * global_count[1];
-                                        if (start[0] != 0) {
-                                            for (int idx_2 = start_idx_2; idx_2 < end_idx_2; idx_2++) {
-                                                ((double *) buf)[idx_2 + global_start[2] -
-                                                                 start[1]] = *((double *) (offset + mem_buffer +
-                                                                                           header_size +
-                                                                                           (idx_2) *
-                                                                                           read_type_size));
-                                            }
-                                        } else {
-                                            for (int idx_1 = start_idx_1; idx_1 < end_idx_1; idx_1++) {
-                                                ((double *) buf)[offset + idx_1 + global_start[1] -
-                                                                 start[1]] = *((double *) (offset + mem_buffer +
-                                                                                           header_size +
-                                                                                           (idx_1) *
-                                                                                           read_type_size));
+                                    for (int idx_0 = start_in_block_idx_0; idx_0 < end_in_block_idx_0; idx_0++) {
+                                        for (int idx_1 = start_in_block_idx_1; idx_1 < end_in_block_idx_1; idx_1++) {
+                                            int offset2D = idx_1 * block_info_count[2];
+                                            int offset_buf2D =
+                                                    (idx_1 + block_info_start[1] - start[1]) * block_info_count[2];
+                                            int offset = offset2D + idx_0 * block_info_count[1] * block_info_count[2];
+                                            int offset_buf = offset_buf2D + (idx_0 + block_info_start[0] - start[0]) *
+                                                                            block_info_count[1] * block_info_count[2];
+                                            for (int idx_2 = start_in_block_idx_2;
+                                                 idx_2 < end_in_block_idx_2; idx_2++) {
+                                                ((double *) buf)[idx_2 + offset_buf] = *((double *) (
+                                                        offset + mem_buffer + header_size +
+                                                        (idx_2) * read_type_size));
                                             }
                                         }
-
                                     }
                                 } else if (av->adios_type == adios2_type_int32_t) {
-                                    for (int idx_0 = start_idx_0; idx_0 < end_idx_0; idx_0++) {
-                                        int offset = idx_0 * global_count[1];
-                                        if (start[0] != 0) {
-                                            for (int idx_1 = start_idx_1; idx_1 < end_idx_1; idx_1++) {
-                                                ((int32_t *) buf)[idx_1 + global_start[1] -
-                                                                  start[1]] = *((int32_t *) (offset + mem_buffer +
-                                                                                             header_size +
-                                                                                             (idx_1) *
-                                                                                             read_type_size));
-                                            }
-                                        } else {
-                                            for (int idx_1 = start_idx_1; idx_1 < end_idx_1; idx_1++) {
-                                                ((int32_t *) buf)[offset + idx_1 + global_start[1] -
-                                                                  start[1]] = *((int32_t *) (offset + mem_buffer +
-                                                                                             header_size +
-                                                                                             (idx_1) *
-                                                                                             read_type_size));
-
+                                    for (int idx_0 = start_in_block_idx_0; idx_0 < end_in_block_idx_0; idx_0++) {
+                                        for (int idx_1 = start_in_block_idx_1; idx_1 < end_in_block_idx_1; idx_1++) {
+                                            int offset2D = idx_1 * block_info_count[2];
+                                            int offset_buf2D =
+                                                    (idx_1 + block_info_start[1] - start[1]) * block_info_count[2];
+                                            int offset = offset2D + idx_0 * block_info_count[1] * block_info_count[2];
+                                            int offset_buf = offset_buf2D + (idx_0 + block_info_start[0] - start[0]) *
+                                                                            block_info_count[1] * block_info_count[2];
+                                            for (int idx_2 = start_in_block_idx_2;
+                                                 idx_2 < end_in_block_idx_2; idx_2++) {
+                                                ((int32_t *) buf)[idx_2 + offset_buf] = *((int32_t *) (
+                                                        offset + mem_buffer + header_size +
+                                                        (idx_2) * read_type_size));
                                             }
                                         }
                                     }
                                 } else if (av->adios_type == adios2_type_uint8_t ||
                                            av->adios_type == adios2_type_int8_t) {
-                                    for (int idx_0 = start_idx_0; idx_0 < end_idx_0; idx_0++) {
-                                        for (int idx_1 = start_idx_1; idx_1 < end_idx_1; idx_1++) {
-                                            int offset = idx_1 * global_count[2] + idx_0 * global_count[1] * global_count[2];
-                                            if (start[0] != 0 && start[1] != 0) {
-                                                for (int idx_2 = start_idx_2; idx_2 < end_idx_1; idx_2++) {
-                                                    ((char *) buf)[idx_2 + global_start[2] - start[2]] = *((char *) (
-                                                            offset + mem_buffer + header_size +
-                                                            (idx_2) * read_type_size));
-                                                }
-                                            } else {
-                                                for (int idx_2 = start_idx_2; idx_2 < end_idx_2; idx_2++) {
-                                                    ((char *) buf)[offset + idx_2 + global_start[2] -
-                                                                   start[2]] = *((char *) (offset + mem_buffer +
-                                                                                           header_size +
-                                                                                           (idx_2) * read_type_size));
-                                                }
+                                    for (int idx_0 = start_in_block_idx_0; idx_0 < end_in_block_idx_0; idx_0++) {
+                                        for (int idx_1 = start_in_block_idx_1; idx_1 < end_in_block_idx_1; idx_1++) {
+                                            int offset2D = idx_1 * block_info_count[2];
+                                            int offset_buf2D =
+                                                    (idx_1 + block_info_start[1] - start[1]) * block_info_count[2];
+                                            int offset = offset2D + idx_0 * block_info_count[1] * block_info_count[2];
+                                            int offset_buf = offset_buf2D + (idx_0 + block_info_start[0] - start[0]) *
+                                                                            block_info_count[1] * block_info_count[2];
+                                            for (int idx_2 = start_in_block_idx_2;
+                                                 idx_2 < end_in_block_idx_2; idx_2++) {
+                                                ((char *) buf)[idx_2 + offset_buf] = *((char *) (
+                                                        offset + mem_buffer + header_size +
+                                                        (idx_2) * read_type_size));
                                             }
-
                                         }
                                     }
                                 } else
                                     return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                                    "Not implemented");
                             }
-                        }else {
+                        } else {
                             return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                            "Not implemented");
                         }
