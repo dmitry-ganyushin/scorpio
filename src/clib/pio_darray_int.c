@@ -1234,6 +1234,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     int frame_id = file->varlist[vid].record;
     /*magically obtain the relevant adios step*/
     int required_adios_step = get_adios_step(file, vid, frame_id);
+    assert(required_adios_step >=0);
     file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
     if (file->engineH == NULL) {
         return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -1257,7 +1258,6 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     int start_idx_in_start_block = -1;
     int end_idx_in_end_block = -1;
     bool start_block_found = false;
-    bool end_block_found = false;
     /* get attribute mappling from variable name to te id*/
     char prefix_var_name[] = "/__pio__/var/";
     char suffix_att_name[] = "/def/decomp";
@@ -1335,7 +1335,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
                 if (decomp_int64_t != NULL) {
                     free(decomp_int64_t);
                 }
-                if (end_block_found) break;
+                if (start_block_found) break;
             }
            break;
         } else {
@@ -1347,6 +1347,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
 if (required_adios_step != time_step) {
     adios2_end_step(file->engineH);
     adios2_close(file->engineH);
+    file->engineH = NULL;
 
     file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
     if (file->engineH == NULL) {

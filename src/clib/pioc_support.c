@@ -3132,10 +3132,7 @@ int adios_read_global_dimensions(iosystem_desc_t *ios, file_desc_t * file, char 
                 file->dim_names[file->num_dim_vars] = (char *) malloc(sub_length + 1);
             }
             if (file->dim_names[file->num_dim_vars]) {
-                //TODODG
-                for (int c = 0; c < sub_length + 1; c++) {
-                    file->dim_names[file->num_dim_vars][c] = var_names[i][prefix_length + c];
-                }
+                memcpy(file->dim_names[file->num_dim_vars], &var_names[i][prefix_length], sub_length + 1);
             }
             adios2_variable *variableH = adios2_inquire_variable(file->ioH, var_names[i]);
             if (variableH != NULL) {

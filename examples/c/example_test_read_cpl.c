@@ -104,7 +104,6 @@ int main(int argc, char* argv[])
 
   varid_a2x_ax_Sa_topo = -1;
   ret = PIOc_inq_varid(ncid_read, "a2x_ax_Sa_topo", &varid_a2x_ax_Sa_topo); ERR
-  PIOc_setframe(ncid_read, varid_a2x_ax_Sa_topo, 1);
   ret = PIOc_read_darray(ncid_read, varid_a2x_ax_Sa_topo, ioid, element_per_pe, read_darray_buffer); ERR
 
   ret = PIOc_closefile(ncid_read); ERR
