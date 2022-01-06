@@ -16,6 +16,7 @@
 #define PUT_GET_VAR_LEN 10
 #define PUT_GET_VAR_LEN_X 10
 #define PUT_GET_VAR_LEN_Y 5
+#define PUT_GET_VAR_LEN_Z 2
 
 /* Max time steps */
 #define MAX_TIME_STEPS 10
@@ -43,14 +44,14 @@ int main(int argc, char* argv[])
   int dimid_text_var_len;
   int dimid_darray_var_len;
   int dimid_put_get_var_len;
-  int dimids_put_get_var_len_2D[2];
+  int dimids_put_get_var_len_3D[3];
   int dimids_time_var[2];
 
     int dimid_darray_var_len_inq;
     PIO_Offset dimlen_darray_var_len_inq;
 
-    int dimids_put_get_var_len_2D_inq[2];
-    PIO_Offset dimlens_put_get_var_len_2D_inq[2];
+    int dimids_put_get_var_len_3D_inq[3];
+    PIO_Offset dimlens_put_get_var_len_3D_inq[3];
 
     /* This simple example uses one-dimensional data. */
   const int NDIMS = 1;
@@ -82,6 +83,7 @@ int main(int argc, char* argv[])
   int varid_dummy_time_var_int;
   int varid_dummy_put_get_var_int;
   int varid_dummy_put_get_var_int_2D;
+  int varid_dummy_put_get_var_int_3D;
   int varid_dummy_put_get_var_float;
   int varid_dummy_put_get_var_double;
 
@@ -137,6 +139,8 @@ int main(int argc, char* argv[])
   int get_var_buffer_int[PUT_GET_VAR_LEN];
   int put_var_buffer_int_2D[PUT_GET_VAR_LEN_X][PUT_GET_VAR_LEN_Y];
   int get_var_buffer_int_2D[PUT_GET_VAR_LEN_X][PUT_GET_VAR_LEN_Y];
+  int put_var_buffer_int_3D[PUT_GET_VAR_LEN_X][PUT_GET_VAR_LEN_Y][PUT_GET_VAR_LEN_Z];
+  int get_var_buffer_int_3D[PUT_GET_VAR_LEN_X][PUT_GET_VAR_LEN_Y][PUT_GET_VAR_LEN_Z];
   double put_var_buffer_double[PUT_GET_VAR_LEN];
   double get_var_buffer_double[PUT_GET_VAR_LEN];
 
@@ -213,6 +217,18 @@ int main(int argc, char* argv[])
       }
   }
 
+  for (int i = 0; i < PUT_GET_VAR_LEN_X; i++) {
+    for (int j = 0; j < PUT_GET_VAR_LEN_Y; j++) {
+      for (int k = 0; k < PUT_GET_VAR_LEN_Z; k++) {
+          if ((i + j + k) % 2 == 0)
+            put_var_buffer_int_3D[i][j][k] = 1;
+          else
+            put_var_buffer_int_3D[i][j][k] = -1;
+          get_var_buffer_int_3D[i][j][k] = 0;
+      }
+    }
+  }
+
   for (int fmt = 0; fmt < 2; fmt++) {
     /* Create a filename to write. */
     sprintf(filename, "example1_%d.nc", fmt);
@@ -247,11 +263,12 @@ int main(int argc, char* argv[])
     ret = PIOc_def_dim(ncid_write, "put_get_var_len", PUT_GET_VAR_LEN, &dimid_put_get_var_len); ERR
     ret = PIOc_def_var(ncid_write, "dummy_put_get_var_int", PIO_INT, NDIMS, &dimid_put_get_var_len, &varid_dummy_put_get_var_int); ERR
 
-    ret = PIOc_def_dim(ncid_write, "put_get_var_lex_x", PUT_GET_VAR_LEN_X, &dimids_put_get_var_len_2D[0]); ERR
-    ret = PIOc_def_dim(ncid_write, "put_get_var_lex_y", PUT_GET_VAR_LEN_Y, &dimids_put_get_var_len_2D[1]); ERR
+    ret = PIOc_def_dim(ncid_write, "put_get_var_len_x", PUT_GET_VAR_LEN_X, &dimids_put_get_var_len_3D[0]); ERR
+    ret = PIOc_def_dim(ncid_write, "put_get_var_len_y", PUT_GET_VAR_LEN_Y, &dimids_put_get_var_len_3D[1]); ERR
+    ret = PIOc_def_dim(ncid_write, "put_get_var_len_z", PUT_GET_VAR_LEN_Z, &dimids_put_get_var_len_3D[2]); ERR
 
-    ret = PIOc_def_var(ncid_write, "dummy_put_get_var_int_2D", PIO_INT, NDIMS + 1, dimids_put_get_var_len_2D, &varid_dummy_put_get_var_int_2D); ERR
-
+    ret = PIOc_def_var(ncid_write, "dummy_put_get_var_int_2D", PIO_INT, 2, dimids_put_get_var_len_3D, &varid_dummy_put_get_var_int_2D); ERR
+    ret = PIOc_def_var(ncid_write, "dummy_put_get_var_int_3D", PIO_INT, 3, dimids_put_get_var_len_3D, &varid_dummy_put_get_var_int_3D); ERR
 
     ret = PIOc_def_var(ncid_write, "dummy_put_get_var_float", PIO_FLOAT, NDIMS, &dimid_put_get_var_len, &varid_dummy_put_get_var_float); ERR
     ret = PIOc_def_var(ncid_write, "dummy_put_get_var_double", PIO_DOUBLE, NDIMS, &dimid_put_get_var_len, &varid_dummy_put_get_var_double); ERR
@@ -301,6 +318,10 @@ int main(int argc, char* argv[])
                               (const int *) put_var_buffer_int_2D); ERR
       /* end */
 #endif
+
+    ret = PIOc_put_var_int(ncid_write, varid_dummy_put_get_var_int_2D, (const int *) put_var_buffer_int_2D); ERR
+    ret = PIOc_put_var_int(ncid_write, varid_dummy_put_get_var_int_3D, (const int *) put_var_buffer_int_3D); ERR
+
     /* Write to int type variable with int type decomposition, type conversions will not be performed. */
     ret = PIOc_write_darray(ncid_write, varid_dummy_darray_var_int, ioid_int, ELEMENTS_PER_PE, write_darray_buffer_int, NULL); ERR
 
@@ -476,7 +497,7 @@ int main(int argc, char* argv[])
     ret = PIOc_get_vars_int(ncid_read, varid_dummy_put_get_var_int, start, count, NULL, get_var_buffer_int + 1); ERR
     for (int i = 1; i < PUT_GET_VAR_LEN - 1; i++) {
       if (get_var_buffer_int[i] != put_var_buffer_int[i]) {
-          printf("rank = %d, get wrong data for dummy_put_get_var_int at index %d\n", my_rank, i);
+          printf("rank = %d, fmt = %d, get wrong data for dummy_put_get_var_int at index %d\n", my_rank, fmt, i);
           break;
       }
     }
@@ -490,7 +511,7 @@ int main(int argc, char* argv[])
     for (int i = 1; i < PUT_GET_VAR_LEN - 1; i++) {
       diff_double = get_var_buffer_double[i] - put_var_buffer_double[i];
       if (fabs(diff_double) > 1E-5) {
-          printf("rank = %d, get wrong data for dummy_put_get_var_float at index %d\n", my_rank, i);
+          printf("rank = %d, fmt = %d, get wrong data for dummy_put_get_var_float at index %d\n", my_rank, fmt, i);
           break;
       }
     }
@@ -505,7 +526,7 @@ int main(int argc, char* argv[])
       for (int i = 1; i < PUT_GET_VAR_LEN - 1; i++) {
           diff_double = get_var_buffer_double[i] - put_var_buffer_double[i];
           if (fabs(diff_double) > 1E-5) {
-              printf("rank = %d, get wrong data for dummy_put_get_var_double at index %d\n", my_rank, i);
+              printf("rank = %d, fmt = %d, get wrong data for dummy_put_get_var_double at index %d\n", my_rank, fmt, i);
               break;
           }
       }
@@ -533,17 +554,50 @@ int main(int argc, char* argv[])
       varid_dummy_put_get_var_int_2D = -1;
       ret = PIOc_inq_varid(ncid_read, "dummy_put_get_var_int_2D", &varid_dummy_put_get_var_int_2D); ERR
 
-      dimids_put_get_var_len_2D_inq[0] = -1;
-      dimids_put_get_var_len_2D_inq[1] = -1;
-      ret = PIOc_inq_vardimid(ncid_read, varid_dummy_put_get_var_int_2D, dimids_put_get_var_len_2D_inq); ERR
-      dimlens_put_get_var_len_2D_inq[0] = -1;
-      ret = PIOc_inq_dimlen(ncid_read, dimids_put_get_var_len_2D_inq[0], &dimlens_put_get_var_len_2D_inq[0]); ERR
-      if (dimlens_put_get_var_len_2D_inq[0] != PUT_GET_VAR_LEN_X)
+      ret = PIOc_get_var_int(ncid_read, varid_dummy_put_get_var_int_2D, (int *) get_var_buffer_int_2D); ERR
+      for (int i = 0; i < PUT_GET_VAR_LEN_X; i++) {
+        for (int j = 0; j < PUT_GET_VAR_LEN_Y; j++) {
+          if (get_var_buffer_int_2D[i][j] != put_var_buffer_int_2D[i][j]) {
+            printf("rank = %d, fmt = %d, get wrong data for dummy_put_get_var_int_2D at index x = %d y = %d\n", my_rank, fmt, i, j);
+              break;
+          }
+        }
+      }
+
+      varid_dummy_put_get_var_int_3D = -1;
+      ret = PIOc_inq_varid(ncid_read, "dummy_put_get_var_int_3D", &varid_dummy_put_get_var_int_3D); ERR
+
+      ret = PIOc_get_var_int(ncid_read, varid_dummy_put_get_var_int_3D, (int *) get_var_buffer_int_3D); ERR
+      for (int i = 0; i < PUT_GET_VAR_LEN_X; i++) {
+        for (int j = 0; j < PUT_GET_VAR_LEN_Y; j++) {
+          for (int k = 0; k < PUT_GET_VAR_LEN_Z; k++) {
+              if (get_var_buffer_int_3D[i][j][k] != put_var_buffer_int_3D[i][j][k]) {
+                  printf("rank = %d, fmt = %d, get wrong data for dummy_put_get_var_int_3D at index x = %d y = %d z = %d\n", my_rank, fmt, i, j, k);
+                  break;
+              }
+          }
+        }
+      }
+
+      dimids_put_get_var_len_3D_inq[0] = -1;
+      dimids_put_get_var_len_3D_inq[1] = -1;
+      dimids_put_get_var_len_3D_inq[2] = -1;
+      ret = PIOc_inq_vardimid(ncid_read, varid_dummy_put_get_var_int_3D, dimids_put_get_var_len_3D_inq); ERR
+
+      dimlens_put_get_var_len_3D_inq[0] = -1;
+      ret = PIOc_inq_dimlen(ncid_read, dimids_put_get_var_len_3D_inq[0], &dimlens_put_get_var_len_3D_inq[0]); ERR
+      if (dimlens_put_get_var_len_3D_inq[0] != PUT_GET_VAR_LEN_X)
                   printf("rank = %d, read wrong length for dimension put_get_var_len_x\n", my_rank);
-      dimlens_put_get_var_len_2D_inq[1] = -1;
-      ret = PIOc_inq_dimlen(ncid_read, dimids_put_get_var_len_2D_inq[1], &dimlens_put_get_var_len_2D_inq[1]); ERR
-      if (dimlens_put_get_var_len_2D_inq[1] != PUT_GET_VAR_LEN_Y)
+
+      dimlens_put_get_var_len_3D_inq[1] = -1;
+      ret = PIOc_inq_dimlen(ncid_read, dimids_put_get_var_len_3D_inq[1], &dimlens_put_get_var_len_3D_inq[1]); ERR
+      if (dimlens_put_get_var_len_3D_inq[1] != PUT_GET_VAR_LEN_Y)
                   printf("rank = %d, read wrong length for dimension put_get_var_len_y\n", my_rank);
+
+      dimlens_put_get_var_len_3D_inq[2] = -1;
+      ret = PIOc_inq_dimlen(ncid_read, dimids_put_get_var_len_3D_inq[2], &dimlens_put_get_var_len_3D_inq[2]); ERR
+      if (dimlens_put_get_var_len_3D_inq[2] != PUT_GET_VAR_LEN_Z)
+                  printf("rank = %d, read wrong length for dimension put_get_var_len_z\n", my_rank);
 
       ret = PIOc_closefile(ncid_read); ERR
   }
