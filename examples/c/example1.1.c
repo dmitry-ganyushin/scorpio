@@ -190,8 +190,8 @@ int main(int argc, char* argv[])
 
   /* Prepare sample data for write buffers and initialize read buffers. */
   for (int i = 0; i < ELEMENTS_PER_PE; i++) {
-    write_darray_buffer_int[i] = my_rank;
-    write_darray_buffer_double[i] = my_rank * 0.1;
+    write_darray_buffer_int[i] = my_rank + 1;
+    write_darray_buffer_double[i] = my_rank * 0.1 + 1.0;
     read_darray_buffer_int[i] = 0;
     read_darray_buffer_double[i] = 0.0;
   }
@@ -467,6 +467,8 @@ int main(int argc, char* argv[])
 
     /* Read float type variable with double type decomposition, type conversions will be performed. */
     ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_float", &varid_dummy_darray_var_float); ERR
+      for (int i = 0; i < ELEMENTS_PER_PE; i++)
+          read_darray_buffer_double[i] = 0.0;
     ret = PIOc_read_darray(ncid_read, varid_dummy_darray_var_float, ioid_double, ELEMENTS_PER_PE, read_darray_buffer_double); ERR
     for (int i = 0; i < ELEMENTS_PER_PE; i++) {
       diff_double = read_darray_buffer_double[i] - write_darray_buffer_double[i];

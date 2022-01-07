@@ -1393,29 +1393,33 @@ if (required_adios_step != time_step) {
         }
         free(data_blocks->BlocksInfo);
         free(data_blocks);
-        adios2_type type;
-        adios2_variable_type(&type, data);
+        adios2_type read_type;
+        adios2_variable_type(&read_type, data);
+        adios2_type out_type = file->adios_vars[vid].adios_type;
+        /* if (out_type == adios2_type_unknown && read_type == adios2_type_float) out_type = adios2_type_float; for out float type */
+        if (out_type == adios2_type_unknown && read_type == adios2_type_float) out_type = adios2_type_double;
         size_t run_idx = 0;
         for (size_t curr_block = start_block; curr_block <= end_block; curr_block++) {
             adios2_set_block_selection(data, curr_block);
             size_t var_size;/* size of the block*/
             adios2_error err_sel = adios2_selection_size(&var_size, data);
-            if (type == adios2_type_int32_t) {
+            if (read_type == adios2_type_int32_t) {
                 data_int32_t = (int32_t *) malloc(var_size * sizeof(int32_t));
                 adios2_get(file->engineH, data, data_int32_t, adios2_mode_sync);
-            }else if (type == adios2_type_double) {
+            }else if (read_type == adios2_type_double) {
                 data_double = (double *) malloc(var_size * sizeof(double));
                 adios2_get(file->engineH, data, data_double, adios2_mode_sync);
-            } else if (type == adios2_type_float) {
+            } else if (read_type == adios2_type_float) {
                 data_float = (float *) malloc(var_size * sizeof(float));
-                /* type conversion*/
-                data_double = (double *) malloc(var_size * sizeof(double));
                 adios2_get(file->engineH, data, data_float, adios2_mode_sync);
-                /*type conversion*/
-                for (int i = 0; i < var_size; i++) {
-                    data_double[i] = data_float[i];
+                /*type conversion from read to double*/
+                if (out_type == adios2_type_double) {
+                    data_double = (double *) malloc(var_size * sizeof(double));
+                    for (int i = 0; i < var_size; i++) {
+                        data_double[i] = data_float[i];
+                    }
+                    free(data_float); data_float = NULL;
                 }
-                free(data_float);
             } else {
                 return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                "Not implemented");
@@ -1423,66 +1427,33 @@ if (required_adios_step != time_step) {
             /*inside one block*/
             /* |000xxx00|  */
             if (curr_block == start_block && curr_block == end_block) {
-                if (type == adios2_type_int32_t) {
+                if (read_type == adios2_type_int32_t) {
                     memcpy((char *) iobuf, &data_int32_t[start_idx_in_start_block],
                            (end_idx_in_end_block - start_idx_in_start_block + 1) * sizeof(int32_t));
-                    free(data_int32_t);
-                } else if (type == adios2_type_float || type == adios2_type_double) {
+                    free(data_int32_t); data_int32_t = NULL;
+                } else if (read_type == adios2_type_float) {
+                    if (out_type == adios2_type_float) {
+                        memcpy((char *) iobuf, &data_float[start_idx_in_start_block],
+                               (end_idx_in_end_block - start_idx_in_start_block + 1) * sizeof(float));
+                        free(data_float); data_float = NULL;
+                    }else if (out_type == adios2_type_double) {
+                        memcpy((char *) iobuf, &data_double[start_idx_in_start_block],
+                               (end_idx_in_end_block - start_idx_in_start_block + 1) * sizeof(double));
+                        free(data_double); data_double = NULL;
+                    }else {
+                        if (data_double != NULL) free(data_double);
+                        if (data_float != NULL) free(data_float);
+                        if (data_int32_t != NULL) free(data_int32_t);
+                        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Not implemented");
+                    }
+                }else if (read_type == adios2_type_double) {
                     memcpy((char *) iobuf, &data_double[start_idx_in_start_block],
                            (end_idx_in_end_block - start_idx_in_start_block + 1) * sizeof(double));
                     free(data_double);
                 } else {
                     return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                    "Not implemented");
-                }
-            } else if (false){
-                /* matching is not correct */
-                /*different block*/
-                /* |000xxxxx|xxx00000|  */
-                /* |000xxxxx|xxxxxxxx|xxx00000|  */
-                /* |xxxxxxxx|xxxxxxxx|xxxxxxxx|xxxxxxxx|*/
-                /*|xxxxxxxx|xxxxxxxx|xxxxxxxx|*/
-                if (curr_block == start_block) {
-                    if (type == adios2_type_int32_t) {
-                        memcpy((char *) iobuf, &data_int32_t[start_idx_in_start_block],
-                               (var_size - start_idx_in_start_block + 1) * sizeof(int32_t));
-                        free(data_int32_t);
-                    } else if (type == adios2_type_float ||  type == adios2_type_double) {
-                        memcpy((char *) iobuf, &data_double[start_idx_in_start_block],
-                               (var_size - start_idx_in_start_block + 1) * sizeof(double));
-                        free(data_double);
-                    } else {
-                        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                       "Not implemented");
-                    }
-                }
-                if (curr_block == end_block) {
-
-                    if (type == adios2_type_int32_t) {
-                        memcpy((char *) iobuf, &data_int32_t[0],
-                               (var_size - end_idx_in_end_block + 1) * sizeof(int32_t));
-                        free(data_int32_t);
-                    } else if (type == adios2_type_float || type == adios2_type_double) {
-                        memcpy((char *) iobuf, &data_double[0],
-                               (var_size - end_idx_in_end_block + 1) * sizeof(double));
-                        free(data_double);
-                    }else {
-                        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                       "Not implemented");
-                    }
-                }
-                /* copy full block */
-                if (start_block < curr_block && curr_block < end_block) {
-                    if (type == adios2_type_int32_t) {
-                        memcpy((char *) iobuf, &data_int32_t[0], var_size * sizeof(int32_t));
-                        free(data_int32_t);
-                    } else if (type == adios2_type_float || type == adios2_type_double) {
-                        memcpy((char *) iobuf, &data_double[0], var_size * sizeof(double));
-                        free(data_double);
-                    }else {
-                        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                       "Not implemented");
-                    }
                 }
             }
         }
