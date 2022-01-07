@@ -1396,8 +1396,7 @@ if (required_adios_step != time_step) {
         adios2_type read_type;
         adios2_variable_type(&read_type, data);
         adios2_type out_type = file->adios_vars[vid].adios_type;
-        /* if (out_type == adios2_type_unknown && read_type == adios2_type_float) out_type = adios2_type_float; for out float type */
-        if (out_type == adios2_type_unknown && read_type == adios2_type_float) out_type = adios2_type_double;
+        out_type = PIOc_get_adios_type(iodesc->piotype);
         size_t run_idx = 0;
         for (size_t curr_block = start_block; curr_block <= end_block; curr_block++) {
             adios2_set_block_selection(data, curr_block);
