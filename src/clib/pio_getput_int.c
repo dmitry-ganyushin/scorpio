@@ -1420,7 +1420,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     uint64_t time_step = required_adios_step;
                     adios2_varinfo *data_blocks = adios2_inquire_blockinfo(file->engineH, av->adios_varid,
                                                                            time_step);
-                    int32_t data_blocks_size = data_blocks->nblocks;
+                    int32_t number_of_data_blocks = data_blocks->nblocks;
                     /* free memeory */
                     for (size_t i = 0; i < data_blocks->nblocks; ++i) {
                         free(data_blocks->BlocksInfo[i].Start);
@@ -1438,7 +1438,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                      * block1: |start| count| data |  */
                     /* 2D */
                     /* |start[0],start[1]|count[0], count[1]| data| */
-                    for (size_t i = 0; i < data_blocks_size; i++) {
+                    for (size_t i = 0; i < number_of_data_blocks; i++) {
                         adios2_set_block_selection(av->adios_varid, i);
                         adiosErr = adios2_selection_size(&var_size, av->adios_varid);
                         block_size = var_size * sizeof(char);
@@ -1514,28 +1514,10 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             }
 
                             if (start_idx != -1 && end_idx != -1) {
-
-                                if (av->adios_type == adios2_type_double)
-                                    for (int idx = start_idx; idx < end_idx; idx++)
-                                        ((double *) buf)[idx + block_info_start[0] - start[0]] = *((double *) (
-                                                mem_buffer +
-                                                header_size +
-                                                (idx) *
-                                                read_type_size));
-                                else if (av->adios_type == adios2_type_int32_t)
-                                    for (int idx = start_idx; idx < end_idx; idx++)
-                                        ((int32_t *) buf)[idx + block_info_start[0] - start[0]] = *((int32_t *) (
-                                                mem_buffer + header_size + (idx) * read_type_size));
-                                else if (av->adios_type == adios2_type_int8_t)
-                                    for (int idx = start_idx; idx < end_idx; idx++)
-                                        ((char *) buf)[idx + block_info_start[0] - start[0]] = *((char *) (mem_buffer +
-                                                                                                           header_size +
-                                                                                                       (idx) *
-                                                                                                       read_type_size));
-                                else
-                                    return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                                   "Not implemented");
-
+                                memcpy((char *) (buf + (block_info_start[0] - start[0] + start_idx) * read_type_size),
+                                       (char *) (mem_buffer +
+                                                 header_size + start_idx * read_type_size),
+                                       (end_idx - start_idx) * read_type_size);
                             }
                         } else if (av->ndims == 2 && read_type == adios2_type_uint8_t) {
                             /* data layout */
@@ -1586,45 +1568,15 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             }
 
                             if (start_in_block_idx_0 != -1 && end_in_block_idx_0 != -1 && start_in_block_idx_1 != -1 && end_in_block_idx_1 != -1) {
-
-                                if (av->adios_type == adios2_type_double) {
-                                    for (int idx_0 = start_in_block_idx_0; idx_0 < end_in_block_idx_0; idx_0++) {
-                                        int offset = idx_0 * block_info_count[1];
-                                        int offset_buf = (idx_0 + block_info_start[0] - start[0]) * block_info_count[1];
-                                            for (int idx_1 = start_in_block_idx_1; idx_1 < end_in_block_idx_1; idx_1++) {
-                                                ((double *) buf)[idx_1 + offset_buf] = *((double *) (offset * read_type_size + mem_buffer +
-                                                                                           header_size +
-                                                                                           idx_1 *
-                                                                                           read_type_size));
-                                            }
-                                    }
-                                } else if (av->adios_type == adios2_type_int32_t) {
-                                    for (int idx_0 = start_in_block_idx_0; idx_0 < end_in_block_idx_0; idx_0++) {
-                                        int offset = idx_0 * block_info_count[1];
-                                        int offset_buf = (idx_0 + block_info_start[0] - start[0]) * block_info_count[1];
-                                            for (int idx_1 = start_in_block_idx_1; idx_1 < end_in_block_idx_1; idx_1++) {
-                                                ((int32_t *) buf)[idx_1 + offset_buf] = *((int32_t *) (offset * read_type_size + mem_buffer +
-                                                                                             header_size +
-                                                                                             (idx_1) *
-                                                                                             read_type_size));
-                                            }
-                                    }
-                                } else if (av->adios_type == adios2_type_uint8_t ||
-                                           av->adios_type == adios2_type_int8_t) {
-                                    for (int idx_0 = start_in_block_idx_0; idx_0 < end_in_block_idx_0; idx_0++) {
-                                        int offset = idx_0 * block_info_count[1];
-                                        int offset_buf = (idx_0 + block_info_start[0] - start[0]) * block_info_count[1];
-                                        for (int idx_1 = start_in_block_idx_1; idx_1 < end_in_block_idx_1; idx_1++) {
-                                            ((char *) buf)[offset_buf + idx_1] = *((char *) (offset * read_type_size + mem_buffer +
-                                                                                   header_size +
-                                                                                   idx_1 * read_type_size));
-                                        }
-                                    }
-                                } else
-                                    return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                                   "Not implemented");
+                                for (int idx_0 = start_in_block_idx_0; idx_0 < end_in_block_idx_0; idx_0++) {
+                                    int offset = idx_0 * block_info_count[1];
+                                    int offset_buf = (idx_0 + block_info_start[0] - start[0]) * block_info_count[1];
+                                    memcpy((char *) (buf + (start_in_block_idx_1 + offset_buf) * read_type_size),
+                                           (char *) (mem_buffer +
+                                                     header_size + start_in_block_idx_1 * read_type_size + offset * read_type_size),
+                                           (end_in_block_idx_1 - start_in_block_idx_1) * read_type_size);
+                                }
                             }
-
                         } else if (av->ndims == 3 && read_type == adios2_type_uint8_t){
                             /* data layout */
                             /*  |adios data block 1 | adios data block2 |*/
@@ -1692,62 +1644,20 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
                             if (start_in_block_idx_0 != -1 && end_in_block_idx_0 != -1 && start_in_block_idx_1 != -1 &&
                                 end_in_block_idx_1 != -1) {
-
-                                if (av->adios_type == adios2_type_double) {
-                                    for (int idx_0 = start_in_block_idx_0; idx_0 < end_in_block_idx_0; idx_0++) {
-                                        for (int idx_1 = start_in_block_idx_1; idx_1 < end_in_block_idx_1; idx_1++) {
-                                            int offset2D = idx_1 * block_info_count[2];
-                                            int offset_buf2D =
-                                                    (idx_1 + block_info_start[1] - start[1]) * block_info_count[2];
-                                            int offset = offset2D + idx_0 * block_info_count[1] * block_info_count[2];
-                                            int offset_buf = offset_buf2D + (idx_0 + block_info_start[0] - start[0]) *
-                                                                            block_info_count[1] * block_info_count[2];
-                                            for (int idx_2 = start_in_block_idx_2;
-                                                 idx_2 < end_in_block_idx_2; idx_2++) {
-                                                ((double *) buf)[idx_2 + offset_buf] = *((double *) (
-                                                        offset * read_type_size + mem_buffer + header_size +
-                                                        idx_2 * read_type_size));
-                                            }
-                                        }
+                                for (int idx_0 = start_in_block_idx_0; idx_0 < end_in_block_idx_0; idx_0++) {
+                                    for (int idx_1 = start_in_block_idx_1; idx_1 < end_in_block_idx_1; idx_1++) {
+                                        int offset2D = idx_1 * block_info_count[2];
+                                        int offset_buf2D =
+                                                (idx_1 + block_info_start[1] - start[1]) * block_info_count[2];
+                                        int offset = offset2D + idx_0 * block_info_count[1] * block_info_count[2];
+                                        int offset_buf = offset_buf2D + (idx_0 + block_info_start[0] - start[0]) *
+                                                                        block_info_count[1] * block_info_count[2];
+                                        memcpy((char *) (buf + (start_in_block_idx_2 + offset_buf) * read_type_size),
+                                               (char *) (mem_buffer +
+                                                         header_size + start_in_block_idx_2 * read_type_size + offset * read_type_size),
+                                               (end_in_block_idx_2 - start_in_block_idx_2) * read_type_size);
                                     }
-                                } else if (av->adios_type == adios2_type_int32_t) {
-                                    for (int idx_0 = start_in_block_idx_0; idx_0 < end_in_block_idx_0; idx_0++) {
-                                        for (int idx_1 = start_in_block_idx_1; idx_1 < end_in_block_idx_1; idx_1++) {
-                                            int offset2D = idx_1 * block_info_count[2];
-                                            int offset_buf2D =
-                                                    (idx_1 + block_info_start[1] - start[1]) * block_info_count[2];
-                                            int offset = offset2D + idx_0 * block_info_count[1] * block_info_count[2];
-                                            int offset_buf = offset_buf2D + (idx_0 + block_info_start[0] - start[0]) *
-                                                                            block_info_count[1] * block_info_count[2];
-                                            for (int idx_2 = start_in_block_idx_2;
-                                                 idx_2 < end_in_block_idx_2; idx_2++) {
-                                                ((int32_t *) buf)[idx_2 + offset_buf] = *((int32_t *) (
-                                                        offset * read_type_size + mem_buffer + header_size +
-                                                        idx_2 * read_type_size));
-                                            }
-                                        }
-                                    }
-                                } else if (av->adios_type == adios2_type_uint8_t ||
-                                           av->adios_type == adios2_type_int8_t) {
-                                    for (int idx_0 = start_in_block_idx_0; idx_0 < end_in_block_idx_0; idx_0++) {
-                                        for (int idx_1 = start_in_block_idx_1; idx_1 < end_in_block_idx_1; idx_1++) {
-                                            int offset2D = idx_1 * block_info_count[2];
-                                            int offset_buf2D =
-                                                    (idx_1 + block_info_start[1] - start[1]) * block_info_count[2];
-                                            int offset = offset2D + idx_0 * block_info_count[1] * block_info_count[2];
-                                            int offset_buf = offset_buf2D + (idx_0 + block_info_start[0] - start[0]) *
-                                                                            block_info_count[1] * block_info_count[2];
-                                            for (int idx_2 = start_in_block_idx_2;
-                                                 idx_2 < end_in_block_idx_2; idx_2++) {
-                                                ((char *) buf)[idx_2 + offset_buf] = *((char *) (
-                                                        offset * read_type_size + mem_buffer + header_size +
-                                                        idx_2 * read_type_size));
-                                            }
-                                        }
-                                    }
-                                } else
-                                    return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                                   "Not implemented");
+                                }
                             }
                         } else {
                             return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
