@@ -42,6 +42,9 @@ int main(int argc, char* argv[])
   int varid_mdims;
   int get_mdims[12 * 386 * 1] = {0};
 
+  int varid_decomp_type;
+  int get_decomp_type[12 * 386] = {0};
+
   int ret = PIO_NOERR;
 
 #ifdef TIMING
@@ -146,10 +149,26 @@ int main(int argc, char* argv[])
   varid_mdims = -1;
   ret = PIOc_inq_varid(ncid_read, "mdims", &varid_mdims); ERR
 
+  for (int i = 0; i < 12 * 386 * 1; i++)
+    get_mdims[i] = -2;
+
   ret = PIOc_get_var_int(ncid_read, varid_mdims, get_mdims); ERR
   if (my_rank == 0) {
     for (int i = 0; i < 12 * 386 * 1; i++)
       printf("get_mdims[%d] = %d\n", i, get_mdims[i]);
+  }
+
+  /* Get one 2D int variable. */
+  varid_decomp_type = -1;
+  ret = PIOc_inq_varid(ncid_read, "decomp_type", &varid_decomp_type); ERR
+
+  for (int i = 0; i < 12 * 386; i++)
+    get_decomp_type[i] = -2;
+
+  ret = PIOc_get_var_int(ncid_read, varid_decomp_type, get_decomp_type); ERR
+  if (my_rank == 0) {
+    for (int i = 0; i < 12 * 386; i++)
+      printf("get_decomp_type[%d] = %d\n", i, get_decomp_type[i]);
   }
 
   ret = PIOc_closefile(ncid_read); ERR

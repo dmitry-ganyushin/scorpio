@@ -1492,32 +1492,34 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             /* 0000xxx00*/
                             size_t read_type_size = av->adios_type_size;
                             //index in a block
-                            int start_idx = -1;
-                            int end_idx = -1;
+                            int start_in_block_idx = -1;
+                            int end_in_block_idx = -1;
                             /* |0000xxxxxx|xxxxxxxxxx|xxxxxxxxxx|xxxxx0000| */
                             /* find beginning of the block */
                             /* case |0000xxxxxx| */
                             if (start[0] >= block_info_start[0] && start[0] < block_info_start[0] + block_info_count[0]) {
-                                start_idx = start[0] - block_info_start[0];
+                                start_in_block_idx = start[0] - block_info_start[0];
                                 /* case |xxxxxxxxx| */
                             } else if (start[0] < block_info_start[0]) {
-                                start_idx = 0;
+                                start_in_block_idx = 0;
                             }
                             /* find end of the block */
                             /*  case |xxxxx0000| */
                             if (start[0] + count[0] >= block_info_start[0] &&
                                 start[0] + count[0] < block_info_start[0] + block_info_count[0]) {
-                                end_idx = start[0] + count[0] - block_info_start[0];
+                                end_in_block_idx = start[0] + count[0] - block_info_start[0];
                                 /*  case |xxxxxxxxx| */
                             } else if (block_info_start[0] + block_info_count[0] <= start[0] + count[0]) {
-                                end_idx = block_info_count[0];
+                                end_in_block_idx = block_info_count[0];
                             }
 
-                            if (start_idx != -1 && end_idx != -1) {
-                                memcpy((char *) (buf + (block_info_start[0] - start[0] + start_idx) * read_type_size),
+                            if (start_in_block_idx != -1 && end_in_block_idx != -1) {
+                                int offset_buf = block_info_start[0] - start[0] + start_in_block_idx;
+                                int offset_mem_buf = start_in_block_idx;
+                                memcpy((char *) (buf + offset_buf * read_type_size),
                                        (char *) (mem_buffer +
-                                                 header_size + start_idx * read_type_size),
-                                       (end_idx - start_idx) * read_type_size);
+                                                 header_size +  offset_mem_buf * read_type_size),
+                                       (end_in_block_idx - start_in_block_idx) * read_type_size);
                             }
                         } else if (av->ndims == 2 && read_type == adios2_type_uint8_t) {
                             /* data layout */
@@ -1569,11 +1571,13 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
                             if (start_in_block_idx_0 != -1 && end_in_block_idx_0 != -1 && start_in_block_idx_1 != -1 && end_in_block_idx_1 != -1) {
                                 for (int idx_0 = start_in_block_idx_0; idx_0 < end_in_block_idx_0; idx_0++) {
-                                    int offset = idx_0 * block_info_count[1];
-                                    int offset_buf = (idx_0 + block_info_start[0] - start[0]) * block_info_count[1];
+                                    int offset_buf_1D = block_info_start[1] - start[1] + start_in_block_idx_1;
+                                    int offset_mem_buf_1D = start_in_block_idx_1;
+                                    int offset_buf = (idx_0 + block_info_start[0] - start[0]) * block_info_count[1] + offset_buf_1D;
+                                    int offset_mem_buf = idx_0 * block_info_count[1] + offset_mem_buf_1D;
                                     memcpy((char *) (buf + (start_in_block_idx_1 + offset_buf) * read_type_size),
                                            (char *) (mem_buffer +
-                                                     header_size + start_in_block_idx_1 * read_type_size + offset * read_type_size),
+                                                     header_size + offset_mem_buf * read_type_size),
                                            (end_in_block_idx_1 - start_in_block_idx_1) * read_type_size);
                                 }
                             }
@@ -1646,15 +1650,17 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                 end_in_block_idx_1 != -1) {
                                 for (int idx_0 = start_in_block_idx_0; idx_0 < end_in_block_idx_0; idx_0++) {
                                     for (int idx_1 = start_in_block_idx_1; idx_1 < end_in_block_idx_1; idx_1++) {
-                                        int offset2D = idx_1 * block_info_count[2];
-                                        int offset_buf2D =
+                                        int offset_buf_1D = block_info_start[2] - start[2] + start_in_block_idx_2;
+                                        int offset_mem_buf_1D = start_in_block_idx_2;
+                                        int offset_buf_2D =
                                                 (idx_1 + block_info_start[1] - start[1]) * block_info_count[2];
-                                        int offset = offset2D + idx_0 * block_info_count[1] * block_info_count[2];
-                                        int offset_buf = offset_buf2D + (idx_0 + block_info_start[0] - start[0]) *
-                                                                        block_info_count[1] * block_info_count[2];
+                                        int offset_mem_buf_2D = idx_1 * block_info_count[2];
+                                        int offset_mem_buf = offset_mem_buf_1D + offset_mem_buf_2D + idx_0 * block_info_count[1] * block_info_count[2];
+                                        int offset_buf = offset_buf_1D + offset_buf_2D + (idx_0 + block_info_start[0] - start[0]) *
+                                                                                         block_info_count[1] * block_info_count[2];
                                         memcpy((char *) (buf + (start_in_block_idx_2 + offset_buf) * read_type_size),
                                                (char *) (mem_buffer +
-                                                         header_size + start_in_block_idx_2 * read_type_size + offset * read_type_size),
+                                                         header_size + offset_mem_buf * read_type_size),
                                                (end_in_block_idx_2 - start_in_block_idx_2) * read_type_size);
                                     }
                                 }
