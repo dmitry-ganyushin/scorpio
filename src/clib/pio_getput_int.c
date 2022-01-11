@@ -1568,14 +1568,14 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             } else if (block_info_start[0] + block_info_count[0] <= start[0] + count[0]) {
                                 end_in_block_idx_0 = block_info_count[0];
                             }
-
                             if (start_in_block_idx_0 != -1 && end_in_block_idx_0 != -1 && start_in_block_idx_1 != -1 && end_in_block_idx_1 != -1) {
                                 for (int idx_0 = start_in_block_idx_0; idx_0 < end_in_block_idx_0; idx_0++) {
                                     int offset_buf_1D = block_info_start[1] - start[1] + start_in_block_idx_1;
                                     int offset_mem_buf_1D = start_in_block_idx_1;
-                                    int offset_buf = (idx_0 + block_info_start[0] - start[0]) * block_info_count[1] + offset_buf_1D;
-                                    int offset_mem_buf = idx_0 * block_info_count[1] + offset_mem_buf_1D;
-                                    memcpy((char *) (buf + (start_in_block_idx_1 + offset_buf) * read_type_size),
+                                    int size_dim_1 = file->dim_values[av->gdimids[1]];
+                                    int offset_buf = (idx_0 + block_info_start[0] - start[0]) * size_dim_1 + offset_buf_1D;
+                                    int offset_mem_buf = idx_0 * size_dim_1 + offset_mem_buf_1D;
+                                    memcpy((char *) (buf + offset_buf * read_type_size),
                                            (char *) (mem_buffer +
                                                      header_size + offset_mem_buf * read_type_size),
                                            (end_in_block_idx_1 - start_in_block_idx_1) * read_type_size);
@@ -1650,15 +1650,17 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                 end_in_block_idx_1 != -1) {
                                 for (int idx_0 = start_in_block_idx_0; idx_0 < end_in_block_idx_0; idx_0++) {
                                     for (int idx_1 = start_in_block_idx_1; idx_1 < end_in_block_idx_1; idx_1++) {
+                                        int size_dim_1 = file->dim_values[av->gdimids[1]];
+                                        int size_dim_2 = file->dim_values[av->gdimids[2]];
                                         int offset_buf_1D = block_info_start[2] - start[2] + start_in_block_idx_2;
                                         int offset_mem_buf_1D = start_in_block_idx_2;
                                         int offset_buf_2D =
-                                                (idx_1 + block_info_start[1] - start[1]) * block_info_count[2];
-                                        int offset_mem_buf_2D = idx_1 * block_info_count[2];
+                                                (idx_1 + block_info_start[1] - start[1]) * size_dim_2;
+                                        int offset_mem_buf_2D = idx_1 * size_dim_2;
                                         int offset_mem_buf = offset_mem_buf_1D + offset_mem_buf_2D + idx_0 * block_info_count[1] * block_info_count[2];
                                         int offset_buf = offset_buf_1D + offset_buf_2D + (idx_0 + block_info_start[0] - start[0]) *
                                                                                          block_info_count[1] * block_info_count[2];
-                                        memcpy((char *) (buf + (start_in_block_idx_2 + offset_buf) * read_type_size),
+                                        memcpy((char *) (buf + offset_buf * read_type_size),
                                                (char *) (mem_buffer +
                                                          header_size + offset_mem_buf * read_type_size),
                                                (end_in_block_idx_2 - start_in_block_idx_2) * read_type_size);
