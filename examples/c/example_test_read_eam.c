@@ -45,6 +45,9 @@ int main(int argc, char* argv[])
   int varid_decomp_type;
   int get_decomp_type[12 * 386] = {0};
 
+  int varid_field_name;
+  char get_field_name[12][386][27];
+
   int ret = PIO_NOERR;
 
 #ifdef TIMING
@@ -169,6 +172,16 @@ int main(int argc, char* argv[])
   if (my_rank == 0) {
     for (int i = 0; i < 12 * 386; i++)
       printf("get_decomp_type[%d] = %d\n", i, get_decomp_type[i]);
+  }
+
+  varid_field_name = -1;
+  ret = PIOc_inq_varid(ncid_read, "field_name", &varid_field_name); ERR
+
+  memset(get_field_name, 0, sizeof(get_field_name));
+  ret = PIOc_get_var_text(ncid_read, varid_field_name, get_field_name); ERR
+  if (my_rank == 0) {
+    for (int f = 0; f < 20; f++)
+      printf("get_field_name[0][%d] = %s\n", f, get_field_name[0][f]);
   }
 
   ret = PIOc_closefile(ncid_read); ERR

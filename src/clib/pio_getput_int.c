@@ -1659,7 +1659,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                         int offset_mem_buf_2D = idx_1 * size_dim_2;
                                         int offset_mem_buf = offset_mem_buf_1D + offset_mem_buf_2D + idx_0 * block_info_count[1] * block_info_count[2];
                                         int offset_buf = offset_buf_1D + offset_buf_2D + (idx_0 + block_info_start[0] - start[0]) *
-                                                                                         block_info_count[1] * block_info_count[2];
+                                                                                         size_dim_1 * size_dim_2;
                                         memcpy((char *) (buf + offset_buf * read_type_size),
                                                (char *) (mem_buffer +
                                                          header_size + offset_mem_buf * read_type_size),
