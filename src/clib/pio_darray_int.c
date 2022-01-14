@@ -1396,6 +1396,9 @@ if (required_adios_step != time_step) {
         adios2_type read_type;
         adios2_variable_type(&read_type, data);
         adios2_type out_type = PIOc_get_adios_type(iodesc->piotype);
+
+        int out_type_size =  get_adios2_type_size(out_type, NULL);
+
         size_t run_idx = 0;
         for (size_t curr_block = start_block; curr_block <= end_block; curr_block++) {
             adios2_set_block_selection(data, curr_block);
@@ -1427,16 +1430,16 @@ if (required_adios_step != time_step) {
             if (curr_block == start_block && curr_block == end_block) {
                 if (read_type == adios2_type_int32_t) {
                     memcpy((char *) iobuf, &data_int32_t[start_idx_in_start_block],
-                           (end_idx_in_end_block - start_idx_in_start_block + 1) * sizeof(int32_t));
+                           (end_idx_in_end_block - start_idx_in_start_block + 1) * out_type_size);
                     free(data_int32_t); data_int32_t = NULL;
                 } else if (read_type == adios2_type_float) {
                     if (out_type == adios2_type_float) {
                         memcpy((char *) iobuf, &data_float[start_idx_in_start_block],
-                               (end_idx_in_end_block - start_idx_in_start_block + 1) * sizeof(float));
+                               (end_idx_in_end_block - start_idx_in_start_block + 1) * out_type_size);
                         free(data_float); data_float = NULL;
                     }else if (out_type == adios2_type_double) {
                         memcpy((char *) iobuf, &data_double[start_idx_in_start_block],
-                               (end_idx_in_end_block - start_idx_in_start_block + 1) * sizeof(double));
+                               (end_idx_in_end_block - start_idx_in_start_block + 1) * out_type_size);
                         free(data_double); data_double = NULL;
                     }else {
                         if (data_double != NULL) free(data_double);
