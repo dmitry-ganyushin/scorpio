@@ -1343,6 +1343,10 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
             adios2_end_step(file->engineH);
         }
     }
+    if (!start_block_found) {
+        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Cannot determing block for decoposition map");
+    }
 /************************* get decomp**************************************/
 if (required_adios_step != time_step) {
     adios2_end_step(file->engineH);

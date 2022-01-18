@@ -75,6 +75,7 @@ add_spio_executable(example_open_4_restart_files TRUE "" example_open_4_restart_
 add_spio_executable(example_test_read_cpl TRUE "" example_test_read_cpl.c)
 add_spio_executable(example_test_read_eam TRUE "" example_test_read_eam.c)
 add_spio_executable(example_test_read_eam_h0 TRUE "" example_test_read_eam_h0.c)
+add_spio_executable(example_test_read_mpassi TRUE "" example_test_read_mpassi.c)
 add_spio_executable(example_read_eam_slow_perf TRUE "" example_read_eam_slow_perf.c)
 add_spio_executable(example_simulate_replay_tool TRUE "" example_simulate_replay_tool.c)
 add_spio_executable(example_inq_non_existent_att TRUE "" example_inq_non_existent_att.c)
