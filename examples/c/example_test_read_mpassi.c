@@ -80,18 +80,18 @@ int main(int argc, char* argv[])
       break;
     }
   }
-
+#if 0
   for (int i = 0; i < 7153; i++)
     get_indexToCellID[i] = -1;
 
-  ret = PIOc_get_var_int(ncid_read, varid_indexToCellID, get_indexToCellID); ERR
+  ret = PIOc_get_var_int(ncid_read, varid_indexToCellID, &get_indexToCellID[0]); ERR
   for (int i = 0; i < 7153; i++) {
     if (get_indexToCellID[i] != (i + 1)) {
-      printf("rank = %d, get wrong data for indexToCellID at index %d\n", my_rank, i);
+      printf("rank = %d, get wrong data for indexToCellID at index %d value = %d\n", my_rank, i, get_indexToCellID[i] );
       break;
     }
   }
-
+#endif
   ret = PIOc_closefile(ncid_read); ERR
 
   free(compmap);

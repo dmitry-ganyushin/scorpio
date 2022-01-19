@@ -1441,7 +1441,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     for (size_t i = 0; i < number_of_data_blocks; i++) {
                         adios2_set_block_selection(av->adios_varid, i);
                         adiosErr = adios2_selection_size(&var_size, av->adios_varid);
-                        block_size = var_size * sizeof(char);
+                        block_size = var_size * av->adios_type_size;
                         if (adiosErr != adios2_error_none) {
                             GPTLstop("PIO:PIOc_put_vars_tc");
                             GPTLstop("PIO:write_total");
@@ -1457,9 +1457,8 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                            pio_get_fname_from_file(file),
                                            file->pio_ncid);
                         }
-                        size_t data_size = block_size - header_size;
 
-                        char *mem_buffer = (char *) calloc(var_size, sizeof(char));
+                        char *mem_buffer = (char *) calloc(var_size, av->adios_type_size);
                         adios2_get(file->engineH, av->adios_varid, mem_buffer, adios2_mode_sync);
                         if (mem_buffer == NULL) {
                             GPTLstop("PIO:PIOc_put_vars_tc");
@@ -1485,7 +1484,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                         for (int cnt = 0; cnt < av->ndims; cnt++) {
                             block_info_count[cnt] = *((int64_t *) (mem_buffer + (cnt + av->ndims) * sizeof(int64_t)));
                         }
-                        if (av->ndims == 1 && read_type == adios2_type_uint8_t) {
+                        if (av->ndims == 1) {
                             /* data layout */
                             /*  |adios data block 1 | adios data block2 |*/
                             /*  |header|     data   | header|   data    |*/
@@ -1521,7 +1520,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                                  header_size +  offset_mem_buf * read_type_size),
                                        (end_in_block_idx - start_in_block_idx) * read_type_size);
                             }
-                        } else if (av->ndims == 2 && read_type == adios2_type_uint8_t) {
+                        } else if (av->ndims == 2) {
                             /* data layout */
                             /*  |adios data block 1 | adios data block2 |*/
                             /*  |header|     data   | header|   data    |*/
@@ -1581,7 +1580,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                            (end_in_block_idx_1 - start_in_block_idx_1) * read_type_size);
                                 }
                             }
-                        } else if (av->ndims == 3 && read_type == adios2_type_uint8_t){
+                        } else if (av->ndims == 3){
                             /* data layout */
                             /*  |adios data block 1 | adios data block2 |*/
                             /*  |header|     data   | header|   data    |*/
