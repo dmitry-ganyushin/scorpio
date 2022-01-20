@@ -1207,6 +1207,66 @@ bool match_decomp_part(int64_t *pInt, size_t pos, long long int *pInt1, long lon
  * @ingroup PIO_read_darray
  * @author
  */
+
+#define ADIOS2_CONVERT_COPY_ARRAY(from_type, to_type) \
+for (size_t pos = 0; pos < len; pos++) {\
+    to_type tmp_out;\
+    from_type tmp_read;\
+    memcpy(&tmp_read, &data_buf[start_idx_in_start_block + pos * read_type_size], read_type_size);\
+    tmp_out = tmp_read;\
+    memcpy((char *) (iobuf + pos * out_type_size), &tmp_out, out_type_size);\
+}
+#define ADIOS_CONVERT_FROM(from_type, to_type) \
+{ \
+    if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_DOUBLE) \
+    { \
+        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, double, *ierr, buf); \
+    } \
+    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_FLOAT) \
+    { \
+        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, float, *ierr, buf); \
+    } \
+    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_REAL) \
+    { \
+        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, float, *ierr, buf); \
+    } \
+    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_INT) \
+    { \
+        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, int, *ierr, buf); \
+    } \
+    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_UINT) \
+    { \
+        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, unsigned int, *ierr, buf); \
+    } \
+    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_SHORT) \
+    { \
+        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, short int, *ierr, buf); \
+    } \
+    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_USHORT) \
+    { \
+        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, unsigned short int, *ierr, buf); \
+    } \
+    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_INT64) \
+    { \
+        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, int64_t, *ierr, buf); \
+    } \
+    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_UINT64) \
+    { \
+        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, uint64_t, *ierr, buf); \
+    } \
+    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_CHAR) \
+    { \
+        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, char, *ierr, buf); \
+    } \
+    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_BYTE) \
+    { \
+        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, char, *ierr, buf); \
+    } \
+    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_UBYTE) \
+    { \
+        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, unsigned char, *ierr, buf); \
+    } \
+}
 int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid, void *iobuf) {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     adios_var_desc_t *adios_vdesc;     /* Information about the variable. */
@@ -1384,9 +1444,7 @@ if (required_adios_step != time_step) {
     free(var_name);
     adios2_variable *data = adios_vdesc->adios_varid;
 
-    int32_t *data_int32_t = NULL;
-    float *data_float = NULL;
-    double *data_double = NULL;
+    char *data_buf = NULL;
     if (data) {
         adios2_varinfo *data_blocks = adios2_inquire_blockinfo(file->engineH, data, time_step);
         int32_t data_blocks_size = data_blocks->nblocks;
@@ -1399,70 +1457,49 @@ if (required_adios_step != time_step) {
         free(data_blocks);
         adios2_type read_type;
         adios2_variable_type(&read_type, data);
+        size_t read_type_size = get_adios2_type_size(read_type, NULL);
         adios2_type out_type = PIOc_get_adios_type(iodesc->piotype);
 
         int out_type_size =  get_adios2_type_size(out_type, NULL);
 
-        size_t run_idx = 0;
-        for (size_t curr_block = start_block; curr_block <= end_block; curr_block++) {
-            adios2_set_block_selection(data, curr_block);
-            size_t var_size;/* size of the block*/
-            adios2_error err_sel = adios2_selection_size(&var_size, data);
-            if (read_type == adios2_type_int32_t) {
-                data_int32_t = (int32_t *) malloc(var_size * sizeof(int32_t));
-                adios2_get(file->engineH, data, data_int32_t, adios2_mode_sync);
-            }else if (read_type == adios2_type_double) {
-                data_double = (double *) malloc(var_size * sizeof(double));
-                adios2_get(file->engineH, data, data_double, adios2_mode_sync);
-            } else if (read_type == adios2_type_float) {
-                data_float = (float *) malloc(var_size * sizeof(float));
-                adios2_get(file->engineH, data, data_float, adios2_mode_sync);
-                /*type conversion from read to double*/
-                if (out_type == adios2_type_double) {
-                    data_double = (double *) malloc(var_size * sizeof(double));
-                    for (int i = 0; i < var_size; i++) {
-                        data_double[i] = data_float[i];
-                    }
-                    free(data_float); data_float = NULL;
-                }
+        size_t curr_block = start_block;
+        adios2_set_block_selection(data, curr_block);
+        size_t block_size;/* size of the block*/
+        adios2_error err_sel = adios2_selection_size(&block_size, data);
+        data_buf = (char *) malloc(block_size * read_type_size);
+        adios2_get(file->engineH, data, data_buf, adios2_mode_sync);
+
+        size_t len = end_idx_in_end_block - start_idx_in_start_block + 1;
+        /* copy without type conversion byte-by-byte */
+        if (read_type == out_type) {
+            /*inside one block*/
+            /* |000xxx00|  */
+            memcpy((char *) iobuf, &data_buf[start_idx_in_start_block * read_type_size],
+                   (end_idx_in_end_block - start_idx_in_start_block + 1) * out_type_size);
+        }
+            /*type conversion*/
+        else if (read_type == adios2_type_int32_t) {
+            if (out_type == adios2_type_int64_t) {
+                /* no conversion */
+            }
+        } else if (read_type == adios2_type_float) {
+            if (out_type == adios2_type_double) {
+                ADIOS2_CONVERT_COPY_ARRAY(float, double);
             } else {
                 return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                "Not implemented");
             }
-            /*inside one block*/
-            /* |000xxx00|  */
-            if (curr_block == start_block && curr_block == end_block) {
-                if (read_type == adios2_type_int32_t) {
-                    memcpy((char *) iobuf, &data_int32_t[start_idx_in_start_block],
-                           (end_idx_in_end_block - start_idx_in_start_block + 1) * out_type_size);
-                    free(data_int32_t); data_int32_t = NULL;
-                } else if (read_type == adios2_type_float) {
-                    if (out_type == adios2_type_float) {
-                        memcpy((char *) iobuf, &data_float[start_idx_in_start_block],
-                               (end_idx_in_end_block - start_idx_in_start_block + 1) * out_type_size);
-                        free(data_float); data_float = NULL;
-                    }else if (out_type == adios2_type_double) {
-                        memcpy((char *) iobuf, &data_double[start_idx_in_start_block],
-                               (end_idx_in_end_block - start_idx_in_start_block + 1) * out_type_size);
-                        free(data_double); data_double = NULL;
-                    }else {
-                        if (data_double != NULL) free(data_double);
-                        if (data_float != NULL) free(data_float);
-                        if (data_int32_t != NULL) free(data_int32_t);
-                        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                       "Not implemented");
-                    }
-                }else if (read_type == adios2_type_double) {
-                    memcpy((char *) iobuf, &data_double[start_idx_in_start_block],
-                           (end_idx_in_end_block - start_idx_in_start_block + 1) * sizeof(double));
-                    free(data_double);
-                } else {
-                    return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                   "Not implemented");
-                }
-            }
+        } else if (read_type == adios2_type_double) {
+
+        } else {
+            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Not implemented");
         }
+        free(data_buf);
+        data_buf = NULL;
     } else {
+        free(data_buf);
+        data_buf = NULL;
         return pio_err(NULL, file, ierr, __FILE__, __LINE__,
                        "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed with iotype=%s. "
                        "The underlying I/O library (%s) call, adios2_inquire_variable, failed.",
