@@ -78,8 +78,12 @@ int main(int argc, char* argv[])
   niotasks = ntasks / ioproc_stride;
 
   ret = PIOc_Init_Intracomm(MPI_COMM_WORLD, niotasks, ioproc_stride, ioproc_start, PIO_REARR_SUBSET, &iosysid); ERR
-
-  char filename_eam_r[] = "F2010_ne4_oQU240_ADIOS.eam.r.0001-01-02-00000.nc";
+  char *filename_eam_r = (char *)malloc(1024);
+  if (argc == 1)
+      strcpy(filename_eam_r, "F2010_ne4_oQU240_ADIOS.eam.r.0001-01-02-00000.nc");
+  else{
+      strcpy(filename_eam_r, argv[1]);
+  }
 
   ret = PIOc_openfile(iosysid, &ncid_read, &format, filename_eam_r, PIO_NOWRITE); ERR
 
@@ -142,7 +146,7 @@ int main(int argc, char* argv[])
         if (my_rank == 0) printf("done in %f\n", 1.0 *(clock() - t0) / CLOCKS_PER_SEC); t0 = clock();
     }
   }
-
+  free(filename_eam_r);
   ret = PIOc_closefile(ncid_read); ERR
 
   ret = PIOc_finalize(iosysid); ERR
