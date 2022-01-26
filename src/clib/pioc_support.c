@@ -3527,6 +3527,10 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         file->varlist[i].use_fill = 0;
         file->varlist[i].fillbuf = NULL;
     }
+    /* Set communicator for all adios processes, process rank, and I/O master node */
+    file->all_comm = ios->union_comm;
+    file->myrank = ios->union_rank;
+    file->num_all_procs = ios->num_uniontasks;
 
     /* Set to true if this task should participate in IO (only true
      * for one task with netcdf serial files. */
