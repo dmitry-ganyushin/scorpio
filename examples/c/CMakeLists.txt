@@ -80,6 +80,7 @@ add_spio_executable(example_read_eam_slow_perf TRUE "" example_read_eam_slow_per
 add_spio_executable(example_simulate_replay_tool TRUE "" example_simulate_replay_tool.c)
 add_spio_executable(example_inq_non_existent_att TRUE "" example_inq_non_existent_att.c)
 add_spio_executable(example_read TRUE "" example_read.c)
+add_spio_executable(read_local_array TRUE "" read_local_array.c)
 add_spio_executable(darray_no_async TRUE "" darray_no_async.c)
 add_spio_executable(darray_async TRUE "" darray_async.c)
 add_spio_executable(put_var TRUE "" put_var.c)

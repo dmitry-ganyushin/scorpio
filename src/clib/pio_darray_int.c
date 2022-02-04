@@ -1216,56 +1216,58 @@ for (size_t pos = 0; pos < len; pos++) {\
     tmp_out = tmp_read;\
     memcpy((char *) (iobuf + pos * out_type_size), &tmp_out, out_type_size);\
 }
-#define ADIOS_CONVERT_FROM(from_type, to_type) \
+#define ADIOS_CONVERT_FROM(from_type) \
 { \
-    if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_DOUBLE) \
+    if (out_type == adios2_type_double) \
     { \
-        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, double, *ierr, buf); \
+        ADIOS2_CONVERT_COPY_ARRAY(from_type, double); \
     } \
-    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_FLOAT) \
+    else if (out_type == adios2_type_float) \
     { \
-        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, float, *ierr, buf); \
+        ADIOS2_CONVERT_COPY_ARRAY(from_type, float); \
     } \
-    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_REAL) \
+    else if (out_type == adios2_type_float) \
     { \
-        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, float, *ierr, buf); \
+        ADIOS2_CONVERT_COPY_ARRAY(from_type, float); \
     } \
-    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_INT) \
+    else if (out_type == adios2_type_int32_t) \
     { \
-        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, int, *ierr, buf); \
+        ADIOS2_CONVERT_COPY_ARRAY(from_type, int); \
     } \
-    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_UINT) \
+    else if (out_type == adios2_type_uint32_t) \
     { \
-        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, unsigned int, *ierr, buf); \
+        ADIOS2_CONVERT_COPY_ARRAY(from_type, unsigned int); \
     } \
-    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_SHORT) \
+    else if (out_type == adios2_type_int16_t) \
     { \
-        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, short int, *ierr, buf); \
+        ADIOS2_CONVERT_COPY_ARRAY(from_type, short int); \
     } \
-    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_USHORT) \
+    else if (out_type == adios2_type_uint16_t) \
     { \
-        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, unsigned short int, *ierr, buf); \
+        ADIOS2_CONVERT_COPY_ARRAY(from_type, unsigned short int); \
     } \
-    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_INT64) \
+    else if (out_type == adios2_type_int64_t) \
     { \
-        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, int64_t, *ierr, buf); \
+        ADIOS2_CONVERT_COPY_ARRAY(from_type, int64_t); \
     } \
-    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_UINT64) \
+    else if (out_type == adios2_type_uint16_t) \
     { \
-        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, uint64_t, *ierr, buf); \
+        ADIOS2_CONVERT_COPY_ARRAY(from_type, uint64_t); \
     } \
-    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_CHAR) \
+    else if (out_type == adios2_type_int8_t) \
     { \
-        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, char, *ierr, buf); \
+        ADIOS2_CONVERT_COPY_ARRAY(from_type, char); \
     } \
-    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_BYTE) \
+    else if (out_type == adios2_type_int8_t) \
     { \
-        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, char, *ierr, buf); \
+        ADIOS2_CONVERT_COPY_ARRAY(from_type, char); \
     } \
-    else if (iodesc->piotype == FROM_TYPE_ID && av->nc_type == PIO_UBYTE) \
+    else if (out_type == adios2_type_uint8_t) \
     { \
-        ADIOS2_CONVERT_COPY_ARRAY(array, arraylen, from_type, unsigned char, *ierr, buf); \
+        ADIOS2_CONVERT_COPY_ARRAY(from_type, unsigned char); \
     } \
+    else \
+    return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Not implemented"); \
 }
 int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid, void *iobuf) {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
@@ -1478,19 +1480,24 @@ if (required_adios_step != time_step) {
                    (end_idx_in_end_block - start_idx_in_start_block + 1) * out_type_size);
         }
             /*type conversion*/
-        else if (read_type == adios2_type_int32_t) {
-            if (out_type == adios2_type_int64_t) {
-                /* no conversion */
-            }
-        } else if (read_type == adios2_type_float) {
-            if (out_type == adios2_type_double) {
-                ADIOS2_CONVERT_COPY_ARRAY(float, double);
-            } else {
-                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                               "Not implemented");
-            }
-        } else if (read_type == adios2_type_double) {
-
+        else if (read_type == adios2_type_float) {
+            ADIOS_CONVERT_FROM(float)
+        } else if (read_type == adios2_type_int8_t) {
+            ADIOS_CONVERT_FROM(int8_t)
+        } else if (read_type == adios2_type_int16_t) {
+            ADIOS_CONVERT_FROM(int16_t)
+        } else if (read_type == adios2_type_int32_t) {
+            ADIOS_CONVERT_FROM(int32_t)
+        } else if (read_type == adios2_type_int64_t) {
+            ADIOS_CONVERT_FROM(int64_t)
+        } else if (read_type == adios2_type_uint8_t) {
+            ADIOS_CONVERT_FROM(uint8_t)
+        } else if (read_type == adios2_type_uint16_t) {
+            ADIOS_CONVERT_FROM(uint16_t)
+        } else if (read_type == adios2_type_uint32_t) {
+            ADIOS_CONVERT_FROM(uint32_t)
+        } else if (read_type ==  adios2_type_uint64_t) {
+            ADIOS_CONVERT_FROM(uint64_t)
         } else {
             return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                            "Not implemented");
