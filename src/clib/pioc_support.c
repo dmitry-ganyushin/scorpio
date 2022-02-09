@@ -3099,6 +3099,7 @@ char const adios_pio_dim_prefix[] = "/__pio__/dim/";
 char const adios_def_nctype_suffix[] = "/def/nctype";
 char const adios_def_adiostype_suffix[] = "/def/adiostype";
 char const adios_def_ndims_suffix[] = "/def/ndims";
+char const adios_def_ncop_suffix[] = "/def/ncop";
 char const adios_def_dims_suffix[] = "/def/dims";
 char const adios_pio_global_prefix[] = "/__pio__/global/";
 char const adios_pio_track_frame_id_prefix[] = "/__pio__/track/frame_id/";
@@ -3108,6 +3109,7 @@ void adios_get_adios_type(file_desc_t *file, size_t);
 void adios_get_ndims(file_desc_t *file, size_t);
 void adios_get_step(file_desc_t *file, size_t, size_t);
 int adios_get_dim_ids(file_desc_t *file, size_t);
+int adios_get_scorpio_type(file_desc_t *file, size_t);
 int adios_get_attrs(file_desc_t *file, int current_var_cnt, char *const *attr_names, size_t i);
 size_t adios_read_vars_vars(file_desc_t *file, size_t var_size, char *const *var_names);
 size_t adios_read_vars_attr(file_desc_t *file, size_t attr_size, char *const *attr_names);
@@ -3237,6 +3239,30 @@ int adios_get_dim_ids(file_desc_t *file, size_t var_id) {/*reading dims */
                     }
                     free(attr_data[a]);
                 }
+                free(attr_data);
+            }
+        }
+        free(dims_attr_name);
+    }
+}
+int adios_get_scorpio_type(file_desc_t *file, size_t var_id) {/*reading dims */
+    {
+        char *dims_attr_name = adios_name(adios_pio_var_prefix,
+                                          file->adios_vars[var_id].name,
+                                          adios_def_ncop_suffix);
+        adios2_attribute *attr = adios2_inquire_attribute(file->ioH, dims_attr_name);
+        if (attr) {
+            size_t size_attr;
+            adios2_error err = adios2_attribute_size(&size_attr, attr);
+            if (size_attr > 0) {
+                char* attr_data = calloc(PIO_MAX_NAME, sizeof(char));
+                err = adios2_attribute_data(attr_data, &size_attr, attr);
+                if (err != adios2_error_none) {
+                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Reading attribute in (ADIOS) file (%s) failed",
+                                   pio_get_fname_from_file(file));
+                }
+                strcpy(file->adios_vars[var_id].scorpio_var_type, attr_data);
                 free(attr_data);
             }
         }
@@ -3625,6 +3651,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                 adios_get_nc_type(file, var_id);
                 adios_get_adios_type(file, var_id);
                 adios_get_ndims(file, var_id);
+                adios_get_scorpio_type(file, var_id);
                 adios_get_dim_ids(file, var_id);
                 adios_get_step(file, var_id, nsteps);
             }

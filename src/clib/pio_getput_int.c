@@ -1197,6 +1197,11 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                            "Writing variable to file (%s, ncid=%d) failed. Invalid variable id (varid=%d, expected >=0 and < number of variables in the file, %d) provided",
                            pio_get_fname_from_file(file), ncid, varid, file->num_vars);
         }
+        /* check put_var type */
+        if (strcmp(file->adios_vars[varid].scorpio_var_type, "put_var") != 0) {
+            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "darray variable is expected");
+        }
         /* get frame_id */
         int frame_id = file->varlist[varid].record;
         /*magically obtain the relevant adios step*/

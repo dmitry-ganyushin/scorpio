@@ -1289,6 +1289,13 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     /* Get the variable info. */
     adios_vdesc = file->adios_vars + vid;
 
+    /* check darray type */
+    if (strcmp(adios_vdesc->scorpio_var_type, "darray") != 0) {
+        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "darray variable is expected");
+    }
+
+
     /* Get the number of dimensions in the decomposition. */
     ndims = iodesc->ndims;
 
