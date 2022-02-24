@@ -96,16 +96,8 @@ int main(int argc, char *argv[]) {
     char put_text_data[PIO_MAX_NAME] = "Dummy text variable string";
 
     /* Buffers for sample write/read darray data. */
-    int write_darray_buffer_int[ELEMENTS_PER_PE];
-    int read_darray_buffer_int[ELEMENTS_PER_PE];
     double write_darray_buffer_double[ELEMENTS_PER_PE];
     double read_darray_buffer_double[ELEMENTS_PER_PE];
-
-    /* Buffers for sample put/get var data. */
-    int put_var_buffer_int[PUT_GET_VAR_LEN];
-    int get_var_buffer_int[PUT_GET_VAR_LEN];
-    double put_var_buffer_double[PUT_GET_VAR_LEN];
-    double get_var_buffer_double[PUT_GET_VAR_LEN];
 
     /* A 1-D array which holds the decomposition mapping for this example. */
     PIO_Offset *compmap;
@@ -128,7 +120,7 @@ int main(int argc, char *argv[]) {
     /* Set lengths of the global dimensions (1D in this example). */
     gdimlen[0] = ELEMENTS_PER_PE * ntasks;
 
-    int ioproc_stride = 1;
+    int ioproc_stride = 4;
     if (ntasks == 1) ioproc_stride = 1;
     niotasks = ntasks / ioproc_stride;
 
@@ -153,20 +145,12 @@ int main(int argc, char *argv[]) {
 
     /* Prepare sample data for write buffers and initialize read buffers. */
     for (int i = 0; i < ELEMENTS_PER_PE; i++) {
-        write_darray_buffer_int[i] = my_rank;
         write_darray_buffer_double[i] = my_rank * 0.1;
-        read_darray_buffer_int[i] = 0;
         read_darray_buffer_double[i] = 0.0;
     }
 
-    for (int i = 0; i < PUT_GET_VAR_LEN; i++) {
-        put_var_buffer_int[i] = i + 1;
-        put_var_buffer_double[i] = (i + 1) * 0.1;
-        get_var_buffer_int[i] = 0;
-        get_var_buffer_double[i] = 0.0;
-    }
 #if 1
-    for (int fmt = 1; fmt < 2; fmt++) {
+    for (int fmt = 0; fmt < 2; fmt++) {
         /* Create a filename to write. */
         sprintf(filename, "example1_%d.nc", fmt);
 
@@ -237,38 +221,6 @@ int main(int argc, char *argv[]) {
         ret = PIOc_put_var_text(ncid_write, varid_dummy_text_var, put_text_data);
         ERR
 
-        /* Put int type data to an int type variable, type conversions will not be performed. */
-        /* Put 1st half data first */
-        start[0] = 0;
-        count[0] = PUT_GET_VAR_LEN / 2;
-        ret = PIOc_put_vars_int(ncid_write, varid_dummy_put_get_var_int, start, count, NULL, put_var_buffer_int);
-        ERR
-        /* Put 2nd half data */
-        start[0] = PUT_GET_VAR_LEN / 2;
-        count[0] = PUT_GET_VAR_LEN / 2;
-        ret = PIOc_put_vars_int(ncid_write, varid_dummy_put_get_var_int, start, count, NULL,
-                                put_var_buffer_int + (PUT_GET_VAR_LEN / 2));
-        ERR
-
-        /* Put double type data to a float type variable, type conversions will be performed. */
-        /* Put 2nd half data first */
-        start[0] = PUT_GET_VAR_LEN / 2;
-        count[0] = PUT_GET_VAR_LEN / 2;
-        ret = PIOc_put_vars_double(ncid_write, varid_dummy_put_get_var_float, start, count, NULL,
-                                   put_var_buffer_double + (PUT_GET_VAR_LEN / 2));
-        ERR
-        /* Put 1st half data */
-        start[0] = 0;
-        count[0] = PUT_GET_VAR_LEN / 2;
-        ret = PIOc_put_vars_double(ncid_write, varid_dummy_put_get_var_float, start, count, NULL,
-                                   put_var_buffer_double);
-        ERR
-
-        /* Write to int type variable with int type decomposition, type conversions will not be performed. */
-        ret = PIOc_write_darray(ncid_write, varid_dummy_darray_var_int, ioid_int, ELEMENTS_PER_PE,
-                                write_darray_buffer_int, NULL);
-        ERR
-
         /* Write to float type variable with double type decomposition, type conversions will be performed. */
         ret = PIOc_write_darray(ncid_write, varid_dummy_darray_var_float, ioid_double, ELEMENTS_PER_PE,
                                 write_darray_buffer_double, NULL);
@@ -281,7 +233,7 @@ int main(int argc, char *argv[]) {
 
     /* Read support is not implemented for ADIOS type yet: change to "fmt < 2" for testing this new feature later.
        Currently, ADIOS type in SCORPIO simply changes actual type to PnetCDF or NetCDF for reading. */
-    for (int fmt = 1; fmt < 2; fmt++) {
+    for (int fmt = 0; fmt < 2; fmt++) {
         /* Note: for ADIOS type, the actual file name on disk is a BP directory named example1_1.nc.bp.dir,
            client code like E3SM still assumes example1_1.nc as the file name to be read.  */
         sprintf(filename, "example1_%d.nc", fmt);
@@ -289,13 +241,6 @@ int main(int argc, char *argv[]) {
         ret = PIOc_openfile(iosysid, &ncid_read, &(formats[fmt]), filename, PIO_NOWRITE);
         ERR
 
-        /* Read int type variable with int type decomposition, type conversions will not be performed. */
-        ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_int", &varid_dummy_darray_var_int);
-        ERR
-        PIOc_setframe(ncid_read, varid_dummy_darray_var_int, 0);
-        ret = PIOc_read_darray(ncid_read, varid_dummy_darray_var_int, ioid_int, ELEMENTS_PER_PE,
-                               read_darray_buffer_int);
-        ERR
         /* Read float type variable with double type decomposition, type conversions will be performed. */
         ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_float", &varid_dummy_darray_var_float);
         ERR
