@@ -66,6 +66,10 @@ int main(int argc, char *argv[]) {
 
     int varid_dummy_darray_var_int;
     int varid_dummy_darray_var_float;
+    int varid_dummy_darray_var_float1;
+    int varid_dummy_darray_var_float2;
+    int varid_dummy_darray_var_float3;
+    int varid_dummy_darray_var_float4;
     int varid_dummy_put_get_var_int;
     int varid_dummy_put_get_var_float;
 
@@ -187,6 +191,19 @@ int main(int argc, char *argv[]) {
         ret = PIOc_def_var(ncid_write, "dummy_darray_var_float", PIO_FLOAT, NDIMS, &dimid_darray_var_len,
                            &varid_dummy_darray_var_float);
         ERR
+        ret = PIOc_def_var(ncid_write, "dummy_darray_var_float1", PIO_FLOAT, NDIMS, &dimid_darray_var_len,
+                           &varid_dummy_darray_var_float1);
+        ERR
+        ret = PIOc_def_var(ncid_write, "dummy_darray_var_float2", PIO_FLOAT, NDIMS, &dimid_darray_var_len,
+                           &varid_dummy_darray_var_float2);
+        ERR
+        ret = PIOc_def_var(ncid_write, "dummy_darray_var_float3", PIO_FLOAT, NDIMS, &dimid_darray_var_len,
+                           &varid_dummy_darray_var_float3);
+        ERR
+        ret = PIOc_def_var(ncid_write, "dummy_darray_var_float4", PIO_FLOAT, NDIMS, &dimid_darray_var_len,
+                           &varid_dummy_darray_var_float4);
+        ERR
+
 
         /* Put some local attributes for variable dummy_darray_var_int. */
         ret = PIOc_put_att(ncid_write, varid_dummy_darray_var_int, "dummy_att_float", PIO_FLOAT, 1,
@@ -225,6 +242,22 @@ int main(int argc, char *argv[]) {
         ret = PIOc_write_darray(ncid_write, varid_dummy_darray_var_float, ioid_double, ELEMENTS_PER_PE,
                                 write_darray_buffer_double, NULL);
         ERR
+        /* Write to float type variable with double type decomposition, type conversions will be performed. */
+        ret = PIOc_write_darray(ncid_write, varid_dummy_darray_var_float1, ioid_double, ELEMENTS_PER_PE,
+                                write_darray_buffer_double, NULL);
+        ERR
+        /* Write to float type variable with double type decomposition, type conversions will be performed. */
+        ret = PIOc_write_darray(ncid_write, varid_dummy_darray_var_float2, ioid_double, ELEMENTS_PER_PE,
+                                write_darray_buffer_double, NULL);
+        ERR
+        /* Write to float type variable with double type decomposition, type conversions will be performed. */
+        ret = PIOc_write_darray(ncid_write, varid_dummy_darray_var_float3, ioid_double, ELEMENTS_PER_PE,
+                                write_darray_buffer_double, NULL);
+        ERR
+        /* Write to float type variable with double type decomposition, type conversions will be performed. */
+        ret = PIOc_write_darray(ncid_write, varid_dummy_darray_var_float4, ioid_double, ELEMENTS_PER_PE,
+                                write_darray_buffer_double, NULL);
+        ERR
 
         ret = PIOc_closefile(ncid_write);
         ERR
@@ -244,7 +277,35 @@ int main(int argc, char *argv[]) {
         /* Read float type variable with double type decomposition, type conversions will be performed. */
         ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_float", &varid_dummy_darray_var_float);
         ERR
+        /* Read float type variable with double type decomposition, type conversions will be performed. */
+        ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_float", &varid_dummy_darray_var_float1);
+        ERR
+        /* Read float type variable with double type decomposition, type conversions will be performed. */
+        ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_float", &varid_dummy_darray_var_float2);
+        ERR
+        /* Read float type variable with double type decomposition, type conversions will be performed. */
+        ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_float", &varid_dummy_darray_var_float3);
+        ERR
+        /* Read float type variable with double type decomposition, type conversions will be performed. */
+        ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_float", &varid_dummy_darray_var_float4);
+        ERR
         ret = PIOc_read_darray(ncid_read, varid_dummy_darray_var_float, ioid_double, ELEMENTS_PER_PE,
+                               read_darray_buffer_double);
+        ERR
+        ERR
+        ret = PIOc_read_darray(ncid_read, varid_dummy_darray_var_float1, ioid_double, ELEMENTS_PER_PE,
+                               read_darray_buffer_double);
+        ERR
+        ERR
+        ret = PIOc_read_darray(ncid_read, varid_dummy_darray_var_float2, ioid_double, ELEMENTS_PER_PE,
+                               read_darray_buffer_double);
+        ERR
+        ERR
+        ret = PIOc_read_darray(ncid_read, varid_dummy_darray_var_float3, ioid_double, ELEMENTS_PER_PE,
+                               read_darray_buffer_double);
+        ERR
+        ERR
+        ret = PIOc_read_darray(ncid_read, varid_dummy_darray_var_float4, ioid_double, ELEMENTS_PER_PE,
                                read_darray_buffer_double);
         ERR
         ret = PIOc_closefile(ncid_read);
