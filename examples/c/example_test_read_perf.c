@@ -2,6 +2,7 @@
 #include <mpi.h>
 #include <pio.h>
 #include <math.h>
+#include <time.h>
 
 #ifdef TIMING
 
@@ -70,6 +71,11 @@ int main(int argc, char *argv[]) {
     int varid_dummy_darray_var_float2;
     int varid_dummy_darray_var_float3;
     int varid_dummy_darray_var_float4;
+    int varid_dummy_darray_var_float5;
+    int varid_dummy_darray_var_float6;
+    int varid_dummy_darray_var_float7;
+    int varid_dummy_darray_var_float8;
+    int varid_dummy_darray_var_float9;
     int varid_dummy_put_get_var_int;
     int varid_dummy_put_get_var_float;
 
@@ -155,6 +161,7 @@ int main(int argc, char *argv[]) {
 
 #if 1
     for (int fmt = 0; fmt < 2; fmt++) {
+        int t0 = clock();
         /* Create a filename to write. */
         sprintf(filename, "example1_%d.nc", fmt);
 
@@ -202,6 +209,21 @@ int main(int argc, char *argv[]) {
         ERR
         ret = PIOc_def_var(ncid_write, "dummy_darray_var_float4", PIO_FLOAT, NDIMS, &dimid_darray_var_len,
                            &varid_dummy_darray_var_float4);
+        ERR
+        ret = PIOc_def_var(ncid_write, "dummy_darray_var_float5", PIO_FLOAT, NDIMS, &dimid_darray_var_len,
+                           &varid_dummy_darray_var_float5);
+        ERR
+        ret = PIOc_def_var(ncid_write, "dummy_darray_var_float6", PIO_FLOAT, NDIMS, &dimid_darray_var_len,
+                           &varid_dummy_darray_var_float6);
+        ERR
+        ret = PIOc_def_var(ncid_write, "dummy_darray_var_float7", PIO_FLOAT, NDIMS, &dimid_darray_var_len,
+                           &varid_dummy_darray_var_float7);
+        ERR
+        ret = PIOc_def_var(ncid_write, "dummy_darray_var_float8", PIO_FLOAT, NDIMS, &dimid_darray_var_len,
+                           &varid_dummy_darray_var_float8);
+        ERR
+        ret = PIOc_def_var(ncid_write, "dummy_darray_var_float9", PIO_FLOAT, NDIMS, &dimid_darray_var_len,
+                           &varid_dummy_darray_var_float9);
         ERR
 
 
@@ -259,14 +281,36 @@ int main(int argc, char *argv[]) {
                                 write_darray_buffer_double, NULL);
         ERR
 
+        /* Write to float type variable with double type decomposition, type conversions will be performed. */
+        ret = PIOc_write_darray(ncid_write, varid_dummy_darray_var_float5, ioid_double, ELEMENTS_PER_PE,
+                                write_darray_buffer_double, NULL);
+        ERR
+        /* Write to float type variable with double type decomposition, type conversions will be performed. */
+        ret = PIOc_write_darray(ncid_write, varid_dummy_darray_var_float6, ioid_double, ELEMENTS_PER_PE,
+                                write_darray_buffer_double, NULL);
+        ERR
+        /* Write to float type variable with double type decomposition, type conversions will be performed. */
+        ret = PIOc_write_darray(ncid_write, varid_dummy_darray_var_float7, ioid_double, ELEMENTS_PER_PE,
+                                write_darray_buffer_double, NULL);
+        ERR
+        /* Write to float type variable with double type decomposition, type conversions will be performed. */
+        ret = PIOc_write_darray(ncid_write, varid_dummy_darray_var_float8, ioid_double, ELEMENTS_PER_PE,
+                                write_darray_buffer_double, NULL);
+        ERR
+        /* Write to float type variable with double type decomposition, type conversions will be performed. */
+        ret = PIOc_write_darray(ncid_write, varid_dummy_darray_var_float9, ioid_double, ELEMENTS_PER_PE,
+                                write_darray_buffer_double, NULL);
+        ERR
+
         ret = PIOc_closefile(ncid_write);
         ERR
+        if (my_rank == 0) printf("write done in %f\n", 1.0 *(clock() - t0) / CLOCKS_PER_SEC); t0 = clock();
     }
 #endif
-
     /* Read support is not implemented for ADIOS type yet: change to "fmt < 2" for testing this new feature later.
        Currently, ADIOS type in SCORPIO simply changes actual type to PnetCDF or NetCDF for reading. */
     for (int fmt = 0; fmt < 2; fmt++) {
+        int t0 = clock();
         /* Note: for ADIOS type, the actual file name on disk is a BP directory named example1_1.nc.bp.dir,
            client code like E3SM still assumes example1_1.nc as the file name to be read.  */
         sprintf(filename, "example1_%d.nc", fmt);
@@ -278,17 +322,34 @@ int main(int argc, char *argv[]) {
         ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_float", &varid_dummy_darray_var_float);
         ERR
         /* Read float type variable with double type decomposition, type conversions will be performed. */
-        ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_float", &varid_dummy_darray_var_float1);
+        ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_float1", &varid_dummy_darray_var_float1);
         ERR
         /* Read float type variable with double type decomposition, type conversions will be performed. */
-        ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_float", &varid_dummy_darray_var_float2);
+        ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_float2", &varid_dummy_darray_var_float2);
         ERR
         /* Read float type variable with double type decomposition, type conversions will be performed. */
-        ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_float", &varid_dummy_darray_var_float3);
+        ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_float3", &varid_dummy_darray_var_float3);
         ERR
         /* Read float type variable with double type decomposition, type conversions will be performed. */
-        ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_float", &varid_dummy_darray_var_float4);
+        ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_float4", &varid_dummy_darray_var_float4);
         ERR
+
+        /* Read float type variable with double type decomposition, type conversions will be performed. */
+        ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_float5", &varid_dummy_darray_var_float5);
+        ERR
+        /* Read float type variable with double type decomposition, type conversions will be performed. */
+        ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_float6", &varid_dummy_darray_var_float6);
+        ERR
+        /* Read float type variable with double type decomposition, type conversions will be performed. */
+        ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_float7", &varid_dummy_darray_var_float7);
+        ERR
+        /* Read float type variable with double type decomposition, type conversions will be performed. */
+        ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_float8", &varid_dummy_darray_var_float8);
+        ERR
+        /* Read float type variable with double type decomposition, type conversions will be performed. */
+        ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_float9", &varid_dummy_darray_var_float9);
+        ERR
+
         ret = PIOc_read_darray(ncid_read, varid_dummy_darray_var_float, ioid_double, ELEMENTS_PER_PE,
                                read_darray_buffer_double);
         ERR
@@ -308,8 +369,28 @@ int main(int argc, char *argv[]) {
         ret = PIOc_read_darray(ncid_read, varid_dummy_darray_var_float4, ioid_double, ELEMENTS_PER_PE,
                                read_darray_buffer_double);
         ERR
+        ret = PIOc_read_darray(ncid_read, varid_dummy_darray_var_float5, ioid_double, ELEMENTS_PER_PE,
+                               read_darray_buffer_double);
+        ERR
+        ERR
+        ret = PIOc_read_darray(ncid_read, varid_dummy_darray_var_float6, ioid_double, ELEMENTS_PER_PE,
+                               read_darray_buffer_double);
+        ERR
+        ERR
+        ret = PIOc_read_darray(ncid_read, varid_dummy_darray_var_float7, ioid_double, ELEMENTS_PER_PE,
+                               read_darray_buffer_double);
+        ERR
+        ERR
+        ret = PIOc_read_darray(ncid_read, varid_dummy_darray_var_float8, ioid_double, ELEMENTS_PER_PE,
+                               read_darray_buffer_double);
+        ERR
+        ERR
+        ret = PIOc_read_darray(ncid_read, varid_dummy_darray_var_float9, ioid_double, ELEMENTS_PER_PE,
+                               read_darray_buffer_double);
+        ERR
         ret = PIOc_closefile(ncid_read);
         ERR
+        if (my_rank == 0) printf("reading done in %f\n", 1.0 *(clock() - t0) / CLOCKS_PER_SEC); t0 = clock();
     }
 
     ret = PIOc_freedecomp(iosysid, ioid_int);
