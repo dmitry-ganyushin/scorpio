@@ -390,7 +390,8 @@ int main(int argc, char *argv[]) {
         ERR
         ret = PIOc_closefile(ncid_read);
         ERR
-        if (my_rank == 0) printf("reading done in %f\n", 1.0 *(clock() - t0) / CLOCKS_PER_SEC); t0 = clock();
+        if (my_rank == 0) printf("reading done in %f sec\n", 1.0 *(clock() - t0) / CLOCKS_PER_SEC);
+        if (my_rank == 0) printf("reading speed %f MB/sec\n", ELEMENTS_PER_PE * ntasks * 1.0 * CLOCKS_PER_SEC / (1.0*(clock() - t0)) /1024.0/1024.0);
     }
 
     ret = PIOc_freedecomp(iosysid, ioid_int);

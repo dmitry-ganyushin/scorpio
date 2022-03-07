@@ -1545,9 +1545,11 @@ if (required_adios_step != time_step) {
 
     return PIO_NOERR;
 }
-
+/* match first 30 elements */
+#define MAX_LEN_MATCH 30
 bool match_decomp_part(int64_t *decomp, size_t offset, MPI_Offset *start, MPI_Offset *end) {
     MPI_Offset len = end - start;
+    if (len > MAX_LEN_MATCH ) len = MAX_LEN_MATCH;
     for (MPI_Offset idx = 0; idx < len; idx++) {
         if (decomp[offset + idx] != start[idx]) return 0;
     }
