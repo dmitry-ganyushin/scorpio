@@ -2426,17 +2426,9 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
 
         /* Find out PIO data type of var. */
         if (file->iotype == PIO_IOTYPE_ADIOS){
-            if (vdesc_adios2->nc_type == PIO_NAT)
-            {
-                if ((ierr = PIOc_inq_vartype(ncid, varid, &vdesc_adios2->nc_type)))
-                {
-                    GPTLstop("PIO:PIOc_read_darray");
-                    return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Inquiring variable data type failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
-                }
-            }
-            //darrays do not have adiostype in bp file
-            //assert(vdesc_adios2->adios_type != adios2_type_unknown);
+            assert(vdesc_adios2->nc_type != PIO_NAT);
+            vdesc_adios2->adios_type = PIOc_get_adios_type(vdesc_adios2->nc_type);
+            assert(vdesc_adios2->adios_type != adios2_type_unknown);
         }else{
             if (vdesc->pio_type == PIO_NAT)
             {
@@ -2454,16 +2446,7 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
         if (file->iotype == PIO_IOTYPE_ADIOS)
         {
             if (vdesc_adios2->adios_type_size == 0)
-            {
-                MPI_Offset offset = vdesc_adios2->adios_type_size;
-                if ((ierr = PIOc_inq_type(ncid, vdesc_adios2->nc_type, NULL, &offset)))
-                {
-                    GPTLstop("PIO:PIOc_read_darray");
-                    return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
-                                   "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Inquiring variable data type length failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid);
-                }
-                vdesc_adios2->adios_type = offset;
-            }
+                vdesc_adios2->adios_type_size = get_adios2_type_size(vdesc_adios2->adios_type, NULL);
             assert(vdesc_adios2->adios_type_size > adios2_type_unknown);
         }else{
             if (vdesc->type_size == 0)
