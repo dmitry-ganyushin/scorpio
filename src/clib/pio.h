@@ -982,7 +982,7 @@ typedef struct file_desc_t
 #endif /* _ADIOS2 */
 
     /* File name - cached */
-    char fname[PIO_MAX_NAME + 1];
+    char fname[4 * PIO_MAX_NAME + 1];
 
     /** The ncid that will be returned to the user. */
     int pio_ncid;
