@@ -1187,9 +1187,9 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         {
             GPTLstop("PIO:PIOc_put_vars_tc");
             GPTLstop("PIO:write_total");
-            spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-            spio_ltimer_stop(file->io_fstats->wr_timer_name);
+            spio_ltimer_stop(file->io_fstats->rd_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             GPTLstop("PIO:PIOc_put_vars_tc_adios");
             GPTLstop("PIO:write_total_adios");
@@ -1282,18 +1282,15 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     }
                 }
 
-                ios->io_fstats->wb += num_elem * typelen;
-                file->io_fstats->wb += num_elem * typelen;
-
                 assert((strlen("/__pio__/var/") + strlen(av->name)) < PIO_MAX_NAME);
                 snprintf(vname, PIO_MAX_NAME, "/__pio__/var/%s", av->name);
                 av->adios_varid = adios2_inquire_variable(file->ioH, vname);
                 if (av->adios_varid == NULL) {
                     GPTLstop("PIO:PIOc_put_vars_tc");
                     GPTLstop("PIO:write_total");
-                    spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                    spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
                     spio_ltimer_stop(file->io_fstats->tot_timer_name);
                     GPTLstop("PIO:PIOc_put_vars_tc_adios");
                     GPTLstop("PIO:write_total_adios");
@@ -1323,9 +1320,9 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     if (adiosErr != adios2_error_none) {
                         GPTLstop("PIO:PIOc_put_vars_tc");
                         GPTLstop("PIO:write_total");
-                        spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                        spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                        spio_ltimer_stop(file->io_fstats->rd_timer_name);
                         spio_ltimer_stop(file->io_fstats->tot_timer_name);
                         GPTLstop("PIO:PIOc_put_vars_tc_adios");
                         GPTLstop("PIO:write_total_adios");
@@ -1344,9 +1341,9 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                         , __FILE__, __func__, av->name));
                 GPTLstop("PIO:PIOc_put_vars_tc");
                 GPTLstop("PIO:write_total");
-                spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                spio_ltimer_stop(file->io_fstats->rd_timer_name);
                 spio_ltimer_stop(file->io_fstats->tot_timer_name);
                 GPTLstop("PIO:PIOc_put_vars_tc_adios");
                 GPTLstop("PIO:write_total_adios");
@@ -1394,9 +1391,6 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 buf_size *= av->adios_type_size;
                 av_size += buf_size;
 
-                ios->io_fstats->wb += num_elem * typelen;
-                file->io_fstats->wb += num_elem * typelen;
-
                 /* PIOc_put_var may be called multiple times with different start/count values
                  * for a variable. ADIOS should output data for each of those calls not just
                  * when the variable is not defined */
@@ -1407,9 +1401,9 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
                     GPTLstop("PIO:PIOc_put_vars_tc");
                     GPTLstop("PIO:write_total");
-                    spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                    spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
                     spio_ltimer_stop(file->io_fstats->tot_timer_name);
                     GPTLstop("PIO:PIOc_put_vars_tc_adios");
                     GPTLstop("PIO:write_total_adios");
@@ -1448,9 +1442,9 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             if (adiosErr != adios2_error_none) {
                                 GPTLstop("PIO:PIOc_put_vars_tc");
                                 GPTLstop("PIO:write_total");
-                                spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                                spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                                spio_ltimer_stop(file->io_fstats->rd_timer_name);
                                 spio_ltimer_stop(file->io_fstats->tot_timer_name);
                                 GPTLstop("PIO:PIOc_put_vars_tc_adios");
                                 GPTLstop("PIO:write_total_adios");
@@ -1466,9 +1460,9 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             if (mem_buffer == NULL) {
                                 GPTLstop("PIO:PIOc_put_vars_tc");
                                 GPTLstop("PIO:write_total");
-                                spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                                spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                                spio_ltimer_stop(file->io_fstats->rd_timer_name);
                                 spio_ltimer_stop(file->io_fstats->tot_timer_name);
                                 GPTLstop("PIO:PIOc_put_vars_tc_adios");
                                 GPTLstop("PIO:write_total_adios");
