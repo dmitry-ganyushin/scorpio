@@ -40,13 +40,16 @@ int main(int argc, char* argv[])
   ret = PIOc_openfile(iosysid, &ncid1, &format, filename1, PIO_NOWRITE); ERR
 
   char filename2[] = "I1850GSWCNPRDCTCBC_f19_g16_ADIOS.elm.rh0.0001-01-02-00000.nc";
+
   ret = PIOc_openfile(iosysid, &ncid2, &format, filename2, PIO_NOWRITE); ERR
-  ret = PIOc_closefile(ncid2); ERR
-	  
+
+
   varid = 151; /* double budg_fluxG(budg_flux = 30); */
   ret = PIOc_get_var_double(ncid1, varid, buffer); ERR
 
+  ret = PIOc_closefile(ncid2); ERR
   ret = PIOc_closefile(ncid1); ERR
+
 
   ret = PIOc_finalize(iosysid); ERR
 

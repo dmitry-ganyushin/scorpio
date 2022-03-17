@@ -1304,6 +1304,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     /*magically obtain the relevant adios step*/
     int required_adios_step = get_adios_step(file, vid, frame_id);
     assert(required_adios_step >=0);
+#if 1
     file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
     if (file->engineH == NULL) {
         return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -1312,6 +1313,54 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     }
     LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
 
+#else
+    /* TODODG
+     * after ADIOS reinit an attribute cannot be read */
+    if (ios->adiosH != NULL)
+    {
+        adios2_error adiosErr = adios2_finalize(ios->adiosH);
+        if (adiosErr != adios2_error_none)
+        {
+            GPTLstop("PIO:PIOc_finalize");
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,"Finalizing ADIOS failed (adios2_error=%s) on iosystem (%d)",
+                           pio_get_fname_from_file(file));
+        }
+
+        ios->adiosH = NULL;
+    }
+    ios->adiosH = adios2_init(ios->union_comm, adios2_debug_mode_on);
+    if (ios->adiosH == NULL)
+    {
+        GPTLstop("PIO:PIOc_Init_Intracomm");
+        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Initializing ADIOS failed");
+    }
+    char declare_name[PIO_MAX_NAME] = {'\0'};
+    struct stat sd;
+    snprintf(declare_name, PIO_MAX_NAME, "%s%lu", file->fname, get_adios2_io_cnt());
+    file->ioH = adios2_declare_io(ios->adiosH, (const char *) declare_name);
+    if (file->ioH == NULL) {
+        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Declaring (ADIOS) IO (name=%s) failed for file (%s)",
+                       declare_name, pio_get_fname_from_file(file));
+    }
+
+    adios2_error adiosErr = adios2_set_engine(file->ioH, "FileStream");
+    if (adiosErr != adios2_error_none) {
+        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Setting (ADIOS) engine (type=FileStream) failed (adios2_error=%s) for file (%s)",
+                       adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
+    }
+
+    LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+    adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
+    file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
+    if (file->engineH == NULL) {
+        LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Opening (ADIOS) file (%s) failed",
+                       pio_get_fname_from_file(file));
+    }
+#endif
     //reading some bookkeeping variables at step 0
     uint64_t time_step = 0;
 
@@ -1334,7 +1383,13 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     strcpy(att_name, prefix_var_name);
     strcat(att_name, adios_vdesc->name);
     strcat(att_name, suffix_att_name);
-    adios2_attribute *attributeH = adios2_inquire_attribute(file->ioH, att_name);
+    adios2_attribute const *attributeH = adios2_inquire_attribute(file->ioH, att_name);
+    if (attributeH == NULL) {
+        LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Cannot read required ADIOS attribute %s from file (%s) failed",
+                       att_name, pio_get_fname_from_file(file));
+    }
     free(att_name);
     size_t size_attr;
     char attr_data[PIO_MAX_NAME];
@@ -1349,7 +1404,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     strcpy(decomp_name, prefix_decomp_name);
     strcat(decomp_name, attr_data);
     /* serching for decomposition array */
-    while(adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
+    while(adios2_begin_step(file->engineH, adios2_step_mode_read, 100.0,
                             &status) == adios2_error_none) {
         if (status == adios2_step_status_end_of_stream) {
             free(decomp_name);
