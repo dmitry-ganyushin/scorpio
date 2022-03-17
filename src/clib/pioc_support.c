@@ -3660,6 +3660,11 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         }
         /*close file */
         adios2_error err = adios2_close(file->engineH);
+        if (err != adios2_error_none) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Closing (ADIOS) file (%s) failed",
+                           pio_get_fname_from_file(file));
+        }
         file->engineH = NULL;
         LOG((2, "adios2_close(%s) : fd = %d", file->fname));
         //open it again
