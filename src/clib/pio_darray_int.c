@@ -1212,7 +1212,7 @@ bool match_decomp_part(int64_t *pInt, size_t pos, long long int *pInt1, long lon
 for (size_t pos = 0; pos < len; pos++) {\
     to_type tmp_out;\
     from_type tmp_read;\
-    memcpy(&tmp_read, &data_buf[start_idx_in_start_block + pos * read_type_size], read_type_size);\
+    memcpy(&tmp_read, &data_buf[(start_idx_in_start_block + pos) * read_type_size], read_type_size);\
     tmp_out = tmp_read;\
     memcpy((char *) (iobuf + pos * out_type_size), &tmp_out, out_type_size);\
 }

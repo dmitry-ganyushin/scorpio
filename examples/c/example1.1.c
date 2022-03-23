@@ -474,7 +474,7 @@ int main(int argc, char* argv[])
     for (int i = 0; i < ELEMENTS_PER_PE; i++) {
       diff_double = read_darray_buffer_double[i] - write_darray_buffer_double[i];
       if (fabs(diff_double) > 1E-5) {
-          printf("rank = %d, read wrong data for dummy_darray_var_float at index %d\n", my_rank, i);
+          printf("rank = %d, read wrong data for dummy_darray_var_float at index %d expected %f got %f \n", my_rank, i, write_darray_buffer_double[i], read_darray_buffer_double[i]);
           break;
       }
     }
