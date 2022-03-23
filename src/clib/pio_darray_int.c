@@ -1540,9 +1540,10 @@ if (required_adios_step != time_step) {
             /* |000xxx00|  */
             memcpy((char *) iobuf, &data_buf[start_idx_in_start_block * read_type_size],
                    (end_idx_in_end_block - start_idx_in_start_block + 1) * out_type_size);
-        }
             /*type conversion*/
-        else if (read_type == adios2_type_float) {
+        }else if (read_type == adios2_type_double) {
+            ADIOS_CONVERT_FROM(double)
+        }else if (read_type == adios2_type_float) {
             ADIOS_CONVERT_FROM(float)
         } else if (read_type == adios2_type_int8_t) {
             ADIOS_CONVERT_FROM(int8_t)

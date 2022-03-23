@@ -467,20 +467,23 @@ int main(int argc, char* argv[])
 
     /* Read float type variable with double type decomposition, type conversions will be performed. */
     ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_float", &varid_dummy_darray_var_float); ERR
-      for (int i = 0; i < ELEMENTS_PER_PE; i++)
-          read_darray_buffer_double[i] = 0.0;
+    for (int i = 0; i < ELEMENTS_PER_PE; i++){
+        read_darray_buffer_double[i] = 0.0;
+    }
     ret = PIOc_read_darray(ncid_read, varid_dummy_darray_var_float, ioid_double, ELEMENTS_PER_PE, read_darray_buffer_double); ERR
     for (int i = 0; i < ELEMENTS_PER_PE; i++) {
       diff_double = read_darray_buffer_double[i] - write_darray_buffer_double[i];
       if (fabs(diff_double) > 1E-5) {
-          printf("rank = %d, read wrong data for dummy_darray_var_double at index %d\n", my_rank, i);
+          printf("rank = %d, read wrong data for dummy_darray_var_float at index %d\n", my_rank, i);
           break;
       }
     }
 
     /* Read double type variable with double type decomposition, type conversions will not be performed. */
-    for (int i = 0; i < ELEMENTS_PER_PE; i++)
-      read_darray_buffer_double[i] = 0.0;
+    for (int i = 0; i < ELEMENTS_PER_PE; i++){
+        read_darray_buffer_double[i] = 0.0;
+    }
+
     ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_double", &varid_dummy_darray_var_double); ERR
     ret = PIOc_read_darray(ncid_read, varid_dummy_darray_var_double, ioid_double, ELEMENTS_PER_PE, read_darray_buffer_double); ERR
     for (int i = 0; i < ELEMENTS_PER_PE; i++) {
