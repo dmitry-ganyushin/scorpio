@@ -3497,7 +3497,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
             }
 
-            LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+            LOG((2, "adios2_open(%s) : fd = %d, ncid = %d", file->fname, file->fh, *ncidp));
             adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
             file->engineH = adios2_open(file->ioH, bpname, adios2_mode_read);
             adios2_file_exist = true;
@@ -3768,6 +3768,10 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         }
         file->engineH = NULL;
         LOG((2, "adios2_close(%s) : fd = %d", file->fname));
+        for (int i = 0; i < file->num_vars; i++) {
+            LOG((2, "var from file (%s) : name = %s,  varid =  %d", file->fname, file->adios_vars[i].name, i));
+        }
+
     }
 #endif
     /* If this is an IO task, then call the netCDF function. */
