@@ -25,10 +25,7 @@ ctest_start("${CTEST_SCRIPT_ARG}" APPEND)
 
 ## -- TEST
 if (DEFINED ENV{ADIOS_CTEST})
-ctest_test(INCLUDE "pio_unit_test|^init|pio_file\
-|ncdf_get_put|ncdf_inq|ncdf_simple_tests|pio_rearr\
-|pio_decomp|pio_sync_tests|pio_buf_lim_tests|pio_iodesc_tests\
-|pio_iosystem_tests|examplePio|example1|darray_no_async")
+ctest_test(INCLUDE "example1.1|example1.2|example1.3")
 elseif (DEFINED ENV{HDF5_CTEST})
 ctest_test(INCLUDE "test_hdf5")
 else ()
