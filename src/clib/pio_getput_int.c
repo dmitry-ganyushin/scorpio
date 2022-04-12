@@ -1459,8 +1459,8 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                          * block1: |start| count| data |  */
                         /* 2D */
                         /* |start[0],start[1]|count[0], count[1]| data| */
-                        for (size_t i = 0; i < number_of_data_blocks; i++) {
-                            adios2_set_block_selection(av->adios_varid, i);
+                        for (size_t block_id = 0; block_id < number_of_data_blocks; block_id++) {
+                            adios2_set_block_selection(av->adios_varid, block_id);
                             adiosErr = adios2_selection_size(&var_size, av->adios_varid);
                             if (adiosErr != adios2_error_none) {
                                 GPTLstop("PIO:PIOc_put_vars_tc");
@@ -1477,7 +1477,6 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                                pio_get_fname_from_file(file),
                                                file->pio_ncid);
                             }
-
                             char *mem_buffer = (char *) calloc(var_size, av->adios_type_size);
                             adios2_get(file->engineH, av->adios_varid, mem_buffer, adios2_mode_sync);
                             if (mem_buffer == NULL) {
