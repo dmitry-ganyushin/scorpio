@@ -1825,8 +1825,12 @@ int PIOc_inq_att(int ncid, int varid, const char *name, nc_type *xtypep,
                 file->adios_attrs[i].att_ncid == ncid)
             {
                 ierr = PIO_NOERR;
-                *xtypep = (nc_type) (file->adios_attrs[i].att_type);
-                *lenp = (PIO_Offset) (file->adios_attrs[i].att_len);
+                if (xtypep != NULL) {
+                    *xtypep = (nc_type) (file->adios_attrs[i].att_type);
+                }
+                if (lenp != NULL) {
+                    *lenp = (PIO_Offset) (file->adios_attrs[i].att_len);
+                }
                 i = file->num_attrs + 1;
             }
         }
