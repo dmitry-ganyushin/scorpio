@@ -13,6 +13,7 @@
 #include <pio.h>
 #include <pio_internal.h>
 #include "spio_io_summary.h"
+#include "qhashtbl.h"
 
 /**
  * Write a netCDF attribute of any type, converting to any type.
