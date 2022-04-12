@@ -3570,7 +3570,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
     /* If async is in use, bcast the parameters from compute to I/O procs. */
     if(ios->async)
     {
-        int len = strlen(filename) + 1;
+        int64_t len = strlen(filename) + 1;
         PIO_SEND_ASYNC_MSG(ios, PIO_MSG_OPEN_FILE, &ierr, len, filename, file->iotype, file->mode);
         if(ierr != PIO_NOERR)
         {
@@ -3615,6 +3615,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             file->adios_vars[var].gdimids = NULL;
             for (int i = 0; i < PIO_MAX_DIMS; i++) file->adios_vars[var].interval_map[i] = PIO_DEFAULT;
         }
+        file->tbl = qhashtbl(1000);
         /*restart mode */
 
         // get available variables and set structures.
