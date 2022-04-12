@@ -639,7 +639,7 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
         }
 #endif /* _PNETCDF */
 
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
         {
             switch(memtype)
             {
@@ -698,6 +698,104 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
             }
         }
     }
+
+#ifdef _ADIOS2
+    if (file->iotype == PIO_IOTYPE_ADIOS)
+    {
+        char *full_name;
+
+        if (varid == NC_GLOBAL)
+        {
+            char prefix_att_name[] = "/__pio__/global/";
+            full_name = malloc(strlen(prefix_att_name) + strlen(name) + 1);
+            strcpy(full_name, prefix_att_name);
+            strcat(full_name, name);
+        }
+        else
+        {
+            char prefix_att_name[] = "/__pio__/var/";
+            full_name = malloc(strlen(prefix_att_name) + strlen(file->adios_vars[varid].name) + strlen("/") + strlen(name) + 1);
+            strcpy(full_name, prefix_att_name);
+            strcat(full_name, file->adios_vars[varid].name);
+            strcat(full_name, "/");
+            strcat(full_name, name);
+        }
+
+        file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
+        if (file->engineH == NULL) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Opening (ADIOS) file (%s) failed",
+                           pio_get_fname_from_file(file));
+        }
+        LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+        adios2_step_status step_status;
+        adios2_error adiosStepErr = adios2_begin_step(file->engineH, adios2_step_mode_read, 10.0, &step_status);
+
+        switch (memtype)
+        {
+            case NC_DOUBLE:
+            {
+                adios2_attribute *attr = adios2_inquire_attribute(file->ioH, full_name);
+                size_t size_attr = 1;
+                double attr_data;
+                adios2_error err = adios2_attribute_data(&attr_data, &size_attr, attr);
+                memcpy(ip, &attr_data, size_attr * sizeof(double));
+                break;
+            }
+            case NC_FLOAT:
+            {
+                adios2_attribute *attr = adios2_inquire_attribute(file->ioH, full_name);
+                size_t size_attr = 1;
+                float attr_data;
+                adios2_error err = adios2_attribute_data(&attr_data, &size_attr, attr);
+                memcpy(ip, &attr_data, size_attr * sizeof(float));
+                break;
+            }
+            case NC_INT:
+            {
+                adios2_attribute *attr = adios2_inquire_attribute(file->ioH, full_name);
+                size_t size_attr = 1;
+                int32_t attr_data;
+                adios2_error err = adios2_attribute_data(&attr_data, &size_attr, attr);
+                memcpy(ip, &attr_data, size_attr * sizeof(int32_t));
+                break;
+            }
+            case NC_CHAR:
+            {
+                adios2_attribute *attr = adios2_inquire_attribute(file->ioH, full_name);
+                size_t size_attr;
+                adios2_attribute_size(&size_attr, attr);
+                char attr_data[PIO_MAX_NAME];
+                memset(attr_data, 0, PIO_MAX_NAME);
+                adios2_error err = adios2_attribute_data(&attr_data, &size_attr, attr);
+                memcpy((char *)ip, &attr_data, strlen(attr_data) * sizeof(char));
+                break;
+            }
+            default:
+                GPTLstop("PIO:PIOc_get_att_tc");
+                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                return pio_err(ios, file, PIO_EBADTYPE, __FILE__, __LINE__,
+                               "Reading variable (%s, varid=%d) attribute (%s) failed. Unsupported attribute type (type = %x)", (varid != PIO_GLOBAL) ? file->varlist[varid].vname : "PIO_GLOBAL", varid, name, memtype);
+        }
+
+        free(full_name);
+
+        adiosStepErr = adios2_end_step(file->engineH);
+        if (adiosStepErr != adios2_error_none)
+        {
+            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "adios2_end_step failed (adios2_error=%s) for file (%s)",
+                           convert_adios2_error_to_string(adiosStepErr), pio_get_fname_from_file(file));
+        }
+
+        adios2_error err = adios2_close(file->engineH);
+        file->engineH = NULL;
+        LOG((2, "adios2_close(%s) : fd = %d", file->fname));
+    }
+#endif
 
     ierr = check_netcdf(NULL, file, ierr, __FILE__, __LINE__);
     if(ierr != PIO_NOERR){
@@ -1103,7 +1201,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         }
 #endif /* _PNETCDF */
 
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->do_io)
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
             switch(xtype)
             {
 #ifdef _NETCDF
@@ -1173,6 +1271,551 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                 "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. Unsupported variable type (type=%x)", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, xtype);
             }
     }
+
+#ifdef _ADIOS2
+    if (file->iotype == PIO_IOTYPE_ADIOS)
+    {
+        if (varid < 0 || varid >= file->num_vars)
+        {
+            GPTLstop("PIO:PIOc_put_vars_tc");
+            GPTLstop("PIO:write_total");
+            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->rd_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            GPTLstop("PIO:PIOc_put_vars_tc_adios");
+            GPTLstop("PIO:write_total_adios");
+            return pio_err(ios, file, PIO_EBADID, __FILE__, __LINE__,
+                           "Writing variable to file (%s, ncid=%d) failed. Invalid variable id (varid=%d, expected >=0 and < number of variables in the file, %d) provided",
+                           pio_get_fname_from_file(file), ncid, varid, file->num_vars);
+        }
+        /* check put_var type */
+        if (strcmp(file->adios_vars[varid].scorpio_var_type, "put_var") != 0) {
+            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "darray variable is expected");
+        }
+        /* get frame_id */
+        int frame_id = file->varlist[varid].record;
+        /*magically obtain the relevant adios step*/
+        int required_adios_step = get_adios_step(file, varid, frame_id);
+
+        if (ios->adiosH != NULL)
+        {
+            adios2_error adiosErr = adios2_finalize(ios->adiosH);
+            if (adiosErr != adios2_error_none)
+            {
+                GPTLstop("PIO:PIOc_finalize");
+                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,"Finalizing ADIOS failed (adios2_error=%s) on iosystem (%d)",
+                           pio_get_fname_from_file(file), ios->iosysid);
+            }
+
+            ios->adiosH = NULL;
+        }
+        ios->adiosH = adios2_init(ios->union_comm, adios2_debug_mode_on);
+        if (ios->adiosH == NULL)
+        {
+            GPTLstop("PIO:PIOc_Init_Intracomm");
+            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Initializing ADIOS failed");
+        }
+        char declare_name[PIO_MAX_NAME] = {'\0'};
+        struct stat sd;
+            snprintf(declare_name, PIO_MAX_NAME, "%s%lu", file->fname, get_adios2_io_cnt());
+            file->ioH = adios2_declare_io(ios->adiosH, (const char *) declare_name);
+            if (file->ioH == NULL) {
+                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Declaring (ADIOS) IO (name=%s) failed for file (%s)",
+                               declare_name, pio_get_fname_from_file(file));
+            }
+
+            adios2_error adiosErr = adios2_set_engine(file->ioH, "FileStream");
+            if (adiosErr != adios2_error_none) {
+                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Setting (ADIOS) engine (type=FileStream) failed (adios2_error=%s) for file (%s)",
+                               convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
+            }
+
+            LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+            adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
+            file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
+            if (file->engineH == NULL) {
+                LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+            }
+
+        adios2_step_status status;
+
+        int step = 0;
+        while (adios2_begin_step(file->engineH, adios2_step_mode_read, 100.0,
+                                 &status) == adios2_error_none) {
+            if (step == required_adios_step || status == adios2_step_status_end_of_stream) {
+                break;
+            } else {
+                adios2_end_step(file->engineH);
+                step++;
+                continue;
+            }
+        }
+        /* First we need to define the variable now that we know it's decomposition */
+        adios_var_desc_t *av = &(file->adios_vars[varid]);
+
+        /* Write ADIOS with memory type since ADIOS does not do conversions.
+         * Add an attribute describing the target output type (defined type).
+         */
+        if (xtype == PIO_NAT)
+            xtype = vartype;
+
+        if (xtype == PIO_LONG_INTERNAL) {
+            int typesize = sizeof(long int);
+            if (typesize == 4)
+                xtype = PIO_INT;
+            else
+                xtype = PIO_INT64;
+        }
+
+        /* No conversion to vartype will be made. Use the in-memory type of the data buffer */
+        av->adios_type = PIOc_get_adios_type(xtype);
+        av->adios_type_size = get_adios2_type_size(av->adios_type, NULL);
+
+        char vname[PIO_MAX_NAME];
+
+        /* Scalars have to be handled differently. */
+        /* ndims should be initialized in the Open function*/
+
+        if (av->ndims == 0) {
+            /* Only the IO master does the IO, so we are not really
+             * getting parallel IO here. */
+            if (file->myrank == 0) {
+                if (start) {
+                    /* Ignore if user specifies start[0] == 0 */
+                    if (start[0] != 0) {
+                        printf("PIO: WARNING: Ignoring user-specified start indices while writing the scalar variable (%s) to file (%s, ncid=%d). An invalid start index (start[0] = %lld) provided (%s:%d)\n",
+                               av->name, pio_get_fname_from_file(file), file->pio_ncid, (long long int) start[0],
+                               __FILE__, __LINE__);
+                    }
+                }
+                if (count) {
+                    /* Ignore if user specifies count[0] == 1 */
+                    if (count[0] != 1) {
+                        printf("PIO: WARNING: Ignoring user-specified counts while writing the scalar variable (%s) to file (%s, ncid=%d). An invalid count (count[0] = %lld) provided (%s:%d)\n",
+                               av->name, pio_get_fname_from_file(file), file->pio_ncid, (long long int) count[0],
+                               __FILE__, __LINE__);
+                    }
+                }
+                if (stride) {
+                    /* Ignore if user specifies stride[0] == 1 */
+                    if (stride[0] != 1) {
+                        printf("PIO: WARNING: Ignoring user-specified strides while writing the scalar variable (%s) to file (%s, ncid=%d). An invalid stride (stride[0] = %lld) provided (%s:%d)\n",
+                               av->name, pio_get_fname_from_file(file), file->pio_ncid, (long long int) stride[0],
+                               __FILE__, __LINE__);
+                    }
+                }
+
+                assert((strlen("/__pio__/var/") + strlen(av->name)) < PIO_MAX_NAME);
+                snprintf(vname, PIO_MAX_NAME, "/__pio__/var/%s", av->name);
+                av->adios_varid = adios2_inquire_variable(file->ioH, vname);
+                if (av->adios_varid == NULL) {
+                    GPTLstop("PIO:PIOc_put_vars_tc");
+                    GPTLstop("PIO:write_total");
+                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    GPTLstop("PIO:PIOc_put_vars_tc_adios");
+                    GPTLstop("PIO:write_total_adios");
+                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)",
+                                   vname, pio_get_fname_from_file(file), file->pio_ncid);
+
+                } else {
+                    if (file->myrank == 0) {
+                        /* singe value */
+                        char *mem_buf = malloc(av->adios_type_size);
+                        adiosErr = adios2_get(file->engineH, av->adios_varid, mem_buf, adios2_mode_sync);
+                        memcpy((char *)buf, mem_buf, av->adios_type_size);
+                        free(mem_buf);
+                    }
+                    if (adiosErr != adios2_error_none) {
+                        GPTLstop("PIO:PIOc_put_vars_tc");
+                        GPTLstop("PIO:write_total");
+                        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                        spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                        GPTLstop("PIO:PIOc_put_vars_tc_adios");
+                        GPTLstop("PIO:write_total_adios");
+                        return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Putting (ADIOS) variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                                       av->name, convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file),
+                                       file->pio_ncid);
+                    }
+                }
+            }
+        } else {
+            /* This is not a scalar var. */
+            if (stride_present) {
+                LOG((2, "ADIOS does not support striding %s:%s\n"
+                        "Variable %s will be corrupted in the output"
+                        , __FILE__, __func__, av->name));
+                GPTLstop("PIO:PIOc_put_vars_tc");
+                GPTLstop("PIO:write_total");
+                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                GPTLstop("PIO:PIOc_put_vars_tc_adios");
+                GPTLstop("PIO:write_total_adios");
+                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "ADIOS does not support striding. Variable %s file (%s, ncid=%d)",
+                               av->name, pio_get_fname_from_file(file), file->pio_ncid);
+            }
+
+            /* Only the IO master actually does these ADIOS calls. */
+            if (file->myrank == 0) {
+                /* Write start and count arrays to be able to reconstruct the variable during conversion. */
+                int64_t pio_var_start[PIO_MAX_DIMS];
+                int64_t pio_var_count[PIO_MAX_DIMS];
+                if (start) {
+                    for (int d = 0; d < av->ndims; d++) {
+                        pio_var_start[d] = (int64_t) start[d];
+                    }
+                } else {
+                    pio_var_start[0] = -1; /* if start is NULL */
+                }
+
+                if (count) {
+                    for (int d = 0; d < av->ndims; d++) {
+                        pio_var_count[d] = (int64_t) count[d];
+                    }
+                } else {
+                    pio_var_count[0] = -1; /* if count is NULL */
+                }
+
+                /* Create a one-dimensional byte array to combine start, count and buf */
+                size_t av_size = 2 * av->ndims * sizeof(int64_t); /* pio_var_start and pio_var_count */
+                size_t buf_size = 1;
+                if (count) {
+                    for (int d = 0; d < av->ndims; d++) {
+                        if (file->dim_values[av->gdimids[d]] != PIO_UNLIMITED) {
+                            buf_size *= (size_t) count[d];
+                        }
+                    }
+                } else {
+                    for (int d = 0; d < av->ndims; d++) {
+                        if (file->dim_values[av->gdimids[d]] != PIO_UNLIMITED) {
+                            buf_size *= (size_t) file->dim_values[av->gdimids[d]];
+                        }
+                    }
+                }
+                buf_size *= av->adios_type_size;
+                av_size += buf_size;
+
+                /* PIOc_put_var may be called multiple times with different start/count values
+                 * for a variable. ADIOS should output data for each of those calls not just
+                 * when the variable is not defined */
+                assert((strlen("/__pio__/var/") + strlen(av->name)) < PIO_MAX_NAME);
+                snprintf(vname, PIO_MAX_NAME, "/__pio__/var/%s", av->name);
+                av->adios_varid = adios2_inquire_variable(file->ioH, vname);
+                if (av->adios_varid == NULL) {
+
+                    GPTLstop("PIO:PIOc_put_vars_tc");
+                    GPTLstop("PIO:write_total");
+                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    GPTLstop("PIO:PIOc_put_vars_tc_adios");
+                    GPTLstop("PIO:write_total_adios");
+                    return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Getting (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)",
+                                   vname, pio_get_fname_from_file(file), file->pio_ncid);
+
+                } else {
+                    if (file->myrank == 0) {
+                        /*reading adios block */
+                        adios2_varinfo *data_blocks = adios2_inquire_blockinfo(file->engineH, av->adios_varid,
+                                                                               required_adios_step);
+                        int32_t number_of_data_blocks = data_blocks->nblocks;
+                        /* free memeory */
+                        for (size_t i = 0; i < data_blocks->nblocks; ++i) {
+                            free(data_blocks->BlocksInfo[i].Start);
+                            free(data_blocks->BlocksInfo[i].Count);
+                        }
+                        free(data_blocks->BlocksInfo);
+                        free(data_blocks);
+                        adios2_type read_type;
+                        adios2_variable_type(&read_type, av->adios_varid);
+                        size_t var_size = 0;
+                        size_t header_size = 2 * (av->ndims * sizeof(int64_t));
+                        /* blocks structure
+                         * single block
+                         * block1: |start| count| data |  */
+                        /* 2D */
+                        /* |start[0],start[1]|count[0], count[1]| data| */
+                        for (size_t i = 0; i < number_of_data_blocks; i++) {
+                            adios2_set_block_selection(av->adios_varid, i);
+                            adiosErr = adios2_selection_size(&var_size, av->adios_varid);
+                            if (adiosErr != adios2_error_none) {
+                                GPTLstop("PIO:PIOc_put_vars_tc");
+                                GPTLstop("PIO:write_total");
+                                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                                spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                                GPTLstop("PIO:PIOc_put_vars_tc_adios");
+                                GPTLstop("PIO:write_total_adios");
+                                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                               "Setting (ADIOS) selection to variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                                               av->name, convert_adios2_error_to_string(adiosErr),
+                                               pio_get_fname_from_file(file),
+                                               file->pio_ncid);
+                            }
+
+                            char *mem_buffer = (char *) calloc(var_size, av->adios_type_size);
+                            adios2_get(file->engineH, av->adios_varid, mem_buffer, adios2_mode_sync);
+                            if (mem_buffer == NULL) {
+                                GPTLstop("PIO:PIOc_put_vars_tc");
+                                GPTLstop("PIO:write_total");
+                                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                                spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                                GPTLstop("PIO:PIOc_put_vars_tc_adios");
+                                GPTLstop("PIO:write_total_adios");
+                                return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                                               "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Out of memory, allocating memory (%lld bytes) for putting ADIOS variable (name = %s)",
+                                               pio_get_vname_from_file(file, varid), varid,
+                                               pio_get_fname_from_file(file), ncid,
+                                               (long long int) (av_size * sizeof(unsigned char)), av->name);
+                            }
+                            /* find out start and count */
+                            int64_t block_info_start[PIO_MAX_DIMS];
+                            int64_t block_info_count[PIO_MAX_DIMS];
+                            for (int cnt = 0; cnt < av->ndims; cnt++) {
+                                block_info_start[cnt] = *((int64_t *) (mem_buffer + cnt * sizeof(int64_t)));
+                            }
+                            for (int cnt = 0; cnt < av->ndims; cnt++) {
+                                block_info_count[cnt] = *((int64_t *) (mem_buffer +
+                                                                       (cnt + av->ndims) * sizeof(int64_t)));
+                            }
+                            if (av->ndims == 1) {
+                                /* data layout */
+                                /*  |adios data block 1 | adios data block2 |*/
+                                /*  |header|     data   | header|   data    |*/
+                                /* 0000xxx00*/
+                                size_t read_type_size = av->adios_type_size;
+                                //index in a block
+                                int64_t start_in_block_idx = -1;
+                                int64_t end_in_block_idx = -1;
+                                /* |0000xxxxxx|xxxxxxxxxx|xxxxxxxxxx|xxxxx0000| */
+                                /* find beginning of the block */
+                                /* case |0000xxxxxx| */
+                                if (start[0] >= block_info_start[0] &&
+                                    start[0] < block_info_start[0] + block_info_count[0]) {
+                                    start_in_block_idx = start[0] - block_info_start[0];
+                                    /* case |xxxxxxxxx| */
+                                } else if (start[0] < block_info_start[0]) {
+                                    start_in_block_idx = 0;
+                                }
+                                /* find end of the block */
+                                /*  case |xxxxx0000| */
+                                if (start[0] + count[0] >= block_info_start[0] &&
+                                    start[0] + count[0] < block_info_start[0] + block_info_count[0]) {
+                                    end_in_block_idx = start[0] + count[0] - block_info_start[0];
+                                    /*  case |xxxxxxxxx| */
+                                } else if (block_info_start[0] + block_info_count[0] <= start[0] + count[0]) {
+                                    end_in_block_idx = block_info_count[0];
+                                }
+
+                                if (start_in_block_idx != -1 && end_in_block_idx != -1) {
+                                    int64_t offset_buf = block_info_start[0] - start[0] + start_in_block_idx;
+                                    int64_t offset_mem_buf = start_in_block_idx;
+                                    memcpy((char *) (buf + offset_buf * read_type_size),
+                                           mem_buffer +
+                                                     header_size + offset_mem_buf * read_type_size,
+                                           (end_in_block_idx - start_in_block_idx) * read_type_size);
+                                }
+                            } else if (av->ndims == 2) {
+                                /* data layout */
+                                /*  |adios data block 1 | adios data block2 |*/
+                                /*  |header|     data   | header|   data    |*/
+                                /* 0000xxx00*/
+                                size_t read_type_size = av->adios_type_size;
+                                /* index in a block with respect tp the block beginning */
+                                int64_t start_in_block_idx_0 = -1;
+                                int64_t end_in_block_idx_0 = -1;
+                                int64_t start_in_block_idx_1 = -1;
+                                int64_t end_in_block_idx_1 = -1;
+
+                                /* |0000xxxxxx|xxxxxxxxxx|xxxxxxxxxx|xxxxx0000| */
+                                /* find beginning of the block */
+                                /* case |0000xxxxxx| */
+                                /* fast index */
+                                if (start[1] >= block_info_start[1] &&
+                                    start[1] < block_info_start[1] + block_info_count[1]) {
+                                    start_in_block_idx_1 = start[1] - block_info_start[1];
+                                    /* case |xxxxxxxxx| */
+                                } else if (start[1] < block_info_start[1]) {
+                                    start_in_block_idx_1 = 0;
+                                }
+                                /* find end of the block */
+                                /*  case |xxxxx0000| */
+                                if (start[1] + count[1] >= block_info_start[1] &&
+                                    start[1] + count[1] < block_info_start[1] + block_info_count[1]) {
+                                    end_in_block_idx_1 = start[1] + count[1] - block_info_start[1];
+                                    /*  case |xxxxxxxxx| */
+                                } else if (block_info_start[1] + block_info_count[1] <= start[1] + count[1]) {
+                                    end_in_block_idx_1 = block_info_count[1];
+                                }
+                                /* slow index */
+                                if (start[0] >= block_info_start[0] &&
+                                    start[0] < block_info_start[0] + block_info_count[0]) {
+                                    start_in_block_idx_0 = start[0] - block_info_start[0];
+                                    /* case |xxxxxxxxx| */
+                                } else if (start[0] < block_info_start[0]) {
+                                    start_in_block_idx_0 = 0;
+                                }
+                                /* find end of the block */
+                                /*  case |xxxxx0000| */
+                                if (start[0] + count[0] >= block_info_start[0] &&
+                                    start[0] + count[0] < block_info_start[0] + block_info_count[0]) {
+                                    end_in_block_idx_0 = start[0] + count[0] - block_info_start[0];
+                                    /*  case |xxxxxxxxx| */
+                                } else if (block_info_start[0] + block_info_count[0] <= start[0] + count[0]) {
+                                    end_in_block_idx_0 = block_info_count[0];
+                                }
+                                if (start_in_block_idx_0 != -1 && end_in_block_idx_0 != -1 &&
+                                    start_in_block_idx_1 != -1 && end_in_block_idx_1 != -1) {
+                                    for (int64_t idx_0 = start_in_block_idx_0; idx_0 < end_in_block_idx_0; idx_0++) {
+                                        int64_t offset_buf_1D = block_info_start[1] - start[1] + start_in_block_idx_1;
+                                        int64_t offset_mem_buf_1D = start_in_block_idx_1;
+                                        int64_t size_dim_1 = file->dim_values[av->gdimids[1]];
+                                        int64_t offset_buf =
+                                                (idx_0 + block_info_start[0] - start[0]) * size_dim_1 + offset_buf_1D;
+                                        int64_t offset_mem_buf = idx_0 * size_dim_1 + offset_mem_buf_1D;
+                                        memcpy((char *) (buf + offset_buf * read_type_size),
+                                                mem_buffer +
+                                                         header_size + offset_mem_buf * read_type_size,
+                                               (end_in_block_idx_1 - start_in_block_idx_1) * read_type_size);
+                                    }
+                                }
+                            } else if (av->ndims == 3) {
+                                /* data layout */
+                                /*  |adios data block 1 | adios data block2 |*/
+                                /*  |header|     data   | header|   data    |*/
+                                /* 0000xxx00*/
+                                size_t read_type_size = av->adios_type_size;
+                                /* index in a block with respect to block beginning */
+                                /* the last index is the fastest */
+                                int64_t start_in_block_idx_0 = -1;
+                                int64_t end_in_block_idx_0 = -1;
+                                int64_t start_in_block_idx_1 = -1;
+                                int64_t end_in_block_idx_1 = -1;
+                                int64_t start_in_block_idx_2 = -1;
+                                int64_t end_in_block_idx_2 = -1;
+
+                                /* |0000xxxxxx|xxxxxxxxxx|xxxxxxxxxx|xxxxx0000| */
+                                /* find beginning of the block */
+                                /* case |0000xxxxxx| */
+                                if (start[2] >= block_info_start[2] &&
+                                    start[2] < block_info_start[2] + block_info_count[2]) {
+                                    start_in_block_idx_2 = start[2] - block_info_start[2];
+                                    /* case |xxxxxxxxx| */
+                                } else if (start[2] < block_info_start[2]) {
+                                    start_in_block_idx_2 = 0;
+                                }
+                                /* find end of the block */
+                                /*  case |xxxxx0000| */
+                                if (start[2] + count[2] >= block_info_start[2] &&
+                                    start[2] + count[2] < block_info_start[2] + block_info_count[2]) {
+                                    end_in_block_idx_2 = start[2] + count[2] - block_info_start[2];
+                                    /*  case |xxxxxxxxx| */
+                                } else if (block_info_start[2] + block_info_count[2] <= start[2] + count[2]) {
+                                    end_in_block_idx_2 = block_info_count[2];
+                                }
+                                if (start[1] >= block_info_start[1] &&
+                                    start[1] < block_info_start[1] + block_info_count[1]) {
+                                    start_in_block_idx_1 = start[1] - block_info_start[1];
+                                    /* case |xxxxxxxxx| */
+                                } else if (start[1] < block_info_start[1]) {
+                                    start_in_block_idx_1 = 0;
+                                }
+                                /* find end of the block */
+                                /*  case |xxxxx0000| */
+                                if (start[1] + count[1] >= block_info_start[1] &&
+                                    start[1] + count[1] < block_info_start[1] + block_info_count[1]) {
+                                    end_in_block_idx_1 = start[1] + count[1] - block_info_start[1];
+                                    /*  case |xxxxxxxxx| */
+                                } else if (block_info_start[1] + block_info_count[1] <= start[1] + count[1]) {
+                                    end_in_block_idx_1 = block_info_count[1];
+                                }
+                                /* slow index */
+                                if (start[0] >= block_info_start[0] &&
+                                    start[0] < block_info_start[0] + block_info_count[0]) {
+                                    start_in_block_idx_0 = start[0] - block_info_start[0];
+                                    /* case |xxxxxxxxx| */
+                                } else if (start[0] < block_info_start[0]) {
+                                    start_in_block_idx_0 = 0;
+                                }
+                                /* find end of the block */
+                                /*  case |xxxxx0000| */
+                                if (start[0] + count[0] >= block_info_start[0] &&
+                                    start[0] + count[0] < block_info_start[0] + block_info_count[0]) {
+                                    end_in_block_idx_0 = start[0] + count[0] - block_info_start[0];
+                                    /*  case |xxxxxxxxx| */
+                                } else if (block_info_start[0] + block_info_count[0] <= start[0] + count[0]) {
+                                    end_in_block_idx_0 = block_info_count[0];
+                                }
+
+                                if (start_in_block_idx_0 != -1 && end_in_block_idx_0 != -1 &&
+                                    start_in_block_idx_1 != -1 &&
+                                    end_in_block_idx_1 != -1) {
+                                    for (int64_t idx_0 = start_in_block_idx_0; idx_0 < end_in_block_idx_0; idx_0++) {
+                                        for (int64_t idx_1 = start_in_block_idx_1; idx_1 < end_in_block_idx_1; idx_1++) {
+                                            int64_t size_dim_1 = file->dim_values[av->gdimids[1]];
+                                            int64_t size_dim_2 = file->dim_values[av->gdimids[2]];
+                                            int64_t offset_buf_1D = block_info_start[2] - start[2] + start_in_block_idx_2;
+                                            int64_t offset_mem_buf_1D = start_in_block_idx_2;
+                                            int64_t offset_buf_2D =
+                                                    (idx_1 + block_info_start[1] - start[1]) * size_dim_2;
+                                            int64_t offset_mem_buf_2D = idx_1 * size_dim_2;
+                                            int64_t offset_mem_buf = offset_mem_buf_1D + offset_mem_buf_2D +
+                                                                 idx_0 * block_info_count[1] * block_info_count[2];
+                                            int64_t offset_buf = offset_buf_1D + offset_buf_2D +
+                                                             (idx_0 + block_info_start[0] - start[0]) *
+                                                             size_dim_1 * size_dim_2;
+                                            memcpy((char *) (buf + offset_buf * read_type_size),
+                                                   mem_buffer +
+                                                             header_size + offset_mem_buf * read_type_size,
+                                                   (end_in_block_idx_2 - start_in_block_idx_2) * read_type_size);
+                                        }
+                                    }
+                                }
+                            } else {
+                                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                               "Not implemented");
+                            }
+                            free(mem_buffer);
+                            mem_buffer = NULL;
+                        }
+                    }
+                }
+            }
+        }
+        adiosErr = adios2_end_step(file->engineH);
+        if (adiosErr != adios2_error_none) {
+            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "adios2_end_step failed (adios2_error=%s) for file (%s)",
+                           convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
+        }
+        adios2_error err = adios2_close(file->engineH);
+        if (err != adios2_error_none) {
+            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "adios2_close failed (adios2_error=%s) for file (%s)",
+                           convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
+        }
+        file->engineH = NULL;
+        LOG((2, "adios2_close(%s) : fd = %d", file->fname));
+    }
+#endif
 
     ierr = check_netcdf(NULL, file, ierr, __FILE__, __LINE__);
     if(ierr != PIO_NOERR){

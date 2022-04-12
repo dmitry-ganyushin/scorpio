@@ -807,9 +807,11 @@ int PIOc_closefile(int ncid)
                 file->block_list = NULL;
             }
         }
-
-        MPI_Comm_free(&(file->node_comm));
-        MPI_Comm_free(&(file->block_comm));
+        
+        if (file->node_comm != 0)
+            MPI_Comm_free(&(file->node_comm));
+        if (file->block_comm != 0)
+            MPI_Comm_free(&(file->block_comm));
 
 #ifdef _ADIOS_BP2NC_TEST /* Comment out for large scale run */
 #ifdef _PNETCDF
