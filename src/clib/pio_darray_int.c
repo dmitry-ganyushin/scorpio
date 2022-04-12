@@ -1186,7 +1186,7 @@ int get_adios_step(file_desc_t *file, int var_id, int frame_id) {
 }
 
 
-bool match_decomp_part(int64_t *pInt, size_t pos, long long int *pInt1, long long int *pInt2);
+bool match_decomp_part(const int64_t *pInt, size_t pos, long long int *pInt1, long long int *pInt2);
 
 /**
  * Read an array of data from a ADIOS2 bp file to the (parallel) IO library.
@@ -1398,7 +1398,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
 
     /* reading /__pio__/var/dummy_darray_var_int/def/decomp */
     char prefix_decomp_name[] = "/__pio__/decomp/";
-    int decomp_name_len = strlen(prefix_decomp_name) + strlen(attr_data) + 1;
+    int64_t decomp_name_len = strlen(prefix_decomp_name) + strlen(attr_data) + 1;
     char *decomp_name = malloc(decomp_name_len);
     memset(decomp_name, 0, decomp_name_len);
     strcpy(decomp_name, prefix_decomp_name);
@@ -1453,7 +1453,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
                         start_block_found = true;
                         end_block = block;
                         end_idx_in_end_block = pos + (end_decomp - start_decomp);
-                    };
+                    }
                 }
                 /* free recourses */
                 if (decomp_int64_t != NULL) {
@@ -1487,12 +1487,26 @@ if (required_adios_step != time_step) {
     for (int step = 0; step < required_adios_step; step++) {
         adios2_error  step_err = adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
                                      &status);
-        adios2_end_step(file->engineH);
+        if (step_err != adios2_error_none) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "adios2_begin_step file (%s) failed",
+                           pio_get_fname_from_file(file));
+        }
+        adios2_error end_step_err = adios2_end_step(file->engineH);
+        if (end_step_err != adios2_error_none) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "adios2_end_step file (%s) failed",
+                           pio_get_fname_from_file(file));
+        }
 
     }
     adios2_error step_err = adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
                                  &status);
-    time_step = required_adios_step;
+    if (step_err != adios2_error_none) {
+        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "adios2_begin_step file (%s) failed",
+                       pio_get_fname_from_file(file));
+    }
 }
 /************************* actual reading**********************************/
     char *var_name = malloc(strlen(prefix_var_name) + strlen(adios_vdesc->name) + 1);
@@ -1510,7 +1524,7 @@ if (required_adios_step != time_step) {
 
     char *data_buf = NULL;
     if (data) {
-        adios2_varinfo *data_blocks = adios2_inquire_blockinfo(file->engineH, data, time_step);
+        adios2_varinfo *data_blocks = adios2_inquire_blockinfo(file->engineH, data, required_adios_step);
         int32_t data_blocks_size = data_blocks->nblocks;
         /* free memeory */
         for (size_t i = 0; i < data_blocks->nblocks; ++i) {
@@ -1601,9 +1615,10 @@ if (required_adios_step != time_step) {
 
     return PIO_NOERR;
 }
-/* match first 30 elements */
+/* match first 30 elements*/
+/* TODO: make it with hashing of data */
 #define MAX_LEN_MATCH 30
-bool match_decomp_part(int64_t *decomp, size_t offset, MPI_Offset *start, MPI_Offset *end) {
+bool match_decomp_part(const int64_t *decomp, size_t offset, MPI_Offset *start, MPI_Offset *end) {
     MPI_Offset len = end - start;
     if (len > MAX_LEN_MATCH ) len = MAX_LEN_MATCH;
     for (MPI_Offset idx = 0; idx < len; idx++) {
