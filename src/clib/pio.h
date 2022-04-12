@@ -862,6 +862,12 @@ typedef struct adios_var_desc_t
     int32_t *num_wb_buffer;
     int32_t decomp_cnt, frame_cnt, fillval_cnt, num_wb_cnt;
     int32_t max_buffer_cnt;
+
+    /* simplified version of an interval map implementation
+     * index is a frame_id and the value is the adios_step */
+    int interval_map[PIO_MAX_DIMS];
+    /* a parameter to mark a variable as a put_var or darray */
+    char scorpio_var_type[PIO_MAX_NAME];
 } adios_var_desc_t;
 
 /* Track attributes */
