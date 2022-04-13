@@ -1337,10 +1337,19 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 } else {
                     if (file->myrank == 0) {
                         /* singe value */
-                        char *mem_buf = malloc(av->adios_type_size);
-                        adiosErr = adios2_get(file->engineH, av->adios_varid, mem_buf, adios2_mode_sync);
-                        memcpy((char *)buf, mem_buf, av->adios_type_size);
-                        free(mem_buf);
+                        /* check cache */
+                        char varname[16];
+                        sprintf(varname, "%d %d", varid, 0);
+                        char *mem_buf = NULL;
+                        mem_buf = file->tbl->get(file->tbl, varname);
+                        if (mem_buf == NULL){
+                            mem_buf = malloc(av->adios_type_size);
+                            adiosErr = adios2_get(file->engineH, av->adios_varid, mem_buf, adios2_mode_sync);
+                            memcpy((char *)buf, mem_buf, av->adios_type_size);
+                            file->tbl->put(file->tbl, varname, mem_buf);
+                            /* will be deleted in the cache delete operation */
+                            /* free(mem_buf); */
+                        }
                     }
                     if (adiosErr != adios2_error_none) {
                         GPTLstop("PIO:PIOc_put_vars_tc");
@@ -1477,22 +1486,29 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                                pio_get_fname_from_file(file),
                                                file->pio_ncid);
                             }
-                            char *mem_buffer = (char *) calloc(var_size, av->adios_type_size);
-                            adios2_get(file->engineH, av->adios_varid, mem_buffer, adios2_mode_sync);
+                            char varname[16];
+                            sprintf(varname, "%d %zu", varid, block_id);
+                            char *mem_buffer = NULL;
+                            mem_buffer = file->tbl->get(file->tbl, varname);
                             if (mem_buffer == NULL) {
-                                GPTLstop("PIO:PIOc_put_vars_tc");
-                                GPTLstop("PIO:write_total");
-                                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                                spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                                spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                                GPTLstop("PIO:PIOc_put_vars_tc_adios");
-                                GPTLstop("PIO:write_total_adios");
-                                return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                                               "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Out of memory, allocating memory (%lld bytes) for putting ADIOS variable (name = %s)",
-                                               pio_get_vname_from_file(file, varid), varid,
-                                               pio_get_fname_from_file(file), ncid,
-                                               (long long int) (av_size * sizeof(unsigned char)), av->name);
+                                mem_buffer = (char *) calloc(var_size, av->adios_type_size);
+                                adios2_get(file->engineH, av->adios_varid, mem_buffer, adios2_mode_sync);
+                                if (mem_buffer == NULL) {
+                                    GPTLstop("PIO:PIOc_put_vars_tc");
+                                    GPTLstop("PIO:write_total");
+                                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                                    GPTLstop("PIO:PIOc_put_vars_tc_adios");
+                                    GPTLstop("PIO:write_total_adios");
+                                    return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                                                   "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Out of memory, allocating memory (%lld bytes) for putting ADIOS variable (name = %s)",
+                                                   pio_get_vname_from_file(file, varid), varid,
+                                                   pio_get_fname_from_file(file), ncid,
+                                                   (long long int) (av_size * sizeof(unsigned char)), av->name);
+                                }
+                                file->tbl->put(file->tbl, varname, mem_buffer);
                             }
                             /* find out start and count */
                             int64_t block_info_start[PIO_MAX_DIMS];
@@ -1701,8 +1717,8 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                 return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                                "Not implemented");
                             }
-                            free(mem_buffer);
-                            mem_buffer = NULL;
+                            /* free(mem_buffer); */
+                            /* mem_buffer = NULL;*/
                         }
                     }
                 }

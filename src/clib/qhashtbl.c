@@ -110,7 +110,17 @@ static void debug(qhashtbl_t *tbl, FILE *out, bool detailed);
 static void free_(qhashtbl_t *tbl);
 
 uint32_t qhashmurmur3_32(const void *data, size_t nbytes);
+char *mystrdup(const char *str)
+{
+    int n = strlen(str) + 1;
+    char *dup = (char*)malloc(n);
+    if (dup)
+    {
+        strcpy(dup, str);
+    }
 
+    return dup;
+}
 /**
  * Initialize hash table.
  *
@@ -280,7 +290,7 @@ static bool put(qhashtbl_t *tbl, const char *fullpath, const void *data)
         return false;
 
     int keylen = strlen(fullpath);
-    char *key = strdup (fullpath);
+    char *key = mystrdup (fullpath);
 
     return qhput (tbl, key, keylen, data);
 }
@@ -359,7 +369,7 @@ static void *get(qhashtbl_t *tbl, const char *fullpath)
         return NULL;
 
     int keylen = strlen(fullpath);
-    char *key = strdup (fullpath);
+    char *key = mystrdup (fullpath);
 
     void * data = qhget (tbl, key, keylen);
     free (key);
@@ -466,6 +476,7 @@ void clear(qhashtbl_t *tbl)
         while (obj != NULL) {
             qhnobj_t *next = obj->next;
             free(obj->key);
+            free(obj->value);
             free(obj);
             obj = next;
             tbl->num--;
