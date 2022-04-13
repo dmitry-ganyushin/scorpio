@@ -1339,7 +1339,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                         /* singe value */
                         /* check cache */
                         char varname[16];
-                        sprintf(varname, "%d %d", varid, 0);
+                        sprintf(varname, "%d %d %d", ncid, varid, 0);
                         char *mem_buf = NULL;
                         mem_buf = file->tbl->get(file->tbl, varname);
                         if (mem_buf == NULL){
@@ -1349,6 +1349,8 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             file->tbl->put(file->tbl, varname, mem_buf);
                             /* will be deleted in the cache delete operation */
                             /* free(mem_buf); */
+                        }else{
+                            /* printf("Used cache ncid = %d varid = %d block_id =%d\n", ncid, varid, 0);*/
                         }
                     }
                     if (adiosErr != adios2_error_none) {
@@ -1487,7 +1489,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                                file->pio_ncid);
                             }
                             char varname[16];
-                            sprintf(varname, "%d %zu", varid, block_id);
+                            sprintf(varname, "%d %d %zu", ncid, varid, block_id);
                             char *mem_buffer = NULL;
                             mem_buffer = file->tbl->get(file->tbl, varname);
                             if (mem_buffer == NULL) {
@@ -1509,6 +1511,8 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                                    (long long int) (av_size * sizeof(unsigned char)), av->name);
                                 }
                                 file->tbl->put(file->tbl, varname, mem_buffer);
+                            }else{
+                               /* printf("Used cache ncid = %d varid = %d block_id =%d\n", ncid, varid, block_id);*/
                             }
                             /* find out start and count */
                             int64_t block_info_start[PIO_MAX_DIMS];
