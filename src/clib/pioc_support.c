@@ -3619,7 +3619,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             file->adios_vars[var].gdimids = NULL;
             for (int i = 0; i < PIO_MAX_DIMS; i++) file->adios_vars[var].interval_map[i] = PIO_DEFAULT;
         }
-        file->tbl = qhashtbl(1000);
+        file->tbl = qhashtbl(10000);
         /*restart mode */
 
         // get available variables and set structures.

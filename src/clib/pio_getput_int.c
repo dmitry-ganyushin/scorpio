@@ -1207,7 +1207,6 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         int frame_id = file->varlist[varid].record;
         /*magically obtain the relevant adios step*/
         int required_adios_step = get_adios_step(file, varid, frame_id);
-
         if (ios->adiosH != NULL)
         {
             adios2_error adiosErr = adios2_finalize(ios->adiosH);
@@ -1235,14 +1234,12 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                "Declaring (ADIOS) IO (name=%s) failed for file (%s)",
                                declare_name, pio_get_fname_from_file(file));
             }
-
             adios2_error adiosErr = adios2_set_engine(file->ioH, "FileStream");
             if (adiosErr != adios2_error_none) {
                 return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                "Setting (ADIOS) engine (type=FileStream) failed (adios2_error=%s) for file (%s)",
                                adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
             }
-
             LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
             adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
             file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
@@ -1288,7 +1285,6 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
 
         /* Scalars have to be handled differently. */
         /* ndims should be initialized in the Open function*/
-
         if (av->ndims == 0) {
             /* Only the IO master does the IO, so we are not really
              * getting parallel IO here. */
@@ -1350,7 +1346,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             /* will be deleted in the cache delete operation */
                             /* free(mem_buf); */
                         }else{
-                            /* printf("Used cache ncid = %d varid = %d block_id =%d\n", ncid, varid, 0);*/
+                            LOG((5, "Used cache ncid = %d varid = %d block_id =%d\n", ncid, varid, block_id));
                         }
                     }
                     if (adiosErr != adios2_error_none) {
@@ -1512,7 +1508,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                 }
                                 file->tbl->put(file->tbl, varname, mem_buffer);
                             }else{
-                               /* printf("Used cache ncid = %d varid = %d block_id =%d\n", ncid, varid, block_id);*/
+                               LOG((5, "Used cache ncid = %d varid = %d block_id =%d\n", ncid, varid, block_id));
                             }
                             /* find out start and count */
                             int64_t block_info_start[PIO_MAX_DIMS];
