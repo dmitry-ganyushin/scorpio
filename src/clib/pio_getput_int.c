@@ -706,6 +706,9 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
                 strcat(full_name, "/");
                 strcat(full_name, name);
             }
+            if (file->engineH != NULL){
+                adios2_close(file->engineH);
+            }
             file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
             if (file->engineH == NULL) {
                 return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -769,16 +772,16 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
             }
 #if _ADIOS2
             free(full_name);
-            adiosStepErr = adios2_end_step(file->engineH);
-            if (adiosStepErr != adios2_error_none)
-            {
-                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                               "adios2_end_step failed (adios2_error=%s) for file (%s)",
-                               adios2_error_to_string(adiosStepErr), pio_get_fname_from_file(file));
-            }
-            adios2_error err = adios2_close(file->engineH);
-            file->engineH = NULL;
-            LOG((2, "adios2_close(%s) : fd = %d", file->fname));
+//            adiosStepErr = adios2_end_step(file->engineH);
+//            if (adiosStepErr != adios2_error_none)
+//            {
+//                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+//                               "adios2_end_step failed (adios2_error=%s) for file (%s)",
+//                               adios2_error_to_string(adiosStepErr), pio_get_fname_from_file(file));
+//            }
+//            adios2_error err = adios2_close(file->engineH);
+//            file->engineH = NULL;
+//            LOG((2, "adios2_close(%s) : fd = %d", file->fname));
 #endif
         }
 
@@ -1207,26 +1210,33 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         int frame_id = file->varlist[varid].record;
         /*magically obtain the relevant adios step*/
         int required_adios_step = get_adios_step(file, varid, frame_id);
-        if (ios->adiosH != NULL)
+        size_t current_adios_step = -1;
+        if (ios->adiosH != NULL && file->engineH != NULL)
         {
-            adios2_error adiosErr = adios2_finalize(ios->adiosH);
-            if (adiosErr != adios2_error_none)
-            {
-                GPTLstop("PIO:PIOc_finalize");
-                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,"Finalizing ADIOS failed (adios2_error=%s) on iosystem (%d)",
-                           pio_get_fname_from_file(file));
-            }
+            adios2_current_step(&current_adios_step, file->engineH);
 
-            ios->adiosH = NULL;
         }
-        ios->adiosH = adios2_init(ios->union_comm, adios2_debug_mode_on);
-        if (ios->adiosH == NULL)
-        {
-            GPTLstop("PIO:PIOc_Init_Intracomm");
-            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Initializing ADIOS failed");
-        }
-        char declare_name[PIO_MAX_NAME] = {'\0'};
-        struct stat sd;
+        if (required_adios_step  != current_adios_step ){
+            if (ios->adiosH != NULL)
+            {
+                adios2_error adiosErr = adios2_finalize(ios->adiosH);
+                if (adiosErr != adios2_error_none)
+                {
+                    GPTLstop("PIO:PIOc_finalize");
+                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,"Finalizing ADIOS failed (adios2_error=%s) on iosystem (%d)",
+                                   pio_get_fname_from_file(file));
+                }
+
+                ios->adiosH = NULL;
+            }
+            ios->adiosH = adios2_init(ios->union_comm, adios2_debug_mode_on);
+            if (ios->adiosH == NULL)
+            {
+                GPTLstop("PIO:PIOc_Init_Intracomm");
+                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Initializing ADIOS failed");
+            }
+            char declare_name[PIO_MAX_NAME] = {'\0'};
+            struct stat sd;
             snprintf(declare_name, PIO_MAX_NAME, "%s%lu", file->fname, get_adios2_io_cnt());
             file->ioH = adios2_declare_io(ios->adiosH, (const char *) declare_name);
             if (file->ioH == NULL) {
@@ -1247,19 +1257,21 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
             }
 
-        adios2_step_status status;
+            adios2_step_status status;
 
-        int step = 0;
-        while (adios2_begin_step(file->engineH, adios2_step_mode_read, 100.0,
-                                 &status) == adios2_error_none) {
-            if (step == required_adios_step || status == adios2_step_status_end_of_stream) {
-                break;
-            } else {
-                adios2_end_step(file->engineH);
-                step++;
-                continue;
+            int step = 0;
+            while (adios2_begin_step(file->engineH, adios2_step_mode_read, 100.0,
+                                     &status) == adios2_error_none) {
+                if (step == required_adios_step || status == adios2_step_status_end_of_stream) {
+                    break;
+                } else {
+                    adios2_end_step(file->engineH);
+                    step++;
+                    continue;
+                }
             }
         }
+
         /* First we need to define the variable now that we know it's decomposition */
         adios_var_desc_t *av = &(file->adios_vars[varid]);
 
@@ -1338,9 +1350,22 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                         sprintf(varname, "%d %d %d", ncid, varid, 0);
                         char *mem_buf = NULL;
                         mem_buf = file->tbl->get(file->tbl, varname);
+                        adios2_error adiosErr;
                         if (mem_buf == NULL){
                             mem_buf = malloc(av->adios_type_size);
                             adiosErr = adios2_get(file->engineH, av->adios_varid, mem_buf, adios2_mode_sync);
+                            if (adiosErr != adios2_error_none) {
+                                GPTLstop("PIO:PIOc_get_vars_tc");
+                                GPTLstop("PIO:read_total");
+                                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                                spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                               "Gutting (ADIOS) variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                                               av->name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file),
+                                               file->pio_ncid);
+                            }
                             memcpy((char *)buf, mem_buf, av->adios_type_size);
                             file->tbl->put(file->tbl, varname, mem_buf);
                             /* will be deleted in the cache delete operation */
@@ -1348,20 +1373,6 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                         }else{
                             LOG((5, "Used cache ncid = %d varid = %d block_id =%d\n", ncid, varid, block_id));
                         }
-                    }
-                    if (adiosErr != adios2_error_none) {
-                        GPTLstop("PIO:PIOc_put_vars_tc");
-                        GPTLstop("PIO:write_total");
-                        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                        spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                        GPTLstop("PIO:PIOc_put_vars_tc_adios");
-                        GPTLstop("PIO:write_total_adios");
-                        return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                       "Putting (ADIOS) variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
-                                       av->name, adios2_error_to_string(adiosErr), pio_get_fname_from_file(file),
-                                       file->pio_ncid);
                     }
                 }
             }
@@ -1371,13 +1382,13 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 LOG((2, "ADIOS does not support striding %s:%s\n"
                         "Variable %s will be corrupted in the output"
                         , __FILE__, __func__, av->name));
-                GPTLstop("PIO:PIOc_put_vars_tc");
+                GPTLstop("PIO:PIOc_get_vars_tc");
                 GPTLstop("PIO:write_total");
                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
                 spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                GPTLstop("PIO:PIOc_put_vars_tc_adios");
+                GPTLstop("PIO:PIOc_get_vars_tc_adios");
                 GPTLstop("PIO:write_total_adios");
                 return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                "ADIOS does not support striding. Variable %s file (%s, ncid=%d)",
@@ -1432,14 +1443,14 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 av->adios_varid = adios2_inquire_variable(file->ioH, vname);
                 if (av->adios_varid == NULL) {
 
-                    GPTLstop("PIO:PIOc_put_vars_tc");
-                    GPTLstop("PIO:write_total");
+                    GPTLstop("PIO:PIOc_get_vars_tc");
+                    GPTLstop("PIO:read_total");
                     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                     spio_ltimer_stop(file->io_fstats->rd_timer_name);
                     spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                    GPTLstop("PIO:PIOc_put_vars_tc_adios");
-                    GPTLstop("PIO:write_total_adios");
+                    GPTLstop("PIO:PIOc_get_vars_tc_adios");
+                    GPTLstop("PIO:read_total_adios");
                     return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                    "Getting (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)",
                                    vname, pio_get_fname_from_file(file), file->pio_ncid);
@@ -1468,18 +1479,18 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                         /* |start[0],start[1]|count[0], count[1]| data| */
                         for (size_t block_id = 0; block_id < number_of_data_blocks; block_id++) {
                             adios2_set_block_selection(av->adios_varid, block_id);
-                            adiosErr = adios2_selection_size(&var_size, av->adios_varid);
+                            adios2_error adiosErr = adios2_selection_size(&var_size, av->adios_varid);
                             if (adiosErr != adios2_error_none) {
-                                GPTLstop("PIO:PIOc_put_vars_tc");
-                                GPTLstop("PIO:write_total");
+                                GPTLstop("PIO:PIOc_get_vars_tc");
+                                GPTLstop("PIO:read_total");
                                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
                                 spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                                GPTLstop("PIO:PIOc_put_vars_tc_adios");
-                                GPTLstop("PIO:write_total_adios");
+                                GPTLstop("PIO:PIOc_get_vars_tc_adios");
+                                GPTLstop("PIO:read_total_adios");
                                 return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                               "Setting (ADIOS) selection to variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                                               "Reading (ADIOS) variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
                                                av->name, adios2_error_to_string(adiosErr),
                                                pio_get_fname_from_file(file),
                                                file->pio_ncid);
@@ -1492,16 +1503,16 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                 mem_buffer = (char *) calloc(var_size, av->adios_type_size);
                                 adios2_get(file->engineH, av->adios_varid, mem_buffer, adios2_mode_sync);
                                 if (mem_buffer == NULL) {
-                                    GPTLstop("PIO:PIOc_put_vars_tc");
-                                    GPTLstop("PIO:write_total");
+                                    GPTLstop("PIO:PIOc_get_vars_tc");
+                                    GPTLstop("PIO:read_total");
                                     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                                     spio_ltimer_stop(file->io_fstats->rd_timer_name);
                                     spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                                    GPTLstop("PIO:PIOc_put_vars_tc_adios");
-                                    GPTLstop("PIO:write_total_adios");
+                                    GPTLstop("PIO:PIOc_get_vars_tc_adios");
+                                    GPTLstop("PIO:read_total_adios");
                                     return pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
-                                                   "Writing variable (%s, varid=%d) to file (%s, ncid=%d) failed. Out of memory, allocating memory (%lld bytes) for putting ADIOS variable (name = %s)",
+                                                   "Reading variable (%s, varid=%d) to file (%s, ncid=%d) failed. Out of memory, allocating memory (%lld bytes) for putting ADIOS variable (name = %s)",
                                                    pio_get_vname_from_file(file, varid), varid,
                                                    pio_get_fname_from_file(file), ncid,
                                                    (long long int) (av_size * sizeof(unsigned char)), av->name);
@@ -1724,20 +1735,20 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 }
             }
         }
-        adiosErr = adios2_end_step(file->engineH);
+/*        adios2_error adiosErr = adios2_end_step(file->engineH);
         if (adiosErr != adios2_error_none) {
             return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                            "adios2_end_step failed (adios2_error=%s) for file (%s)",
                            adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
-        }
-        adios2_error err = adios2_close(file->engineH);
+        }*/
+/*        adios2_error err = adios2_close(file->engineH);
         if (err != adios2_error_none) {
             return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                            "adios2_close failed (adios2_error=%s) for file (%s)",
                            adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
         }
         file->engineH = NULL;
-        LOG((2, "adios2_close(%s) : fd = %d", file->fname));
+        LOG((2, "adios2_close(%s) : fd = %d", file->fname));*/
     }
 #endif
 
