@@ -558,9 +558,7 @@ int PIOc_closefile(int ncid)
 
             adios2_mode mode;
             adios2_engine_openmode(&mode, file->engineH);
-            if (mode == adios2_mode_write) {
-
-
+            if (mode != adios2_mode_read) {
                 ierr = ADIOS2_BEGIN_STEP(file, NULL);
                 if (ierr != PIO_NOERR)
                     return ierr;
