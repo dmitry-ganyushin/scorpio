@@ -1210,55 +1210,56 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         int frame_id = file->varlist[varid].record;
         /*magically obtain the relevant adios step*/
         int required_adios_step = get_adios_step(file, varid, frame_id);
-        size_t current_adios_step = -1;
+        size_t current_adios_step = 0;
         if (ios->adiosH != NULL && file->engineH != NULL)
         {
             adios2_current_step(&current_adios_step, file->engineH);
-
         }
-        if (required_adios_step  != current_adios_step ){
-            if (ios->adiosH != NULL)
-            {
-                adios2_error adiosErr = adios2_finalize(ios->adiosH);
-                if (adiosErr != adios2_error_none)
-                {
-                    GPTLstop("PIO:PIOc_finalize");
-                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,"Finalizing ADIOS failed (adios2_error=%s) on iosystem (%d)",
-                                   pio_get_fname_from_file(file));
-                }
+//        if (required_adios_step  != current_adios_step ){
+//            if (ios->adiosH != NULL)
+//            {
+//                adios2_error adiosErr = adios2_finalize(ios->adiosH);
+//                if (adiosErr != adios2_error_none)
+//                {
+//                    GPTLstop("PIO:PIOc_finalize");
+//                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,"Finalizing ADIOS failed (adios2_error=%s) on iosystem (%d)",
+//                                   pio_get_fname_from_file(file));
+//                }
+//
+//                ios->adiosH = NULL;
+//            }
+//            ios->adiosH = adios2_init(ios->union_comm, adios2_debug_mode_on);
+//            if (ios->adiosH == NULL)
+//            {
+//                GPTLstop("PIO:PIOc_Init_Intracomm");
+//                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Initializing ADIOS failed");
+//            }
+//            char declare_name[PIO_MAX_NAME] = {'\0'};
+//            struct stat sd;
+//            snprintf(declare_name, PIO_MAX_NAME, "%s%lu", file->fname, get_adios2_io_cnt());
+//            file->ioH = adios2_declare_io(ios->adiosH, (const char *) declare_name);
+//            if (file->ioH == NULL) {
+//                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+//                               "Declaring (ADIOS) IO (name=%s) failed for file (%s)",
+//                               declare_name, pio_get_fname_from_file(file));
+//            }
+//            adios2_error adiosErr = adios2_set_engine(file->ioH, "FileStream");
+//            if (adiosErr != adios2_error_none) {
+//                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+//                               "Setting (ADIOS) engine (type=FileStream) failed (adios2_error=%s) for file (%s)",
+//                               adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
+//            }
+//            LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+//            adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
 
-                ios->adiosH = NULL;
-            }
-            ios->adiosH = adios2_init(ios->union_comm, adios2_debug_mode_on);
-            if (ios->adiosH == NULL)
-            {
-                GPTLstop("PIO:PIOc_Init_Intracomm");
-                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Initializing ADIOS failed");
-            }
-            char declare_name[PIO_MAX_NAME] = {'\0'};
-            struct stat sd;
-            snprintf(declare_name, PIO_MAX_NAME, "%s%lu", file->fname, get_adios2_io_cnt());
-            file->ioH = adios2_declare_io(ios->adiosH, (const char *) declare_name);
-            if (file->ioH == NULL) {
-                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                               "Declaring (ADIOS) IO (name=%s) failed for file (%s)",
-                               declare_name, pio_get_fname_from_file(file));
-            }
-            adios2_error adiosErr = adios2_set_engine(file->ioH, "FileStream");
-            if (adiosErr != adios2_error_none) {
-                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                               "Setting (ADIOS) engine (type=FileStream) failed (adios2_error=%s) for file (%s)",
-                               adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
-            }
-            LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
-            adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
+        if (file->engineH != NULL && required_adios_step != current_adios_step) {
+            adios2_close(file->engineH);
+            LOG((2, "adios2_close(%s) : fd = %d", file->fname, file->fh));
             file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
             if (file->engineH == NULL) {
                 LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
             }
-
             adios2_step_status status;
-
             int step = 0;
             while (adios2_begin_step(file->engineH, adios2_step_mode_read, 100.0,
                                      &status) == adios2_error_none) {
@@ -1271,6 +1272,25 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 }
             }
         }
+        if (file->engineH == 0) {
+            file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
+            if (file->engineH == NULL) {
+                LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+            }
+            adios2_step_status status;
+            int step = 0;
+            while (adios2_begin_step(file->engineH, adios2_step_mode_read, 100.0,
+                                     &status) == adios2_error_none) {
+                if (step == required_adios_step || status == adios2_step_status_end_of_stream) {
+                    break;
+                } else {
+                    adios2_end_step(file->engineH);
+                    step++;
+                    continue;
+                }
+            }
+        }
+
 
         /* First we need to define the variable now that we know it's decomposition */
         adios_var_desc_t *av = &(file->adios_vars[varid]);
@@ -1371,7 +1391,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             /* will be deleted in the cache delete operation */
                             /* free(mem_buf); */
                         }else{
-                            LOG((5, "Used cache ncid = %d varid = %d block_id =%d\n", ncid, varid, block_id));
+                            LOG((5, "Used cache ncid = %d varid = %d block_id =%d\n", ncid, varid, 0));
                         }
                     }
                 }
