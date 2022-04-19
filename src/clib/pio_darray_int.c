@@ -1402,7 +1402,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     strcat(att_name, suffix_att_name);
     adios2_attribute const *attributeH = adios2_inquire_attribute(file->ioH, att_name);
     if (attributeH == NULL) {
-        LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+        LOG((2, "adios2_inquire_attribute(%s) : attribute = %s", file->fname, att_name));
         return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                        "Cannot read required ADIOS attribute %s from file (%s) failed",
                        att_name, pio_get_fname_from_file(file));

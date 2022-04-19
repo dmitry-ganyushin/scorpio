@@ -1256,8 +1256,11 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             adios2_close(file->engineH);
             LOG((2, "adios2_close(%s) : fd = %d", file->fname, file->fh));
             file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
+            LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
             if (file->engineH == NULL) {
-                LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Opening (ADIOS) file (%s) failed",
+                               pio_get_fname_from_file(file));
             }
             adios2_step_status status;
             int step = 0;
@@ -1274,8 +1277,11 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         }
         if (file->engineH == 0) {
             file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
+            LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
             if (file->engineH == NULL) {
-                LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Opening (ADIOS) file (%s) failed",
+                               pio_get_fname_from_file(file));
             }
             adios2_step_status status;
             int step = 0;

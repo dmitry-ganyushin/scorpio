@@ -624,6 +624,7 @@ int PIOc_closefile(int ncid)
                 if (ierr != PIO_NOERR)
                     return ierr;
             }
+            LOG((2, "adios2_close(%s) : fd = %d", file->fname, file->fh));
             adios2_error adiosErr = adios2_close(file->engineH);
             file->engineH = NULL;
             if (adiosErr != adios2_error_none)

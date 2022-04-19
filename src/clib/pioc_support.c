@@ -3501,14 +3501,13 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
             }
 
-            LOG((2, "adios2_open(%s) : fd = %d, ncid = %d", file->fname, file->fh, *ncidp));
+            LOG((2, "adios2_open(%s) : fd = %d, ncid = %d", file->fname, *ncidp));
             adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
             file->engineH = adios2_open(file->ioH, bpname, adios2_mode_read);
             adios2_file_exist = true;
             /*failed to open with adios2 trying pnetcdf */
             if (file->engineH == NULL) {
                 adios2_file_exist = false;
-                LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
             } else {
                 strncpy(file->fname, bpname, PIO_MAX_NAME);
             }
@@ -3674,12 +3673,12 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         LOG((2, "adios2_close(%s) : fd = %d", file->fname));
         //open it again
         file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
+        LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
         if (file->engineH == NULL) {
             return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                            "Opening (ADIOS) file (%s) failed",
                            pio_get_fname_from_file(file));
         }
-        LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
 
         size_t step = 0;
         /* move to the last step */
