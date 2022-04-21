@@ -1320,14 +1320,13 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
                                adios2_error_to_string(err), pio_get_fname_from_file(file));
             }
         }
-
+        LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
         file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
         if (file->engineH == NULL) {
             return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                            "Opening (ADIOS) file (%s) failed",
                            pio_get_fname_from_file(file));
         }
-        LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
 
 #else
         /* TODODG
@@ -1369,6 +1368,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
 
         LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
         adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
+        LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
         file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
         if (file->engineH == NULL) {
             LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
@@ -1493,14 +1493,13 @@ if (required_adios_step != time_step) {
     adios2_end_step(file->engineH);
     adios2_close(file->engineH);
     file->engineH = NULL;
-
+    LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
     file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
     if (file->engineH == NULL) {
         return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                        "Opening (ADIOS) file (%s) failed",
                        pio_get_fname_from_file(file));
     }
-    LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
     for (int step = 0; step < required_adios_step; step++) {
         adios2_error  step_err = adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
                                      &status);
