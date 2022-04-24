@@ -3762,24 +3762,6 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             adios2_end_step(file->engineH);
             step++;
         }
-//        LOG((2, "adios2_close(%s) : fd = %d", file->fname));
-//        adios2_error err_close = adios2_close(file->engineH);
-//        if (err_close != adios2_error_none) {
-//            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-//                           "Closing (ADIOS) file (%s) failed",
-//                           pio_get_fname_from_file(file));
-//        }
-//        file->engineH = NULL;
-//        adios2_bool status_remove;
-//        LOG((2, "adios2_remove_io(%s)", file->fname));
-//        adios2_error  err_remove = adios2_remove_io(&status_remove, ios->adiosH, file->fname);
-//        if (status_remove != adios2_true || err_remove != adios2_error_none)
-//        {
-//            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-//                           "Removing (ADIOS) IO (%s) failed",
-//                           pio_get_fname_from_file(file));
-//        }
-//        file->ioH = NULL;
         for (int i = 0; i < file->num_vars; i++) {
             LOG((2, "var from file (%s) : name = %s,  varid =  %d", file->fname, file->adios_vars[i].name, i));
         }

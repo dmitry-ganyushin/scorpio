@@ -1301,88 +1301,9 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
 
     /* get frame_id */
     int frame_id = file->varlist[vid].record;
-
-//    size_t current_adios_step = -1;
-//    if (ios->adiosH != NULL && file->engineH != NULL)
-//    {
-//        adios2_current_step(&current_adios_step, file->engineH);
-//
-//    }
-
-//#if 1
-//        if (file->engineH != NULL){
-//            adios2_error err = adios2_close(file->engineH);
-//            if (err != adios2_error_none) {
-//                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-//                               "adios2_close failed (adios2_error=%s) for file (%s)",
-//                               adios2_error_to_string(err), pio_get_fname_from_file(file));
-//            }
-//        }
-//        LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
-//        file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
-//        if (file->engineH == NULL) {
-//            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-//                           "Opening (ADIOS) file (%s) failed",
-//                           pio_get_fname_from_file(file));
-//        }
-//
-//#else
-//        /* TODODG
-//         * after ADIOS reinit an attribute cannot be read */
-//        if (ios->adiosH != NULL)
-//        {
-//            adios2_error adiosErr = adios2_finalize(ios->adiosH);
-//            if (adiosErr != adios2_error_none)
-//            {
-//                GPTLstop("PIO:PIOc_finalize");
-//                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,"Finalizing ADIOS failed (adios2_error=%s) on iosystem (%d)",
-//                               pio_get_fname_from_file(file));
-//            }
-//
-//            ios->adiosH = NULL;
-//        }
-//        ios->adiosH = adios2_init(ios->union_comm, adios2_debug_mode_on);
-//        if (ios->adiosH == NULL)
-//        {
-//            GPTLstop("PIO:PIOc_Init_Intracomm");
-//            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Initializing ADIOS failed");
-//        }
-//        char declare_name[PIO_MAX_NAME] = {'\0'};
-//        struct stat sd;
-//        snprintf(declare_name, PIO_MAX_NAME, "%s%lu", file->fname, get_adios2_io_cnt());
-//        file->ioH = adios2_declare_io(ios->adiosH, (const char *) declare_name);
-//        if (file->ioH == NULL) {
-//            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-//                           "Declaring (ADIOS) IO (name=%s) failed for file (%s)",
-//                           declare_name, pio_get_fname_from_file(file));
-//        }
-//
-//        adios2_error adiosErr = adios2_set_engine(file->ioH, "FileStream");
-//        if (adiosErr != adios2_error_none) {
-//            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-//                           "Setting (ADIOS) engine (type=FileStream) failed (adios2_error=%s) for file (%s)",
-//                           adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
-//        }
-//
-//        LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
-//        adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
-//        LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
-//        file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
-//        if (file->engineH == NULL) {
-//            LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
-//            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-//                           "Opening (ADIOS) file (%s) failed",
-//                           pio_get_fname_from_file(file));
-//        }
-//#endif
     /*magically obtain the relevant adios step*/
     int required_adios_step = get_adios_step(file, vid, frame_id);
     assert(required_adios_step >=0);
-//    size_t current_adios_step = 0;
-//    if (file->engineH != NULL)
-//    {
-//        adios2_current_step(&current_adios_step, file->engineH);
-//    }
 /* we should search decomposition array from the step 0 anyway, so we close and open the bp file */
     if (file->engineH != NULL) {
         /* close bp file and remove IO object */
@@ -1425,23 +1346,11 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
                            "Opening (ADIOS) file (%s) failed",
                            pio_get_fname_from_file(file));
         }
-        adios2_step_status status;
-        int step = 0;
-        while (adios2_begin_step(file->engineH, adios2_step_mode_read, 100.0,
-                                 &status) == adios2_error_none) {
-            if (step == required_adios_step || status == adios2_step_status_end_of_stream) {
-                break;
-            } else {
-                adios2_end_step(file->engineH);
-                step++;
-                continue;
-            }
-        }
     }
+    adios2_step_status status;
+    int step = 0;
     //reading some bookkeeping variables at step 0
     uint64_t time_step = 0;
-
-    adios2_step_status status;
 
 /************************* get decomp info *********************************/
     MPI_Offset *start_decomp = &(iodesc->map[0]);
@@ -1460,9 +1369,8 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     strcpy(att_name, prefix_var_name);
     strcat(att_name, adios_vdesc->name);
     strcat(att_name, suffix_att_name);
-
-//    adios2_begin_step(file->engineH, adios2_step_mode_read, 100.0,
-//                      &status);
+    adios2_begin_step(file->engineH, adios2_step_mode_read, 100.0,
+                      &status);
     adios2_attribute const *attributeH = adios2_inquire_attribute(file->ioH, att_name);
     if (attributeH == NULL) {
         LOG((2, "adios2_inquire_attribute(%s) : attribute = %s", file->fname, att_name));
@@ -1471,8 +1379,6 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
                        att_name, pio_get_fname_from_file(file));
     }
     free(att_name);
-    int step = 0;
-
     size_t size_attr;
     char attr_data[PIO_MAX_NAME];
     memset(attr_data, 0, PIO_MAX_NAME);
@@ -1485,6 +1391,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     memset(decomp_name, 0, decomp_name_len);
     strcpy(decomp_name, prefix_decomp_name);
     strcat(decomp_name, attr_data);
+
     adios2_close(file->engineH);
     file->engineH = NULL;//TODODG optimize opens
     file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
@@ -1494,6 +1401,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
                        "Opening (ADIOS) file (%s) failed",
                        pio_get_fname_from_file(file));
     }
+
     /* serching for decomposition array */
     while(adios2_begin_step(file->engineH, adios2_step_mode_read, 100.0,
                             &status) == adios2_error_none) {
