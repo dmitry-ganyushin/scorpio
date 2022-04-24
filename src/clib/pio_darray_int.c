@@ -1384,7 +1384,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
 //        adios2_current_step(&current_adios_step, file->engineH);
 //    }
 /* we should search decomposition array from the step 0 anyway, so we close and open the bp file */
-    if (required_adios_step >= 0 && file->engineH != NULL) {
+    if (file->engineH != NULL) {
         /* close bp file and remove IO object */
         LOG((2, "adios2_close(%s) : fd = %d", file->fname));
         adios2_error err_close = adios2_close(file->engineH);
@@ -1425,18 +1425,18 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
                            "Opening (ADIOS) file (%s) failed",
                            pio_get_fname_from_file(file));
         }
-//        adios2_step_status status;
-//        int step = 0;
-//        while (adios2_begin_step(file->engineH, adios2_step_mode_read, 100.0,
-//                                 &status) == adios2_error_none) {
-//            if (step == required_adios_step || status == adios2_step_status_end_of_stream) {
-//                break;
-//            } else {
-//                adios2_end_step(file->engineH);
-//                step++;
-//                continue;
-//            }
-//        }
+        adios2_step_status status;
+        int step = 0;
+        while (adios2_begin_step(file->engineH, adios2_step_mode_read, 100.0,
+                                 &status) == adios2_error_none) {
+            if (step == required_adios_step || status == adios2_step_status_end_of_stream) {
+                break;
+            } else {
+                adios2_end_step(file->engineH);
+                step++;
+                continue;
+            }
+        }
     }
     //reading some bookkeeping variables at step 0
     uint64_t time_step = 0;
@@ -1461,8 +1461,8 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     strcat(att_name, adios_vdesc->name);
     strcat(att_name, suffix_att_name);
 
-    adios2_begin_step(file->engineH, adios2_step_mode_read, 100.0,
-                      &status);
+//    adios2_begin_step(file->engineH, adios2_step_mode_read, 100.0,
+//                      &status);
     adios2_attribute const *attributeH = adios2_inquire_attribute(file->ioH, att_name);
     if (attributeH == NULL) {
         LOG((2, "adios2_inquire_attribute(%s) : attribute = %s", file->fname, att_name));
