@@ -1369,8 +1369,30 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     strcpy(att_name, prefix_var_name);
     strcat(att_name, adios_vdesc->name);
     strcat(att_name, suffix_att_name);
-    adios2_begin_step(file->engineH, adios2_step_mode_read, 100.0,
-                      &status);
+
+    for (int step = 0; step < required_adios_step; step++) {
+        adios2_error  step_err = adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
+                                                   &status);
+        if (step_err != adios2_error_none) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "adios2_begin_step file (%s) failed",
+                           pio_get_fname_from_file(file));
+        }
+        adios2_error end_step_err = adios2_end_step(file->engineH);
+        if (end_step_err != adios2_error_none) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "adios2_end_step file (%s) failed",
+                           pio_get_fname_from_file(file));
+        }
+
+    }
+    adios2_error  step_err = adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
+                                               &status);
+    if (step_err != adios2_error_none) {
+        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "adios2_begin_step file (%s) failed",
+                       pio_get_fname_from_file(file));
+    }
     adios2_attribute const *attributeH = adios2_inquire_attribute(file->ioH, att_name);
     if (attributeH == NULL) {
         LOG((2, "adios2_inquire_attribute(%s) : attribute = %s", file->fname, att_name));
