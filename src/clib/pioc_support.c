@@ -3464,23 +3464,6 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
     if (file->iotype == PIO_IOTYPE_ADIOS) {
         /* trying to open a file with adios */
 #ifdef _ADIOS2
-        if (ios->adiosH != NULL)
-        {
-            adios2_error adiosErr = adios2_finalize(ios->adiosH);
-            if (adiosErr != adios2_error_none)
-            {
-                GPTLstop("PIO:PIOc_finalize");
-                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Finalizing ADIOS failed (adios2_error=%s) on iosystem (%d)", adios2_error_to_string(adiosErr), iosysid);
-            }
-
-            ios->adiosH = NULL;
-        }
-        ios->adiosH = adios2_init(ios->union_comm, adios2_debug_mode_on);
-        if (ios->adiosH == NULL)
-        {
-            GPTLstop("PIO:PIOc_Init_Intracomm");
-            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Initializing ADIOS failed");
-        }
         char bpname[PIO_MAX_NAME]  = {'\0'};
         strcat(bpname, filename);
         strcat(bpname, ".bp");
@@ -3593,7 +3576,6 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         comm = ios->union_comm;
     }
     *ncidp = pio_add_to_file_list(file, comm);
-
     LOG((2, "Opened file %s file->pio_ncid = %d file->fh = %d ierr = %d",
             filename, file->pio_ncid, file->fh, ierr));
 
@@ -3669,7 +3651,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         }
         file->engineH = NULL;
         //open it again
-        LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+        LOG((2, "adios2_open(%s)", file->fname));
         file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
         if (file->engineH == NULL) {
             return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -3679,7 +3661,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
 
         size_t step = 0;
         /* move to the last step */
-        while (adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
+        while(adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
                                  &status) == adios2_error_none) {
 
             if (status == adios2_step_status_end_of_stream) {

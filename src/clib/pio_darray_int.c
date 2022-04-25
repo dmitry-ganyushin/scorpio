@@ -1497,7 +1497,7 @@ if (required_adios_step != time_step) {
     adios2_end_step(file->engineH);
     adios2_close(file->engineH);
     file->engineH = NULL;
-    LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+    LOG((2, "adios2_open(%s) ", file->fname));
     file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
     if (file->engineH == NULL) {
         return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
