@@ -662,9 +662,10 @@ int PIOc_closefile(int ncid)
             adios2_bool status_remove = adios2_false;
             adios2_error err_remove = adios2_remove_io(&status_remove, ios->adiosH, file->fname);
             if (status_remove != adios2_true || err_remove != adios2_error_none) {
-                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                               "Removing (ADIOS) IO (%s) failed",
-                               pio_get_fname_from_file(file));
+//                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+//                               "Removing (ADIOS) IO (%s) failed",
+//                               pio_get_fname_from_file(file));
+                LOG((2, "PIO_closefile: adios2_remove_io(%s)  failed", file->fname));
             }
             file->ioH = NULL;
         }
