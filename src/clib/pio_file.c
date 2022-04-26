@@ -563,7 +563,7 @@ int PIOc_closefile(int ncid)
                 if (ierr != PIO_NOERR)
                     return ierr;
 
-                adios2_attribute *attributeH = adios2_inquire_attribute(file->ioH, "/__pio__/fillmode");
+                adios2_attribute const *attributeH = adios2_inquire_attribute(file->ioH, "/__pio__/fillmode");
                 if (attributeH == NULL) {
                     attributeH = adios2_define_attribute(file->ioH, "/__pio__/fillmode", adios2_type_int32_t,
                                                          &file->fillmode);
@@ -626,7 +626,6 @@ int PIOc_closefile(int ncid)
             }
             LOG((2, "adios2_close(%s) : fd = %d", file->fname, file->fh));
             adios2_error adiosErr = adios2_close(file->engineH);
-            file->engineH = NULL;
             if (adiosErr != adios2_error_none)
             {
                 if (file->iotype == PIO_IOTYPE_ADIOS)
@@ -658,6 +657,16 @@ int PIOc_closefile(int ncid)
             }
 
             file->engineH = NULL;
+            /* remove associated  IO object */
+            LOG((2, "adios2_remove_io(%s)", file->fname));
+            adios2_bool status_remove = adios2_false;
+            adios2_error err_remove = adios2_remove_io(&status_remove, ios->adiosH, file->fname);
+            if (status_remove != adios2_true || err_remove != adios2_error_none) {
+                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Removing (ADIOS) IO (%s) failed",
+                               pio_get_fname_from_file(file));
+            }
+            file->ioH = NULL;
         }
 
         for (int i = 0; i < file->num_dim_vars; i++)
