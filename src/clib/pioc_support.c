@@ -731,7 +731,7 @@ int check_netcdf(iosystem_desc_t *ios, file_desc_t *file, int status,
     assert(ios || file);
     assert(fname);
 
-    LOG((1, "check_netcdf status = %d fname = %s line = %d", status, fname, line));
+    LOG((1, "check_netcdf status = %d fname = %s source file name = %s line = %d", status, file->fname, fname, line));
 
     /* Find the error handler. Error handlers associated with file has
      * priority over ios error handlers.
