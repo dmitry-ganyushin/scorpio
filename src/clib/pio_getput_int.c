@@ -1313,7 +1313,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         if (av->ndims == 0) {
             /* Only the IO master does the IO, so we are not really
              * getting parallel IO here. */
-            if (file->myrank == 0) {
+            if (true || file->myrank == 0) {
                 if (start) {
                     /* Ignore if user specifies start[0] == 0 */
                     if (start[0] != 0) {
@@ -1356,7 +1356,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                    vname, pio_get_fname_from_file(file), file->pio_ncid);
 
                 } else {
-                    if (file->myrank == 0) {
+                    if (true || file->myrank == 0) {
                         /* singe value */
                         /* check cache */
                         char varname[16];
@@ -1409,7 +1409,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             }
 
             /* Only the IO master actually does these ADIOS calls. */
-            if (file->myrank == 0) {
+            if (true || file->myrank == 0) {
                 /* Write start and count arrays to be able to reconstruct the variable during conversion. */
                 int64_t pio_var_start[PIO_MAX_DIMS];
                 int64_t pio_var_count[PIO_MAX_DIMS];
@@ -1469,7 +1469,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                    vname, pio_get_fname_from_file(file), file->pio_ncid);
 
                 } else {
-                    if (file->myrank == 0) {
+                    if (true || file->myrank == 0) {
                         /*reading adios block */
                         adios2_varinfo *data_blocks = adios2_inquire_blockinfo(file->engineH, av->adios_varid,
                                                                                required_adios_step);
@@ -1532,7 +1532,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                 }
                                 file->tbl->put(file->tbl, varname, mem_buffer);
                             }else{
-                               LOG((5, "Used cache ncid = %d varid = %d block_id =%d\n", ncid, varid, block_id));
+                               LOG((3, "Used cache ncid = %d varid = %d block_id =%d\n", ncid, varid, block_id));
                             }
                             /* find out start and count */
                             int64_t block_info_start[PIO_MAX_DIMS];
@@ -1762,21 +1762,20 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         return pio_err(NULL, file, ierr, __FILE__, __LINE__,
                         "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed. The internal I/O library (%s) call failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), ncid, pio_iotype_to_string(file->iotype));
     }
-
-    /* Send the data. */
-    LOG((2, "PIOc_get_vars_tc bcasting data num_elem = %d typelen = %d ios->ioroot = %d", num_elem,
-         typelen, ios->ioroot));
-    if ((mpierr = MPI_Bcast(buf, num_elem * typelen, MPI_BYTE, ios->ioroot, ios->my_comm)))
-    {
-        GPTLstop("PIO:PIOc_get_vars_tc");
-        spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-        spio_ltimer_stop(file->io_fstats->rd_timer_name);
-        spio_ltimer_stop(file->io_fstats->tot_timer_name);
-        return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+    if (file->iotype != PIO_IOTYPE_ADIOS) {
+        /* Send the data. */
+        LOG((2, "PIOc_get_vars_tc bcasting data num_elem = %d typelen = %d ios->ioroot = %d", num_elem,
+                typelen, ios->ioroot));
+        if ((mpierr = MPI_Bcast(buf, num_elem * typelen, MPI_BYTE, ios->ioroot, ios->my_comm))) {
+            GPTLstop("PIO:PIOc_get_vars_tc");
+            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->rd_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        }
+        LOG((2, "PIOc_get_vars_tc bcasting data complete"));
     }
-    LOG((2, "PIOc_get_vars_tc bcasting data complete"));
-
     ios->io_fstats->rb += num_elem * typelen;
     file->io_fstats->rb += num_elem * typelen;
 
