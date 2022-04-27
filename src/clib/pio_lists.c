@@ -162,8 +162,8 @@ int pio_delete_file_from_list(int ncid)
             free(cfile->unlim_dimids);
             free(cfile->io_fstats);
             /* Free the memory used for this file. */
-            if (cfile->tbl != NULL){
-                cfile->tbl->free(cfile->tbl);
+            if (cfile->cache_data_blocks != NULL){
+                cfile->cache_data_blocks->free(cfile->cache_data_blocks);
             }
             free(cfile);
             

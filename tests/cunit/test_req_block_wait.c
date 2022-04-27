@@ -211,8 +211,8 @@ int test_teardown(iosystem_desc_t **pios, file_desc_t **pfile)
 
   if(file){
     free_file_varlist(file);
-    file->tbl->free(file->tbl);
-    free(file->tbl);
+    file->cache_data_blocks->free(file->cache_data_blocks);
+    free(file->cache_data_blocks);
     free(file);
     *pfile = NULL;
   }

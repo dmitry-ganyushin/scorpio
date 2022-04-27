@@ -1360,9 +1360,9 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                         /* singe value */
                         /* check cache */
                         char varname[16];
-                        sprintf(varname, "%d %d %d", ncid, varid, 0);
+                        sprintf(varname, "%d %d", varid, 0);
                         char *mem_buf = NULL;
-                        mem_buf = file->tbl->get(file->tbl, varname);
+                        mem_buf = file->cache_data_blocks->get(file->cache_data_blocks, varname);
                         adios2_error adiosErr;
                         if (mem_buf == NULL){
                             mem_buf = malloc(av->adios_type_size);
@@ -1380,7 +1380,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                                file->pio_ncid);
                             }
                             memcpy((char *)buf, mem_buf, av->adios_type_size);
-                            file->tbl->put(file->tbl, varname, mem_buf);
+                            file->cache_data_blocks->put(file->cache_data_blocks, varname, mem_buf);
                             /* will be deleted in the cache delete operation */
                             /* free(mem_buf); */
                         }else{
@@ -1509,9 +1509,9 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                                file->pio_ncid);
                             }
                             char varname[16];
-                            sprintf(varname, "%d %d %zu", ncid, varid, block_id);
+                            sprintf(varname, "%d %zu", varid, block_id);
                             char *mem_buffer = NULL;
-                            mem_buffer = file->tbl->get(file->tbl, varname);
+                            mem_buffer = file->cache_data_blocks->get(file->cache_data_blocks, varname);
                             if (mem_buffer == NULL) {
                                 mem_buffer = (char *) calloc(var_size, av->adios_type_size);
                                 adios2_get(file->engineH, av->adios_varid, mem_buffer, adios2_mode_sync);
@@ -1530,7 +1530,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                                    pio_get_fname_from_file(file), ncid,
                                                    (long long int) (av_size * sizeof(unsigned char)), av->name);
                                 }
-                                file->tbl->put(file->tbl, varname, mem_buffer);
+                                file->cache_data_blocks->put(file->cache_data_blocks, varname, mem_buffer);
                             }else{
                                LOG((3, "Used cache ncid = %d varid = %d block_id =%d\n", ncid, varid, block_id));
                             }
