@@ -1360,7 +1360,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                         /* singe value */
                         /* check cache */
                         char varname[16];
-                        sprintf(varname, "%d %d", varid, 0);
+                        sprintf(varname, "%d", varid);
                         char *mem_buf = NULL;
                         mem_buf = file->cache_data_blocks->get(file->cache_data_blocks, varname);
                         adios2_error adiosErr;
@@ -1491,22 +1491,36 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                         /* 2D */
                         /* |start[0],start[1]|count[0], count[1]| data| */
                         for (size_t block_id = 0; block_id < number_of_data_blocks; block_id++) {
-                            adios2_set_block_selection(av->adios_varid, block_id);
-                            adios2_error adiosErr = adios2_selection_size(&var_size, av->adios_varid);
-                            if (adiosErr != adios2_error_none) {
-                                GPTLstop("PIO:PIOc_get_vars_tc");
-                                GPTLstop("PIO:read_total");
-                                spio_ltimer_stop(ios->io_fstats->rd_timer_name);
-                                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                                spio_ltimer_stop(file->io_fstats->rd_timer_name);
-                                spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                                GPTLstop("PIO:PIOc_get_vars_tc_adios");
-                                GPTLstop("PIO:read_total_adios");
-                                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                               "Reading (ADIOS) variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
-                                               av->name, adios2_error_to_string(adiosErr),
-                                               pio_get_fname_from_file(file),
-                                               file->pio_ncid);
+                            /* caching var_size */
+                            char varname_size[32];
+                            sprintf(varname_size, "%d sel_size %zu", varid, block_id);
+                            char *mem_buffer_size = NULL;
+                            mem_buffer_size = file->cache_data_blocks->get(file->cache_data_blocks, varname_size);
+                            if (mem_buffer_size == NULL) {
+                                mem_buffer_size = (char *) calloc(1, sizeof(size_t));
+                                adios2_set_block_selection(av->adios_varid, block_id);
+                                adios2_error adiosErr = adios2_selection_size(&var_size, av->adios_varid);
+                                if (adiosErr != adios2_error_none) {
+                                    GPTLstop("PIO:PIOc_get_vars_tc");
+                                    GPTLstop("PIO:read_total");
+                                    spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+                                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                                    spio_ltimer_stop(file->io_fstats->rd_timer_name);
+                                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                                    GPTLstop("PIO:PIOc_get_vars_tc_adios");
+                                    GPTLstop("PIO:read_total_adios");
+                                    return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                                   "Reading (ADIOS) variable (name=%s) failed (adios2_error=%s) for file (%s, ncid=%d)",
+                                                   av->name, adios2_error_to_string(adiosErr),
+                                                   pio_get_fname_from_file(file),
+                                                   file->pio_ncid);
+                                }
+                                memcpy(mem_buffer_size, &var_size, sizeof (size_t));
+
+                                /* add to cache */
+                                file->cache_data_blocks->put(file->cache_data_blocks, varname_size, mem_buffer_size);
+                            }else{
+                                memcpy(&var_size, mem_buffer_size, sizeof (size_t));
                             }
                             char varname[16];
                             sprintf(varname, "%d %zu", varid, block_id);
