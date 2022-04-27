@@ -212,7 +212,9 @@ int test_teardown(iosystem_desc_t **pios, file_desc_t **pfile)
   if(file){
     free_file_varlist(file);
     file->cache_data_blocks->free(file->cache_data_blocks);
+    file->cache_block_sizes->free(file->cache_block_sizes);
     free(file->cache_data_blocks);
+    free(file->cache_block_sizes);
     free(file);
     *pfile = NULL;
   }

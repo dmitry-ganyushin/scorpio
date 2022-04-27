@@ -2977,7 +2977,9 @@ int PIOc_createfile_int(int iosysid, int *ncidp, int *iotype, const char *filena
         spio_ltimer_stop(file->io_fstats->wr_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
         file->cache_data_blocks->free(file->cache_data_blocks);
+        file->cache_block_sizes->free(file->cache_block_sizes);
         free(file->cache_data_blocks);
+        free(file->cache_block_sizes);
         free(file->io_fstats);
         free(file);
         return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
@@ -2995,7 +2997,9 @@ int PIOc_createfile_int(int iosysid, int *ncidp, int *iotype, const char *filena
         spio_ltimer_stop(file->io_fstats->wr_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
         file->cache_data_blocks->free(file->cache_data_blocks);
+        file->cache_block_sizes->free(file->cache_block_sizes);
         free(file->cache_data_blocks);
+        free(file->cache_block_sizes);
         free(file->io_fstats);
         free(file);
         return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
@@ -3598,6 +3602,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             for (int i = 0; i < PIO_MAX_DIMS; i++) file->adios_vars[var].interval_map[i] = PIO_DEFAULT;
         }
         file->cache_data_blocks = qhashtbl(10000);
+        file->cache_block_sizes = qhashtbl(10000);
         /*restart mode */
 
         // get available variables and set structures.
@@ -3823,7 +3828,9 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
                 spio_ltimer_stop(file->io_fstats->tot_timer_name);
                 file->cache_data_blocks->free(file->cache_data_blocks);
+                file->cache_block_sizes->free(file->cache_block_sizes);
                 free(file->cache_data_blocks);
+                free(file->cache_block_sizes);
                 free(file->io_fstats);
                 free(file);
                 PIO_get_avail_iotypes(avail_iotypes, PIO_MAX_NAME);
@@ -3900,7 +3907,9 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         spio_ltimer_stop(file->io_fstats->rd_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
         file->cache_data_blocks->free(file->cache_data_blocks);
+        file->cache_block_sizes->free(file->cache_block_sizes);
         free(file->cache_data_blocks);
+        free(file->cache_block_sizes);
         free(file->io_fstats);
         free(file);
         return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
@@ -3915,7 +3924,9 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             spio_ltimer_stop(file->io_fstats->rd_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             file->cache_data_blocks->free(file->cache_data_blocks);
+            file->cache_block_sizes->free(file->cache_block_sizes);
             free(file->cache_data_blocks);
+            free(file->cache_block_sizes);
             free(file->io_fstats);
             free(file);
             LOG((1, "PIOc_openfile_retry failed, ierr = %d", ierr));

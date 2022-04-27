@@ -981,6 +981,7 @@ typedef struct file_desc_t
     /** Store current frameid for end_step in PIO_setframe */
     int current_frame;
     qhashtbl_t *cache_data_blocks;
+    qhashtbl_t *cache_block_sizes;
 #endif /* _ADIOS2 */
 
     /* File name - cached */

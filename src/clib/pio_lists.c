@@ -165,6 +165,9 @@ int pio_delete_file_from_list(int ncid)
             if (cfile->cache_data_blocks != NULL){
                 cfile->cache_data_blocks->free(cfile->cache_data_blocks);
             }
+            if (cfile->cache_block_sizes != NULL){
+                cfile->cache_block_sizes->free(cfile->cache_block_sizes);
+            }
             free(cfile);
             
             return PIO_NOERR;

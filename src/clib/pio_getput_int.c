@@ -1493,9 +1493,9 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                         for (size_t block_id = 0; block_id < number_of_data_blocks; block_id++) {
                             /* caching var_size */
                             char varname_size[32];
-                            sprintf(varname_size, "%d sel_size %zu", varid, block_id);
+                            sprintf(varname_size, "%d  %zu sel_size", varid, block_id);
                             char *mem_buffer_size = NULL;
-                            mem_buffer_size = file->cache_data_blocks->get(file->cache_data_blocks, varname_size);
+                            mem_buffer_size = file->cache_block_sizes->get(file->cache_block_sizes, varname_size);
                             if (mem_buffer_size == NULL) {
                                 mem_buffer_size = (char *) calloc(1, sizeof(size_t));
                                 adios2_set_block_selection(av->adios_varid, block_id);
@@ -1518,7 +1518,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                 memcpy(mem_buffer_size, &var_size, sizeof (size_t));
 
                                 /* add to cache */
-                                file->cache_data_blocks->put(file->cache_data_blocks, varname_size, mem_buffer_size);
+                                file->cache_block_sizes->put(file->cache_block_sizes, varname_size, mem_buffer_size);
                             }else{
                                 memcpy(&var_size, mem_buffer_size, sizeof (size_t));
                             }

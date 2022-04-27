@@ -60,26 +60,26 @@
  *  // create a hash-table with 10 hash-index range.
  *  // Please beaware, the hash-index range 10 does not mean the number of
  *  // objects which can be stored. You can put as many as you want.
- *  qhashtbl_t *tbl = qHashtbl(10);
+ *  qhashtbl_t *cache_data_blocks = qHashtbl(10);
  *
  *  // put objects into table.
- *  tbl->put(tbl, "sample1", "binary", 6);
- *  tbl->putstr(tbl, "sample2", "string");
- *  tbl->putint(tbl, "sample3", 1);
+ *  cache_data_blocks->put(cache_data_blocks, "sample1", "binary", 6);
+ *  cache_data_blocks->putstr(cache_data_blocks, "sample2", "string");
+ *  cache_data_blocks->putint(cache_data_blocks, "sample3", 1);
  *
  *  // debug print out
- *  tbl->debug(tbl, stdout, true);
+ *  cache_data_blocks->debug(cache_data_blocks, stdout, true);
  *
  *  // get objects
- *  void *sample1 = tbl->get(tbl, "sample1", &size, true);
- *  char *sample2 = tbl->getstr(tbl, "sample2", false);
- *  int  sample3  = tbl->getint(tbl, "sample3");
+ *  void *sample1 = cache_data_blocks->get(cache_data_blocks, "sample1", &size, true);
+ *  char *sample2 = cache_data_blocks->getstr(cache_data_blocks, "sample2", false);
+ *  int  sample3  = cache_data_blocks->getint(cache_data_blocks, "sample3");
  *
  *  // sample1 is memalloced
  *  if(sample1 != NULL) free(sample1);
  *
  *  // release table
- *  tbl->free(tbl);
+ *  cache_data_blocks->free(cache_data_blocks);
  * @endcode
  *
  * @note
@@ -134,7 +134,7 @@ char *mystrdup(const char *str)
  * @code
  *  // create a hash-table with hash-index range 1000 (does not mean maximum
  *  // number of objects).
- *  qhashtbl_t *tbl = qhashtbl(1000);
+ *  qhashtbl_t *cache_data_blocks = qhashtbl(1000);
  * @endcode
  */
 qhashtbl_t *qhashtbl(int range)
@@ -320,16 +320,16 @@ static bool put2(qhashtbl_t *tbl, const char *path, const char *name, const void
  *  - ENOMEM : Memory allocation failure.
  *
  * @code
- *  qhashtbl_t *tbl = qHashtbl(1000);
+ *  qhashtbl_t *cache_data_blocks = qHashtbl(1000);
  *  (...codes...)
  *
  *  // with newmem flag unset
  *  int size;
- *  struct myobj *obj = (struct myobj*)tbl->get(tbl, "key_name", &size, false);
+ *  struct myobj *obj = (struct myobj*)cache_data_blocks->get(cache_data_blocks, "key_name", &size, false);
  *
  *  // with newmem flag set
  *  int size;
- *  struct myobj *obj = (struct myobj*)tbl->get(tbl, "key_name", &size, true);
+ *  struct myobj *obj = (struct myobj*)cache_data_blocks->get(cache_data_blocks, "key_name", &size, true);
  *  if(obj != NULL) free(obj);
  * @endcode
  *
@@ -468,7 +468,7 @@ static int size(qhashtbl_t *tbl)
 void clear(qhashtbl_t *tbl)
 {
     if (!tbl) return;
-    //debug(tbl, stdout, 0);
+    //debug(cache_data_blocks, stdout, 0);
     int idx;
     qhnobj_t *obj;
     for (idx = 0; idx < tbl->range && tbl->num > 0; idx++) {
