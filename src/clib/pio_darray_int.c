@@ -1435,12 +1435,12 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
                            pio_iotype_to_string(file->iotype),
                            "ADIOS2");
         }
-        adios2_variable *decomp = adios2_inquire_variable(file->ioH, decomp_name);
+        adios2_variable *decomp_adios_var = adios2_inquire_variable(file->ioH, decomp_name);
 
         int64_t *decomp_int64_t = NULL;
-        if (decomp) {
+        if (decomp_adios_var) {
             free(decomp_name);
-            adios2_varinfo *decomp_blocks = adios2_inquire_blockinfo(file->engineH, decomp, time_step);
+            adios2_varinfo *decomp_blocks = adios2_inquire_blockinfo(file->engineH, decomp_adios_var, time_step);
             int32_t decomp_blocks_size = decomp_blocks->nblocks;
             /* free memeory */
             for (size_t i = 0; i < decomp_blocks->nblocks; ++i) {
@@ -1450,15 +1450,15 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
             free(decomp_blocks->BlocksInfo);
             free(decomp_blocks);
             adios2_type type;
-            adios2_variable_type(&type, decomp);
+            adios2_variable_type(&type, decomp_adios_var);
 
             for (size_t block = 0; block < decomp_blocks_size; block++) {
-                adios2_set_block_selection(decomp, block);
+                adios2_set_block_selection(decomp_adios_var, block);
                 size_t var_size;
-                adios2_error err_sel = adios2_selection_size(&var_size, decomp);
+                adios2_error err_sel = adios2_selection_size(&var_size, decomp_adios_var);
                 if (type == adios2_type_int64_t) {
                     decomp_int64_t = (int64_t *) malloc(var_size * sizeof(int64_t));
-                    adios2_get(file->engineH, decomp, decomp_int64_t, adios2_mode_sync);
+                    adios2_get(file->engineH, decomp_adios_var, decomp_int64_t, adios2_mode_sync);
                 } else {
                     return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                    "Not implemented");
