@@ -26,7 +26,7 @@
 #define MAX_RANK_STR 12
 #define ERROR_PREFIX "ERROR: "
 #define NC_LEVEL_DIFF 3
-int pio_log_level = 2;
+int pio_log_level = 0;
 int pio_log_ref_cnt = 0;
 int my_rank;
 FILE *LOG_FILE = NULL;
