@@ -3614,6 +3614,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
 
         while (adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
                                  &status) == adios2_error_none) {
+            file->begin_step_called = 1;
             if (status == adios2_step_status_end_of_stream) {
                 break;
             }
@@ -3691,6 +3692,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                 adios_get_step(file, var_id, nsteps);
             }
             adios2_end_step(file->engineH);
+            file->begin_step_called = 0;
             nsteps++;
         }
         /*close file */
@@ -3715,7 +3717,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         /* move to the last step */
         while(adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
                                  &status) == adios2_error_none) {
-
+            file->begin_step_called = 1;
             if (status == adios2_step_status_end_of_stream) {
                 break;
             }
@@ -3725,10 +3727,12 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             }
             step++;
             adios2_end_step(file->engineH);
+            file->begin_step_called = 0;
         }
         int attr_id = 0;
         while (adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
                                  &status) == adios2_error_none) {
+            file->begin_step_called = 1;
             if (status == adios2_step_status_end_of_stream) {
                 break;
             }
@@ -3811,6 +3815,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             file->num_attrs += attr_id;
             //TODODG do not do end step on the last step
             adios2_end_step(file->engineH);
+            file->begin_step_called = 0;
             step++;
         }
         for (int i = 0; i < file->num_vars; i++) {

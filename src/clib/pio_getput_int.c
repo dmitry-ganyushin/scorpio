@@ -712,10 +712,11 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
             {
                 adios2_current_step(&current_adios_step, file->engineH);
             }
-            if (current_adios_step != required_adios_step) {
+            if (file->engineH != NULL && current_adios_step != required_adios_step) {
                 /* close bp file and remove IO object */
                 LOG((2, "adios2_close(%s) : fd = %d", file->fname));
                 adios2_error err_close = adios2_close(file->engineH);
+                file->begin_step_called = 0;
                 if (err_close != adios2_error_none) {
                     return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                    "Closing (ADIOS) file (%s) failed",
@@ -749,6 +750,7 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
                 file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
                 adios2_step_status step_status;
                 adios2_error adiosStepErr = adios2_begin_step(file->engineH, adios2_step_mode_read, 10.0, &step_status);
+                file->begin_step_called = 1;
             }
 
             switch(memtype)
@@ -1240,6 +1242,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             /* close bp file and remove IO object */
             LOG((2, "adios2_close(%s) : fd = %d", file->fname));
             adios2_error err_close = adios2_close(file->engineH);
+            file->begin_step_called = 0;
             if (err_close != adios2_error_none) {
                 return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                "Closing (ADIOS) file (%s) failed",
@@ -1275,6 +1278,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             int step = 0;
             while (adios2_begin_step(file->engineH, adios2_step_mode_read, 100.0,
                                      &status) == adios2_error_none) {
+                file->begin_step_called = 1;
                 if (step == required_adios_step || status == adios2_step_status_end_of_stream) {
                     break;
                 } else {
