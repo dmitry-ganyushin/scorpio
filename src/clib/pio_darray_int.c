@@ -1304,6 +1304,11 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
 
     /* get frame_id */
     int frame_id = file->varlist[vid].record;
+    if (file->engineH == NULL) {
+        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Expecting file (%s) to be openned",
+                       pio_get_fname_from_file(file));
+    }
     /*magically obtain the relevant adios step*/
     int required_adios_step = get_adios_step(file, vid, frame_id);
     assert(required_adios_step >=0);
@@ -1448,7 +1453,12 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
         adios2_error err_sel = adios2_selection_size(&block_size, decomp_adios_var);
         if (type == adios2_type_int64_t) {
             decomp_int64_t = (int64_t *) malloc(block_size * sizeof(int64_t));
-            adios2_get(file->engineH, decomp_adios_var, decomp_int64_t, adios2_mode_sync);
+            adios2_error err = adios2_get(file->engineH, decomp_adios_var, decomp_int64_t, adios2_mode_sync);
+            if (err != adios2_error_none) {
+                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "adios2_get for file (%s) failed",
+                               pio_get_fname_from_file(file));
+            }
         } else {
             return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                            "Not implemented");
@@ -1586,8 +1596,12 @@ if (required_adios_step < time_step) {
         size_t block_size;/* size of the block*/
         adios2_error err_sel = adios2_selection_size(&block_size, data);
         data_buf = (char *) malloc(block_size * read_type_size);
-        adios2_get(file->engineH, data, data_buf, adios2_mode_sync);
-
+        adios2_error err =  adios2_get(file->engineH, data, data_buf, adios2_mode_sync);
+        if (err != adios2_error_none) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "adios2_get for file (%s) failed",
+                           pio_get_fname_from_file(file));
+        }
         size_t len = end_idx_in_end_block - start_idx_in_start_block + 1;
         /* copy without type conversion byte-by-byte */
         if (read_type == out_type) {
