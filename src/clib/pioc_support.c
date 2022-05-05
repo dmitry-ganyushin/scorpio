@@ -3625,50 +3625,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             adios_read_global_dimensions(ios, file, var_names, var_size);
             /* read names of variables from variables */
             size_t nvars = adios_read_vars_vars(file, var_size, var_names);
-#if 0
-            /* read decomp arrays into cache not finished*/
-            for (int var_id = 0; var_id < var_size; var_id++){
-                if (strstr(var_names[var_id], adios_pio_decomp_prefix) != NULL) {
-                    adios2_variable *decomp_adios_var = adios2_inquire_variable(file->ioH, var_names[var_id]);
 
-                    int64_t *decomp_int64_t = NULL;
-                    if (decomp_adios_var) {
-                        adios2_varinfo *decomp_blocks = adios2_inquire_blockinfo(file->engineH, decomp_adios_var,
-                                                                                 nsteps);
-                        int32_t decomp_blocks_size = decomp_blocks->nblocks;
-                        /* free memeory */
-                        for (size_t i = 0; i < decomp_blocks->nblocks; ++i) {
-                            free(decomp_blocks->BlocksInfo[i].Start);
-                            free(decomp_blocks->BlocksInfo[i].Count);
-                        }
-                        free(decomp_blocks->BlocksInfo);
-                        free(decomp_blocks);
-                        adios2_type type;
-                        adios2_variable_type(&type, decomp_adios_var);
-
-                        for (size_t block = 0; block < decomp_blocks_size; block++) {
-                            adios2_set_block_selection(decomp_adios_var, block);
-                            size_t var_size_decomp;
-                            adios2_error err_sel = adios2_selection_size(&var_size_decomp, decomp_adios_var);
-                            if (type == adios2_type_int64_t) {
-                                decomp_int64_t = (int64_t *) malloc(var_size_decomp * sizeof(int64_t));
-                                adios2_get(file->engineH, decomp_adios_var, decomp_int64_t, adios2_mode_sync);
-                                /* add to cache */
-                                file->cache_block_sizes->put(file->cache_block_sizes, var_names[var_id], decomp_int64_t);
-                                char varname_size[PIO_MAX_NAME];
-                                sprintf(varname_size, "%s sel_size", var_names[var_id]);
-                                char *buff = malloc(sizeof (size_t));
-                                memcpy(buff, &var_size_decomp, sizeof (size_t));
-                                file->cache_block_sizes->put(file->cache_block_sizes, varname_size, buff);
-                            } else {
-                                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                               "Not implemented");
-                            }
-                        }
-                    }
-                }
-            }
-#endif
             /* free memory */
             for (size_t i = 0; i < var_size; i++)  free(var_names[i]);
             free(var_names);
