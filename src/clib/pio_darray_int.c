@@ -1317,8 +1317,8 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
         adios2_current_step(&current_adios_step, file->engineH);
     }
 /* we should search decomposition array from the step 0 anyway, so we close and open the bp file */
-/* should not reopen openned file at step 0, but that segfaults for small F case. See comment below */
-    if ( file->engineH != NULL || (file->engineH != NULL && current_adios_step != 0) ||
+/* should not reopen opened file at step 0, but that segfaults for small F case. See comment below */
+    if ( (file->engineH != NULL && current_adios_step != 0) ||
         (file->engineH != NULL && current_adios_step == 0 && file->begin_step_called == 0)) {
         if (file->begin_step_called == 1) {
             adios2_end_step(file->engineH);
@@ -1368,8 +1368,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     }
     adios2_step_status status;
     int step = 0;
-    //reading some bookkeeping variables at step 0
-    uint64_t time_step = 0;
+
 
 /************************* get decomp info *********************************/
     MPI_Offset *start_decomp = &(iodesc->map[0]);
@@ -1413,9 +1412,14 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     adios2_variable *decomp_adios_var = NULL;
     /* searching for decomposition array; if begin_step is done, do not make it again */
     /* should not reopen openned file at step 0, but that segfaults for small F case */
-    if (false || current_adios_step == 0 && file->begin_step_called == 1) {
+    if (current_adios_step == 0 && file->begin_step_called == 1) {
         decomp_adios_var = adios2_inquire_variable(file->ioH, decomp_name);
-    }else {
+        if (decomp_adios_var == NULL) {
+            adios2_end_step(file->engineH);
+            file->begin_step_called = 0;
+        }
+    }
+    if (decomp_adios_var == NULL) {
         while (adios2_begin_step(file->engineH, adios2_step_mode_read, 100.0,
                                  &status) == adios2_error_none) {
             file->begin_step_called = 1;
@@ -1432,7 +1436,6 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
             if (decomp_adios_var) {
                 break;
             } else {
-                time_step++;
                 adios2_end_step(file->engineH);
                 file->begin_step_called = 0;
             }
@@ -1441,7 +1444,8 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     /* search for start block and indices */
     free(decomp_name);
     int64_t *decomp_int64_t = NULL;
-    adios2_varinfo *decomp_blocks = adios2_inquire_blockinfo(file->engineH, decomp_adios_var, time_step);
+    adios2_current_step(&current_adios_step, file->engineH);
+    adios2_varinfo *decomp_blocks = adios2_inquire_blockinfo(file->engineH, decomp_adios_var, current_adios_step);
     int32_t decomp_blocks_size = decomp_blocks->nblocks;
     /* free memeory */
     for (size_t i = 0; i < decomp_blocks->nblocks; ++i) {
@@ -1494,7 +1498,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     }
     adios2_current_step(&current_adios_step, file->engineH);
 /************************* get decomp**************************************/
-if (required_adios_step < time_step) {
+if (required_adios_step < current_adios_step) {
     adios2_end_step(file->engineH);
     file->begin_step_called = 0;
     adios2_close(file->engineH);

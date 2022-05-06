@@ -3616,6 +3616,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                  &status) == adios2_error_none) {
             file->begin_step_called = 1;
             if (status == adios2_step_status_end_of_stream) {
+                file->begin_step_called = 0;
                 break;
             }
 
@@ -3676,10 +3677,12 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                  &status) == adios2_error_none) {
             file->begin_step_called = 1;
             if (status == adios2_step_status_end_of_stream) {
+                file->begin_step_called = 0;
                 break;
             }
             if (step == nsteps - 2) {
                 adios2_end_step(file->engineH);
+                file->begin_step_called = 0;
                 break;
             }
             step++;
@@ -3691,6 +3694,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                  &status) == adios2_error_none) {
             file->begin_step_called = 1;
             if (status == adios2_step_status_end_of_stream) {
+                file->begin_step_called = 0;
                 break;
             }
 
