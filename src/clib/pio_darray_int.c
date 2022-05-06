@@ -1322,7 +1322,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
         (file->engineH != NULL && current_adios_step == 0 && file->begin_step_called == 0)) {
         if (file->begin_step_called == 1) {
             adios2_end_step(file->engineH);
-            file->begin_step_called == 0;
+            file->begin_step_called = 0;
         }
         /* close bp file and remove IO object */
         LOG((2, "adios2_close(%s) : fd = %d", file->fname));
