@@ -3782,6 +3782,33 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         for (int i = 0; i < file->num_vars; i++) {
             LOG((2, "var from file (%s) : name = %s,  varid =  %d", file->fname, file->adios_vars[i].name, i));
         }
+        /* open file to be ready to use */
+        /*close file */
+        LOG((2, "adios2_close(%s) : fd = %d", file->fname));
+        err = adios2_close(file->engineH);
+        if (err != adios2_error_none) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Closing (ADIOS) file (%s) failed",
+                           pio_get_fname_from_file(file));
+        }
+        file->engineH = NULL;
+        //open it again
+        LOG((2, "adios2_open(%s)", file->fname));
+        file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
+        if (file->engineH == NULL) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Opening (ADIOS) file (%s) failed",
+                           pio_get_fname_from_file(file));
+        }
+        /* make begin_step to be ready to use */
+        err = adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
+                          &status);
+        if (err != adios2_error_none) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "begin_step (ADIOS) file (%s) failed",
+                           pio_get_fname_from_file(file));
+        }
+        file->begin_step_called = 1;
     }
 #endif
     /* If this is an IO task, then call the netCDF function. */
