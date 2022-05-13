@@ -1214,13 +1214,15 @@ bool match_decomp_part(const int64_t *pInt, size_t pos, long long int *pInt1, lo
  */
 
 #define ADIOS2_CONVERT_COPY_ARRAY(from_type, to_type) \
-for (size_t pos = 0; pos < len; pos++) {\
-    to_type tmp_out;\
     from_type tmp_read;\
+    to_type* tmp_out = (to_type*)malloc(len * out_type_size);\
+for (int pos = 0; pos < len; pos++) {\
     memcpy(&tmp_read, &data_buf[(start_idx_in_start_block + pos) * read_type_size], read_type_size);\
-    tmp_out = tmp_read;\
-    memcpy((char *) (iobuf + pos * out_type_size), &tmp_out, out_type_size);\
-}
+    tmp_out[pos] = (to_type)tmp_read;\
+};\
+memcpy((char *) (iobuf), tmp_out, out_type_size * len);\
+free(tmp_out);
+
 #define ADIOS_CONVERT_FROM(from_type) \
 { \
     if (out_type == adios2_type_double) \
@@ -1307,69 +1309,71 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
 
     /* get frame_id */
     int frame_id = file->varlist[vid].record;
+    if (file->engineH == NULL) {
+        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Expecting file (%s) to be openned",
+                       pio_get_fname_from_file(file));
+    }
     /*magically obtain the relevant adios step*/
     int required_adios_step = get_adios_step(file, vid, frame_id);
     assert(required_adios_step >=0);
-#if 1
-    file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
-    if (file->engineH == NULL) {
-        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                       "Opening (ADIOS) file (%s) failed",
-                       pio_get_fname_from_file(file));
+    size_t current_adios_step = 0;
+    if (file->engineH != NULL) {
+        adios2_current_step(&current_adios_step, file->engineH);
     }
-    LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
-#else
-    /* TODODG
-     * after ADIOS reinit an attribute cannot be read */
-    if (ios->adiosH != NULL)
-    {
-        adios2_error adiosErr = adios2_finalize(ios->adiosH);
-        if (adiosErr != adios2_error_none)
-        {
-            GPTLstop("PIO:PIOc_finalize");
-            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,"Finalizing ADIOS failed (adios2_error=%s) on iosystem (%d)",
+/* we should search decomposition array from the step 0 anyway, so we close and open the bp file */
+/* should not reopen opened file at step 0, but that segfaults for small F case. See comment below */
+    if ( (file->engineH != NULL && current_adios_step != 0) ||
+        (file->engineH != NULL && current_adios_step == 0 && file->begin_step_called == 0)) {
+        if (file->begin_step_called == 1) {
+            adios2_end_step(file->engineH);
+            file->begin_step_called = 0;
+        }
+        /* close bp file and remove IO object */
+        LOG((2, "adios2_close(%s) : fd = %d", file->fname));
+        adios2_error err_close = adios2_close(file->engineH);
+        file->begin_step_called = 0;
+        if (err_close != adios2_error_none) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Closing (ADIOS) file (%s) failed",
                            pio_get_fname_from_file(file));
         }
-
-        ios->adiosH = NULL;
+        file->engineH = NULL;
+        adios2_bool status_remove;
+        LOG((2, "adios2_remove_io(%s)", file->fname));
+        adios2_error err_remove = adios2_remove_io(&status_remove, ios->adiosH, file->fname);
+        if (status_remove != adios2_true || err_remove != adios2_error_none) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Removing (ADIOS) IO (%s) failed",
+                           pio_get_fname_from_file(file));
+        }
+        file->ioH = NULL;
+        /* create IO object and open bp file */
+        file->ioH = adios2_declare_io(ios->adiosH, file->fname);
+        if (file->ioH == NULL) {
+            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Declaring (ADIOS) IO (name=%s) failed for file (%s)",
+                           file->fname, pio_get_fname_from_file(file));
+        }
+        adios2_error adiosErr = adios2_set_engine(file->ioH, "FileStream");
+        if (adiosErr != adios2_error_none) {
+            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Setting (ADIOS) engine (type=FileStream) failed (adios2_error=%s) for file (%s)",
+                           convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
+        }
+        adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
+        LOG((2, "adios2_open(%s) ", file->fname));
+        file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
+        if (file->engineH == NULL)
+        {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Opening (ADIOS) file (%s) failed",
+                           pio_get_fname_from_file(file));
+        }
     }
-    ios->adiosH = adios2_init(ios->union_comm, adios2_debug_mode_on);
-    if (ios->adiosH == NULL)
-    {
-        GPTLstop("PIO:PIOc_Init_Intracomm");
-        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Initializing ADIOS failed");
-    }
-    char declare_name[PIO_MAX_NAME] = {'\0'};
-    struct stat sd;
-    snprintf(declare_name, PIO_MAX_NAME, "%s%lu", file->fname, get_adios2_io_cnt());
-    file->ioH = adios2_declare_io(ios->adiosH, (const char *) declare_name);
-    if (file->ioH == NULL) {
-        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                       "Declaring (ADIOS) IO (name=%s) failed for file (%s)",
-                       declare_name, pio_get_fname_from_file(file));
-    }
-
-    adios2_error adiosErr = adios2_set_engine(file->ioH, "FileStream");
-    if (adiosErr != adios2_error_none) {
-        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                       "Setting (ADIOS) engine (type=FileStream) failed (adios2_error=%s) for file (%s)",
-                       convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
-    }
-
-    LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
-    adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
-    file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
-    if (file->engineH == NULL) {
-        LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
-        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                       "Opening (ADIOS) file (%s) failed",
-                       pio_get_fname_from_file(file));
-    }
-#endif
-    //reading some bookkeeping variables at step 0
-    uint64_t time_step = 0;
-
     adios2_step_status status;
+    int step = 0;
+
 
 /************************* get decomp info *********************************/
     MPI_Offset *start_decomp = &(iodesc->map[0]);
@@ -1388,19 +1392,19 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     strcpy(att_name, prefix_var_name);
     strcat(att_name, adios_vdesc->name);
     strcat(att_name, suffix_att_name);
-    adios2_attribute const *attributeH = adios2_inquire_attribute(file->ioH, att_name);
-    if (attributeH == NULL) {
-        LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+
+    size_t size_attr;
+    char attr_data[PIO_MAX_NAME] ={'\0'};
+    /* get from cache */
+    char *attr_data_buff = NULL;
+    attr_data_buff = file->cache_block_sizes->get(file->cache_block_sizes, att_name);
+    free(att_name);
+    if (attr_data_buff == NULL) {
         return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                       "Cannot read required ADIOS attribute %s from file (%s) failed",
+                       "Cannot read cached value %s from  (ADIOS) file (%s) failed",
                        att_name, pio_get_fname_from_file(file));
     }
-    free(att_name);
-    size_t size_attr;
-    char attr_data[PIO_MAX_NAME];
-    memset(attr_data, 0, PIO_MAX_NAME);
-    adios2_error err = adios2_attribute_data(attr_data, &size_attr, attributeH);
-
+    memcpy(&attr_data, attr_data_buff, strlen(attr_data_buff));
     /* reading /__pio__/var/dummy_darray_var_int/def/decomp */
     char prefix_decomp_name[] = "/__pio__/decomp/";
     int64_t decomp_name_len = strlen(prefix_decomp_name) + strlen(attr_data) + 1;
@@ -1408,80 +1412,102 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     memset(decomp_name, 0, decomp_name_len);
     strcpy(decomp_name, prefix_decomp_name);
     strcat(decomp_name, attr_data);
-    /* searching for decomposition array */
-    while(adios2_begin_step(file->engineH, adios2_step_mode_read, 100.0,
-                            &status) == adios2_error_none) {
-        if (status == adios2_step_status_end_of_stream) {
-            free(decomp_name);
-            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                           "Reading decomposition array for variable (%s, varid=%d) from file (%s, ncid=%d) failed with iotype=%s. The underlying I/O library (%s) call, adios2_inquire_variable, failed.",
-                           pio_get_vname_from_file(file, vid), vid, pio_get_fname_from_file(file), file->pio_ncid,
-                           pio_iotype_to_string(file->iotype),
-                           "ADIOS2");
-        }
-        adios2_variable *decomp = adios2_inquire_variable(file->ioH, decomp_name);
 
-        int64_t *decomp_int64_t = NULL;
-        if (decomp) {
-            free(decomp_name);
-            adios2_varinfo *decomp_blocks = adios2_inquire_blockinfo(file->engineH, decomp, time_step);
-            int32_t decomp_blocks_size = decomp_blocks->nblocks;
-            /* free memeory */
-            for (size_t i = 0; i < decomp_blocks->nblocks; ++i) {
-                free(decomp_blocks->BlocksInfo[i].Start);
-                free(decomp_blocks->BlocksInfo[i].Count);
-            }
-            free(decomp_blocks->BlocksInfo);
-            free(decomp_blocks);
-            adios2_type type;
-            adios2_variable_type(&type, decomp);
 
-            for (size_t block = 0; block < decomp_blocks_size; block++) {
-                adios2_set_block_selection(decomp, block);
-                size_t var_size;
-                adios2_error err_sel = adios2_selection_size(&var_size, decomp);
-                if (type == adios2_type_int64_t) {
-                    decomp_int64_t = (int64_t *) malloc(var_size * sizeof(int64_t));
-                    adios2_get(file->engineH, decomp, decomp_int64_t, adios2_mode_sync);
-                } else {
-                    return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                   "Not implemented");
-                }
-                /* search for the start and end index inside one block */
-                /* number if reading processes should be by an integer */
-                /* factor larger than a number of writing processes    */
-                /* example: 4 writing processes 16 reading processes   */
-                for (size_t pos = 0; pos < var_size; pos++) {
-                    if (!start_block_found && match_decomp_part(decomp_int64_t, pos, start_decomp, end_decomp)) {
-                        start_block = block;
-                        start_idx_in_start_block = pos;
-                        start_block_found = true;
-                        end_block = block;
-                        end_idx_in_end_block = pos + (end_decomp - start_decomp);
-                    }
-                }
-                /* free recourses */
-                if (decomp_int64_t != NULL) {
-                    free(decomp_int64_t);
-                }
-                if (start_block_found) break;
-            }
-           break;
-        } else {
-            time_step++;
+    adios2_variable *decomp_adios_var = NULL;
+    /* searching for decomposition array; if begin_step is done, do not make it again */
+    /* should not reopen openned file at step 0, but that segfaults for small F case */
+    if (current_adios_step == 0 && file->begin_step_called == 1) {
+        decomp_adios_var = adios2_inquire_variable(file->ioH, decomp_name);
+        if (decomp_adios_var == NULL) {
             adios2_end_step(file->engineH);
+            file->begin_step_called = 0;
         }
+    }
+    if (decomp_adios_var == NULL) {
+        while (adios2_begin_step(file->engineH, adios2_step_mode_read, 100.0,
+                                 &status) == adios2_error_none) {
+            file->begin_step_called = 1;
+            if (status == adios2_step_status_end_of_stream) {
+                free(decomp_name);
+                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Reading decomposition array for variable (%s, varid=%d) from file (%s, ncid=%d) failed with iotype=%s. The underlying I/O library (%s) call, adios2_inquire_variable, failed.",
+                               pio_get_vname_from_file(file, vid), vid, pio_get_fname_from_file(file), file->pio_ncid,
+                               pio_iotype_to_string(file->iotype),
+                               "ADIOS2");
+            }
+            decomp_adios_var = adios2_inquire_variable(file->ioH, decomp_name);
+
+            if (decomp_adios_var) {
+                break;
+            } else {
+                adios2_end_step(file->engineH);
+                file->begin_step_called = 0;
+            }
+        }
+    }
+    /* search for start block and indices */
+    free(decomp_name);
+    int64_t *decomp_int64_t = NULL;
+    adios2_current_step(&current_adios_step, file->engineH);
+    adios2_varinfo *decomp_blocks = adios2_inquire_blockinfo(file->engineH, decomp_adios_var, current_adios_step);
+    int32_t decomp_blocks_size = decomp_blocks->nblocks;
+    /* free memeory */
+    for (size_t i = 0; i < decomp_blocks->nblocks; ++i) {
+        free(decomp_blocks->BlocksInfo[i].Start);
+        free(decomp_blocks->BlocksInfo[i].Count);
+    }
+    free(decomp_blocks->BlocksInfo);
+    free(decomp_blocks);
+    adios2_type type;
+    adios2_variable_type(&type, decomp_adios_var);
+
+    for (size_t block = 0; block < decomp_blocks_size; block++) {
+        adios2_set_block_selection(decomp_adios_var, block);
+        size_t block_size;
+        adios2_error err_sel = adios2_selection_size(&block_size, decomp_adios_var);
+        if (type == adios2_type_int64_t) {
+            decomp_int64_t = (int64_t *) malloc(block_size * sizeof(int64_t));
+            adios2_error err = adios2_get(file->engineH, decomp_adios_var, decomp_int64_t, adios2_mode_sync);
+            if (err != adios2_error_none) {
+                return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "adios2_get for file (%s) failed",
+                               pio_get_fname_from_file(file));
+            }
+        } else {
+            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Not implemented");
+        }
+        /* search for the start and end index inside one block */
+        /* number if reading processes should be by an integer */
+        /* factor larger than a number of writing processes    */
+        /* example: 4 writing processes 16 reading processes   */
+        for (size_t pos = 0; pos < block_size; pos++) {
+            if (!start_block_found && match_decomp_part(decomp_int64_t, pos, start_decomp, end_decomp)) {
+                start_block = block;
+                start_idx_in_start_block = pos;
+                start_block_found = true;
+                end_idx_in_end_block = pos + (end_decomp - start_decomp);
+            }
+        }
+        /* free recourses */
+        if (decomp_int64_t != NULL) {
+            free(decomp_int64_t);
+        }
+        if (start_block_found) break;
     }
     if (!start_block_found) {
         return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                        "Cannot determing block for decoposition map");
     }
+    adios2_current_step(&current_adios_step, file->engineH);
 /************************* get decomp**************************************/
-if (required_adios_step != time_step) {
+if (required_adios_step < current_adios_step) {
     adios2_end_step(file->engineH);
+    file->begin_step_called = 0;
     adios2_close(file->engineH);
     file->engineH = NULL;
-
+    LOG((2, "adios2_open(%s) ", file->fname));
     file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
     if (file->engineH == NULL) {
         return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -1497,7 +1523,42 @@ if (required_adios_step != time_step) {
                            "adios2_begin_step file (%s) failed",
                            pio_get_fname_from_file(file));
         }
+        file->begin_step_called = 1;
         adios2_error end_step_err = adios2_end_step(file->engineH);
+        if (end_step_err != adios2_error_none) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "adios2_end_step file (%s) failed",
+                           pio_get_fname_from_file(file));
+        }
+        file->begin_step_called = 0;
+    }
+    adios2_error step_err = adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
+                                 &status);
+    file->begin_step_called = 1;
+    if (step_err != adios2_error_none) {
+        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "adios2_begin_step file (%s) failed",
+                       pio_get_fname_from_file(file));
+    }
+}else if (required_adios_step > current_adios_step) {
+    adios2_error end_step_err = adios2_end_step(file->engineH);
+    file->begin_step_called = 0;
+    if (end_step_err != adios2_error_none) {
+        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "adios2_end_step file (%s) failed",
+                       pio_get_fname_from_file(file));
+    }
+    for (int step = 0; step < required_adios_step - current_adios_step - 1; step++) {
+        adios2_error  step_err = adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
+                                                   &status);
+        if (step_err != adios2_error_none) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "adios2_begin_step file (%s) failed",
+                           pio_get_fname_from_file(file));
+        }
+        file->begin_step_called = 1;
+        adios2_error end_step_err = adios2_end_step(file->engineH);
+        file->begin_step_called = 0;
         if (end_step_err != adios2_error_none) {
             return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                            "adios2_end_step file (%s) failed",
@@ -1505,12 +1566,13 @@ if (required_adios_step != time_step) {
         }
     }
     adios2_error step_err = adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
-                                 &status);
+                                              &status);
     if (step_err != adios2_error_none) {
         return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                        "adios2_begin_step file (%s) failed",
                        pio_get_fname_from_file(file));
     }
+    file->begin_step_called = 1;
 }
 /************************* actual reading**********************************/
     char *var_name = malloc(strlen(prefix_var_name) + strlen(adios_vdesc->name) + 1);
@@ -1549,8 +1611,12 @@ if (required_adios_step != time_step) {
         size_t block_size;/* size of the block*/
         adios2_error err_sel = adios2_selection_size(&block_size, data);
         data_buf = (char *) malloc(block_size * read_type_size);
-        adios2_get(file->engineH, data, data_buf, adios2_mode_sync);
-
+        adios2_error err =  adios2_get(file->engineH, data, data_buf, adios2_mode_sync);
+        if (err != adios2_error_none) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "adios2_get for file (%s) failed",
+                           pio_get_fname_from_file(file));
+        }
         size_t len = end_idx_in_end_block - start_idx_in_start_block + 1;
         /* copy without type conversion byte-by-byte */
         if (read_type == out_type) {
@@ -1597,29 +1663,11 @@ if (required_adios_step != time_step) {
     }
 /************************* end actual reading**********************************/
 
-    adios2_error  step_err = adios2_end_step(file->engineH);
-    if (step_err != adios2_error_none)
-    {
-        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                       "adios2_end_step failed (adios2_error=%s) for file (%s)",
-                       convert_adios2_error_to_string(step_err), pio_get_fname_from_file(file));
-    }
-    err = adios2_close(file->engineH);
-    if (err != adios2_error_none)
-    {
-        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                       "adios2_end_step failed (adios2_error=%s) for file (%s)",
-                       convert_adios2_error_to_string(err), pio_get_fname_from_file(file));
-    }
-    file->engineH = NULL;
-    LOG((2, "adios2_close(%s) : fd = %d", file->fname));
-
     /* Stop timing this function. */
     GPTLstop("PIO:read_darray_nc");
 
     return PIO_NOERR;
 }
-
 /* match first 30 elements*/
 /* TODO: make it with hashing of data */
 #define MAX_LEN_MATCH 30

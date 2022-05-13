@@ -50,6 +50,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <adios2_c.h>
+#include "qhashtbl.h"
 
 #define ADIOS_PIO_MAX_DECOMPS 1024 /* Maximum number of decomps */
 #define MAX_STEP_CALLS 512 /* Maximum number of application steps before adios end step is called */
@@ -972,6 +973,10 @@ typedef struct file_desc_t
 
     /** Store current frameid for end_step in PIO_setframe */
     int current_frame;
+    /* hash tables to store adios blocks and blocks */
+    qhashtbl_t *cache_data_blocks;
+    qhashtbl_t *cache_block_sizes;
+
 #endif /* _ADIOS2 */
 
     /* File name - cached */
