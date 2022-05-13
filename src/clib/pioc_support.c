@@ -1031,7 +1031,7 @@ int check_netcdf(iosystem_desc_t *ios, file_desc_t *file, int status,
     assert(ios || file);
     assert(fname);
 
-    LOG((1, "check_netcdf status = %d fname = %s line = %d", status, fname, line));
+    LOG((1, "check_netcdf status = %d  source file name = %s line = %d", status, fname, line));
 
     /* Find the error handler. Error handlers associated with file has
      * priority over ios error handlers.
@@ -3411,6 +3411,10 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 #endif
         spio_ltimer_stop(file->io_fstats->wr_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
+        file->cache_data_blocks->free(file->cache_data_blocks);
+        file->cache_block_sizes->free(file->cache_block_sizes);
+        free(file->cache_data_blocks);
+        free(file->cache_block_sizes);
         free(file->io_fstats);
         free(file);
         return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
@@ -3432,6 +3436,10 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 #endif
         spio_ltimer_stop(file->io_fstats->wr_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
+        file->cache_data_blocks->free(file->cache_data_blocks);
+        file->cache_block_sizes->free(file->cache_block_sizes);
+        free(file->cache_data_blocks);
+        free(file->cache_block_sizes);
         free(file->io_fstats);
         free(file);
         return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
@@ -3549,8 +3557,10 @@ char const adios_def_adiostype_suffix[] = "/def/adiostype";
 char const adios_def_ndims_suffix[] = "/def/ndims";
 char const adios_def_ncop_suffix[] = "/def/ncop";
 char const adios_def_dims_suffix[] = "/def/dims";
+char const adios_def_decomp_suffix[] = "/def/decomp";
 char const adios_pio_global_prefix[] = "/__pio__/global/";
 char const adios_pio_track_frame_id_prefix[] = "/__pio__/track/frame_id/";
+char const adios_pio_decomp_prefix[] = "/__pio__/decomp/";
 
 void adios_get_nc_type(file_desc_t *file, size_t);
 void adios_get_adios_type(file_desc_t *file, size_t);
@@ -3843,6 +3853,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                         int mode, int retry)
 {
     char tname[SPIO_TIMER_MAX_NAME];
+    char declare_name[PIO_MAX_NAME] = {'\0'};
     iosystem_desc_t *ios;      /* Pointer to io system information. */
     file_desc_t *file;         /* Pointer to file information. */
     int imode;                 /* Internal mode val for netcdf4 file open. */
@@ -3949,7 +3960,8 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         struct stat sd;
         if (0 == stat(bpname, &sd)) {
             snprintf(declare_name, PIO_MAX_NAME, "%s%lu", bpname, get_adios2_io_cnt());
-            file->ioH = adios2_declare_io(ios->adiosH, (const char *) declare_name);
+            strncpy(file->fname, bpname, PIO_MAX_NAME);
+            file->ioH = adios2_declare_io(ios->adiosH, file->fname);
             if (file->ioH == NULL) {
                 return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                "Declaring (ADIOS) IO (name=%s) failed for file (%s)",
@@ -3965,7 +3977,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
 
             LOG((2, "adios2_open(%s) : fd = %d, ncid = %d", file->fname, file->fh, *ncidp));
             adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
-            file->engineH = adios2_open(file->ioH, bpname, adios2_mode_read);
+            file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
             adios2_file_exist = true;
             /*failed to open with adios2 trying pnetcdf */
             if (file->engineH == NULL) {
@@ -4102,6 +4114,8 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             file->adios_vars[var].gdimids = NULL;
             for (int i = 0; i < PIO_MAX_DIMS; i++) file->adios_vars[var].interval_map[i] = PIO_DEFAULT;
         }
+        file->cache_data_blocks = qhashtbl(10000);
+        file->cache_block_sizes = qhashtbl(10000);
         /*restart mode */
 
         // get available variables and set structures.
@@ -4111,7 +4125,9 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
 
         while (adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
                                  &status) == adios2_error_none) {
+            file->begin_step_called = 1;
             if (status == adios2_step_status_end_of_stream) {
+                file->begin_step_called = 0;
                 break;
             }
 
@@ -4121,6 +4137,8 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             adios_read_global_dimensions(ios, file, var_names, var_size);
             /* read names of variables from variables */
             size_t nvars = adios_read_vars_vars(file, var_size, var_names);
+
+            /* free memory */
             for (size_t i = 0; i < var_size; i++)  free(var_names[i]);
             free(var_names);
             /* additionally read variables from atrributes like
@@ -4143,9 +4161,11 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                 adios_get_step(file, var_id, nsteps);
             }
             adios2_end_step(file->engineH);
+            file->begin_step_called = 0;
             nsteps++;
         }
         /*close file */
+        LOG((2, "adios2_close(%s) : fd = %d", file->fname));
         adios2_error err = adios2_close(file->engineH);
         if (err != adios2_error_none) {
             return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -4155,6 +4175,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         file->engineH = NULL;
         LOG((2, "adios2_close(%s) : fd = %d", file->fname));
         //open it again
+        LOG((2, "adios2_open(%s)", file->fname));
         file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
         if (file->engineH == NULL) {
             return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -4165,23 +4186,28 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
 
         size_t step = 0;
         /* move to the last step */
-        while (adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
+        while(adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
                                  &status) == adios2_error_none) {
-
+            file->begin_step_called = 1;
             if (status == adios2_step_status_end_of_stream) {
+                file->begin_step_called = 0;
                 break;
             }
             if (step == nsteps - 2) {
                 adios2_end_step(file->engineH);
+                file->begin_step_called = 0;
                 break;
             }
             step++;
             adios2_end_step(file->engineH);
+            file->begin_step_called = 0;
         }
         int attr_id = 0;
         while (adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
                                  &status) == adios2_error_none) {
+            file->begin_step_called = 1;
             if (status == adios2_step_status_end_of_stream) {
+                file->begin_step_called = 0;
                 break;
             }
 
@@ -4205,6 +4231,23 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                     }
                     attr_id++;
                     assert(attr_id < PIO_MAX_ATTRS);
+                }
+                /* cache decomp attrubutes */
+                if (strstr(attr_names[i], adios_pio_var_prefix) != NULL &&
+                    strstr(attr_names[i], adios_def_decomp_suffix) != NULL) {
+                    adios2_attribute const *attributeH = adios2_inquire_attribute(file->ioH, attr_names[i]);
+                    if (attributeH != NULL) {
+                        size_t size_attr;
+                        char *attr_data = malloc(PIO_MAX_NAME);
+                        memset(attr_data, 0, PIO_MAX_NAME);
+                        adios2_error err = adios2_attribute_data(attr_data, &size_attr, attributeH);
+                        if (err != adios2_error_none){
+                            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                           "Reading (ADIOS) attribute %s in file file (%s) failed",
+                                           attr_names[i], pio_get_fname_from_file(file));
+                        }
+                        file->cache_block_sizes->put(file->cache_block_sizes, attr_names[i], attr_data);
+                    }
                 }
             }
             file->num_gattrs += attr_id;
@@ -4245,19 +4288,39 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             free(attr_names);
             file->num_attrs += attr_id;
             adios2_end_step(file->engineH);
+            file->begin_step_called = 0;
             step++;
         }
-        adios2_error err_close = adios2_close(file->engineH);
-        if (err_close != adios2_error_none) {
+        for (int i = 0; i < file->num_vars; i++) {
+            LOG((2, "var from file (%s) : name = %s,  varid =  %d", file->fname, file->adios_vars[i].name, i));
+        }
+        /* open file to be ready to use */
+        /*close file */
+        LOG((2, "adios2_close(%s) : fd = %d", file->fname));
+        err = adios2_close(file->engineH);
+        if (err != adios2_error_none) {
             return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                            "Closing (ADIOS) file (%s) failed",
                            pio_get_fname_from_file(file));
         }
         file->engineH = NULL;
-        LOG((2, "adios2_close(%s) : fd = %d", file->fname));
-        for (int i = 0; i < file->num_vars; i++) {
-            LOG((2, "var from file (%s) : name = %s,  varid =  %d", file->fname, file->adios_vars[i].name, i));
+        //open it again
+        LOG((2, "adios2_open(%s)", file->fname));
+        file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
+        if (file->engineH == NULL) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Opening (ADIOS) file (%s) failed",
+                           pio_get_fname_from_file(file));
         }
+        /* make begin_step to be ready to use */
+        err = adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
+                          &status);
+        if (err != adios2_error_none) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "begin_step (ADIOS) file (%s) failed",
+                           pio_get_fname_from_file(file));
+        }
+        file->begin_step_called = 1;
     }
 #endif
 
@@ -4334,7 +4397,10 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
                 spio_ltimer_stop(file->io_fstats->tot_timer_name);
-
+                file->cache_data_blocks->free(file->cache_data_blocks);
+                file->cache_block_sizes->free(file->cache_block_sizes);
+                free(file->cache_data_blocks);
+                free(file->cache_block_sizes);
                 free(file->io_fstats);
                 free(file);
                 PIO_get_avail_iotypes(avail_iotypes, PIO_MAX_NAME);
@@ -4410,6 +4476,10 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->rd_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
+        file->cache_data_blocks->free(file->cache_data_blocks);
+        file->cache_block_sizes->free(file->cache_block_sizes);
+        free(file->cache_data_blocks);
+        free(file->cache_block_sizes);
         free(file->io_fstats);
         free(file);
         return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
@@ -4425,6 +4495,10 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->rd_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            file->cache_data_blocks->free(file->cache_data_blocks);
+            file->cache_block_sizes->free(file->cache_block_sizes);
+            free(file->cache_data_blocks);
+            free(file->cache_block_sizes);
             free(file->io_fstats);
             free(file);
             LOG((1, "PIOc_openfile_retry failed, ierr = %d", ierr));
