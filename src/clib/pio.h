@@ -67,6 +67,7 @@ extern "C" {
 #include <unistd.h>
 #include <limits.h>
 #include <adios2_c.h>
+#include "qhashtbl.h"
 
 #define MAX_ADIOS_BUFFER_COUNT (PIO_MAX_CACHED_STEPS_FOR_ADIOS + 16) /* Maximum buffer size for aggregating decomp_id, frame_id, and fillval_id values */
 #define BLOCK_MAX_BUFFER ((unsigned long)INT_MAX) /* 2GB limit of MPI_Gatherv */
@@ -1058,6 +1059,10 @@ typedef struct file_desc_t
 
     /** Store current frameid for end_step in PIO_setframe */
     int current_frame;
+    /* hash tables to store adios blocks and blocks */
+    qhashtbl_t *cache_data_blocks;
+    qhashtbl_t *cache_block_sizes;
+
 #endif /* _ADIOS2 */
 
 #ifdef _HDF5
