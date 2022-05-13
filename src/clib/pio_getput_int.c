@@ -1388,6 +1388,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                             /* will be deleted in the cache delete operation */
                             /* free(mem_buf); */
                         }else{
+                            memcpy((char *)buf, mem_buf, av->adios_type_size);
                             LOG((3, "Used cache ncid = %d varid = %d block_id =%d\n", ncid, varid, 0));
                         }
                     }
