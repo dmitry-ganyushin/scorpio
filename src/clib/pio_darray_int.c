@@ -1322,7 +1322,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
         adios2_current_step(&current_adios_step, file->engineH);
     }
 /* we should search decomposition array from the step 0 anyway, so we close and open the bp file */
-/* should not reopen opened file at step 0, but that segfaults for small F case. See comment below */
+/* should not reopen opened file at step 0 */
     if ( (file->engineH != NULL && current_adios_step != 0) ||
         (file->engineH != NULL && current_adios_step == 0 && file->begin_step_called == 0)) {
         if (file->begin_step_called == 1) {
@@ -1558,12 +1558,12 @@ if (required_adios_step < current_adios_step) {
         }
         file->begin_step_called = 1;
         adios2_error end_step_err = adios2_end_step(file->engineH);
-        file->begin_step_called = 0;
         if (end_step_err != adios2_error_none) {
             return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                            "adios2_end_step file (%s) failed",
                            pio_get_fname_from_file(file));
         }
+        file->begin_step_called = 0;
     }
     adios2_error step_err = adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
                                               &status);

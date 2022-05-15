@@ -1374,6 +1374,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     break;
                 } else {
                     adios2_end_step(file->engineH);
+                    file->begin_step_called = 0;
                     step++;
                     continue;
                 }
