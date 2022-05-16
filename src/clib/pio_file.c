@@ -674,7 +674,9 @@ int PIOc_closefile(int ncid)
                     return ierr;
                 }
             }
+            LOG((2, "adios2_close(%s)", file->fname));
             adios2_error adiosErr = adios2_close(file->engineH);
+            file->begin_step_called = 0;
             if (adiosErr != adios2_error_none)
             {
                 if (file->iotype == PIO_IOTYPE_ADIOS)

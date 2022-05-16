@@ -1330,7 +1330,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
             file->begin_step_called = 0;
         }
         /* close bp file and remove IO object */
-        LOG((2, "adios2_close(%s) : fd = %d", file->fname));
+        LOG((2, "adios2_close(%s)", file->fname));
         adios2_error err_close = adios2_close(file->engineH);
         file->begin_step_called = 0;
         if (err_close != adios2_error_none) {
@@ -1505,16 +1505,16 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
 if (required_adios_step < current_adios_step) {
     adios2_end_step(file->engineH);
     file->begin_step_called = 0;
+    LOG((2, "adios2_close(%s)", file->fname));
     adios2_close(file->engineH);
-    file->engineH = NULL;
-    LOG((2, "adios2_open(%s) ", file->fname));
+    file->engineH = NULL
+    LOG((2, "adios2_open(%s)", file->fname));
     file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
     if (file->engineH == NULL) {
         return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                        "Opening (ADIOS) file (%s) failed",
                        pio_get_fname_from_file(file));
     }
-    LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
     for (int step = 0; step < required_adios_step; step++) {
         adios2_error  step_err = adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
                                      &status);

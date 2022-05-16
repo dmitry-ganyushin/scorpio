@@ -726,7 +726,7 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
             }
             if (file->engineH != NULL && current_adios_step != required_adios_step) {
                 /* close bp file and remove IO object */
-                LOG((2, "adios2_close(%s) : fd = %d", file->fname));
+                LOG((2, "adios2_close(%s)", file->fname));
                 adios2_error err_close = adios2_close(file->engineH);
                 file->begin_step_called = 0;
                 if (err_close != adios2_error_none) {
@@ -1329,7 +1329,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         }
         if (current_adios_step != required_adios_step) {
             /* close bp file and remove IO object */
-            LOG((2, "adios2_close(%s) : fd = %d", file->fname));
+            LOG((2, "adios2_close(%s)", file->fname));
             adios2_error err_close = adios2_close(file->engineH);
             file->begin_step_called = 0;
             if (err_close != adios2_error_none) {
@@ -1361,9 +1361,8 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                "Setting (ADIOS) engine (type=FileStream) failed (adios2_error=%s) for file (%s)",
                                convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
             }
-
-            LOG((2, "adios2_open(%s) : fd = %d ncid = %d ", file->fname, file->fh, ncid));
             adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
+            LOG((2, "adios2_open(%s) : fd = %d ncid = %d ", file->fname, file->fh, ncid));
             file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
             adios2_step_status status;
             int step = 0;
