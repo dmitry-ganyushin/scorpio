@@ -1328,6 +1328,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         size_t current_adios_step = 0;
         if (file->engineH != NULL)
         {
+            LOG((2, "adios2_current_step (%s) engine %p", file->fname, file->engineH));
             adios2_current_step(&current_adios_step, file->engineH);
         }
         if (current_adios_step != required_adios_step) {
