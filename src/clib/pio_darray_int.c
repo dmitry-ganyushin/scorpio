@@ -1330,7 +1330,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
             file->begin_step_called = 0;
         }
         /* close bp file and remove IO object */
-        LOG((2, "adios2_close(%s) engine %p", file->fname, file->engineH));
+        LOG((2, "adios2_close(%s) io %p engine %p", file->fname, file->ioH, file->engineH));
         adios2_error err_close = adios2_close(file->engineH);
         file->begin_step_called = 0;
         if (err_close != adios2_error_none) {
@@ -1366,7 +1366,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
         adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
         LOG((2, "adios2_open(%s) ", file->fname));
         file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
-        LOG((2, "adios2_open engine (%p) ", file->engineH));
+        LOG((2, "adios2_open %p  engine %p", file->ioH, file->engineH));
         if (file->engineH == NULL)
         {
             return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -1508,7 +1508,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
 if (required_adios_step < current_adios_step) {
     adios2_end_step(file->engineH);
     file->begin_step_called = 0;
-    LOG((2, "adios2_close(%s) engine %p", file->fname, file->engineH));
+    LOG((2, "adios2_close(%s) io %p engine %p", file->fname, file->ioH, file->engineH));
     adios2_error err_close = adios2_close(file->engineH);
     if (err_close != adios2_error_none) {
         return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -1518,7 +1518,7 @@ if (required_adios_step < current_adios_step) {
     file->engineH = NULL;
     LOG((2, "adios2_open(%s)", file->fname));
     file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
-    LOG((2, "adios2_open engine (%p)", file->engineH));
+    LOG((2, "adios2_open %p  engine (%p)", file->ioH, file->engineH));
     if (file->engineH == NULL) {
         return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                        "Opening (ADIOS) file (%s) failed",
