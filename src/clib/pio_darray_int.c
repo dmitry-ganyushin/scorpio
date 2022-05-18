@@ -1506,8 +1506,13 @@ if (required_adios_step < current_adios_step) {
     adios2_end_step(file->engineH);
     file->begin_step_called = 0;
     LOG((2, "adios2_close(%s)", file->fname));
-    adios2_close(file->engineH);
-    file->engineH = NULL
+    adios2_error err_close = adios2_close(file->engineH);
+    if (err_close != adios2_error_none) {
+        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                       "Closing (ADIOS) file (%s) failed",
+                       pio_get_fname_from_file(file));
+    }
+    file->engineH = NULL;
     LOG((2, "adios2_open(%s)", file->fname));
     file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
     if (file->engineH == NULL) {

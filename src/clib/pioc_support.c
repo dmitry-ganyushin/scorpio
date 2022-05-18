@@ -2836,7 +2836,7 @@ int PIOc_createfile_int(int iosysid, int *ncidp, int *iotype, const char *filena
                            "Initializing block merge failed for file (%s)",
                            pio_get_fname_from_file(file));
         }
-        LOG((2, "adios2_open(%s) : fd = %d ncid = %d ", file->ffilename, file->fh, ncid));
+        LOG((2, "adios2_open(%s) : fd = %d ncid = %d ", file->filename, file->fh, ncidp));
         file->engineH = adios2_open(file->ioH, file->filename, adios2_mode_write);
         if (file->engineH == NULL)
         {
