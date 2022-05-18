@@ -726,7 +726,7 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
             }
             if (file->engineH != NULL && current_adios_step != required_adios_step) {
                 /* close bp file and remove IO object */
-                LOG((2, "adios2_close(%s)", file->fname));
+                LOG((2, "adios2_close(%s) engine %p", file->fname, file->engineH));
                 adios2_error err_close = adios2_close(file->engineH);
                 file->begin_step_called = 0;
                 if (err_close != adios2_error_none) {
@@ -760,6 +760,7 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
                 adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
                 LOG((2, "adios2_open(%s) : fd = %d, ncid = %d", file->fname, ncid));
                 file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
+                LOG((2, "adios2_open engine (%p) ", file->engineH));
                 adios2_step_status step_status;
                 adios2_error adiosStepErr = adios2_begin_step(file->engineH, adios2_step_mode_read, 10.0, &step_status);
                 file->begin_step_called = 1;
@@ -1329,7 +1330,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         }
         if (current_adios_step != required_adios_step) {
             /* close bp file and remove IO object */
-            LOG((2, "adios2_close(%s)", file->fname));
+            LOG((2, "adios2_close(%s) engine %p", file->fname, file->engineH));
             adios2_error err_close = adios2_close(file->engineH);
             file->begin_step_called = 0;
             if (err_close != adios2_error_none) {
@@ -1364,6 +1365,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
             LOG((2, "adios2_open(%s) : fd = %d ncid = %d ", file->fname, file->fh, ncid));
             file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
+            LOG((2, "adios2_open engine (%p)", file->engineH));
             adios2_step_status status;
             int step = 0;
             while (adios2_begin_step(file->engineH, adios2_step_mode_read, 100.0,
