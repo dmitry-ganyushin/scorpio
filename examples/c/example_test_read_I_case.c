@@ -46,6 +46,7 @@ int main(int argc, char* argv[])
   varid = 151; /* double budg_fluxG(budg_flux = 30); */
   ret = PIOc_get_var_double(ncid1, varid, buffer); ERR
 
+
   ret = PIOc_closefile(ncid2); ERR
   ret = PIOc_closefile(ncid1); ERR
 

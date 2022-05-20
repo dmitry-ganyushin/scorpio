@@ -708,14 +708,6 @@ int PIOc_closefile(int ncid)
             }
 
             file->engineH = NULL;
-//            /* remove associated  IO object */
-//            LOG((2, "adios2_remove_io(%s)", file->fname));
-//            adios2_bool status_remove = adios2_false;
-//            adios2_error err_remove = adios2_remove_io(&status_remove, ios->adiosH, file->fname);
-//            if (status_remove != adios2_true || err_remove != adios2_error_none) {
-//                LOG((2, "PIO_closefile: adios2_remove_io(%s)  failed", file->fname));
-//            }
-//            file->ioH = NULL;
         }
 
         for (int i = 0; i < file->num_dim_vars; i++)

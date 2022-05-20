@@ -1339,15 +1339,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
                            pio_get_fname_from_file(file));
         }
         file->engineH = NULL;
-//        adios2_bool status_remove;
-//        LOG((2, "adios2_remove_io(%s)", file->fname));
-//        adios2_error err_remove = adios2_remove_io(&status_remove, ios->adiosH, file->fname);
-//        if (status_remove != adios2_true || err_remove != adios2_error_none) {
-//            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-//                           "Removing (ADIOS) IO (%s) failed",
-//                           pio_get_fname_from_file(file));
-//        }
-//        file->ioH = NULL;
+
         /* create IO object and open bp file */
         char declare_name[PIO_MAX_NAME] = {'\0'};
         snprintf(declare_name, PIO_MAX_NAME, "%s%lu", file->fname, get_adios2_io_cnt());
