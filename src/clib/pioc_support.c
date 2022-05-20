@@ -3651,21 +3651,21 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
          iosysid, *iotype, filename, mode, retry));
 
     /* Allocate space for the file info. */
-    if (!(file = calloc(sizeof(file_desc_t), 1)))
-    {
+    if (!(file = calloc(sizeof(file_desc_t), 1))) {
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                        "Opening file (%s) failed. Out of memory allocating %lld bytes for the file structure", filename, (unsigned long long) (sizeof(*file)));
+                       "Opening file (%s) failed. Out of memory allocating %lld bytes for the file structure", filename,
+                       (unsigned long long) (sizeof(*file)));
     }
 
     file->io_fstats = calloc(sizeof(spio_io_fstats_summary_t), 1);
-    if(!(file->io_fstats))
-    {
+    if (!(file->io_fstats)) {
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         return pio_err(ios, NULL, PIO_ENOMEM, __FILE__, __LINE__,
-                        "Opening file (%s) failed. Out of memory allocating %lld bytes for caching file I/O statistics", filename, (unsigned long long) (sizeof(spio_io_fstats_summary_t)));
+                       "Opening file (%s) failed. Out of memory allocating %lld bytes for caching file I/O statistics",
+                       filename, (unsigned long long) (sizeof(spio_io_fstats_summary_t)));
     }
 
     /* Fill in some file values. */
@@ -3717,21 +3717,25 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         struct stat sd;
         if (0 == stat(bpname, &sd)) {
             strncpy(file->fname, bpname, PIO_MAX_NAME);
-            snprintf(declare_name, PIO_MAX_NAME, "%s%lu", file->fname, get_adios2_io_cnt());
-            file->ioH = adios2_declare_io(ios->adiosH, file->fname);
-            if (file->ioH == NULL) {
-                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                               "Declaring (ADIOS) IO (name=%s) failed for file (%s)",
-                               declare_name, pio_get_fname_from_file(file));
+            //snprintf(declare_name, PIO_MAX_NAME, "%s%lu", file->fname, get_adios2_io_cnt());
+            file->ioH = adios2_at_io(ios->adiosH, file->fname);
+            if (file->ioH == NULL){
+                file->ioH = adios2_declare_io(ios->adiosH, file->fname);
+                if (file->ioH == NULL) {
+                    return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Declaring (ADIOS) IO (name=%s) failed for file (%s)",
+                                   declare_name, pio_get_fname_from_file(file));
+                }
+                adios2_error adiosErr = adios2_set_engine(file->ioH, "FileStream");
+                if (adiosErr != adios2_error_none) {
+                    return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Setting (ADIOS) engine (type=FileStream) failed (adios2_error=%s) for file (%s)",
+                                   convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
+                }
+                adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
             }
 
-            adios2_error adiosErr = adios2_set_engine(file->ioH, "FileStream");
-            if (adiosErr != adios2_error_none) {
-                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                               "Setting (ADIOS) engine (type=FileStream) failed (adios2_error=%s) for file (%s)",
-                               convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
-            }
-            adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
+
             LOG((2, "adios2_open(%s) : fd = %d, ncid = %d", file->fname, file->fh, *ncidp));
             file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
             LOG((2, "adios2_open(%s) io %p engine (%p)", file->fname, file->ioH, file->engineH));

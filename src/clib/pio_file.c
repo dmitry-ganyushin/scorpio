@@ -709,6 +709,8 @@ int PIOc_closefile(int ncid)
 
             file->engineH = NULL;
         }
+        adios2_bool result;
+        adios2_remove_io(&result, ios->adiosH, file->fname);
 
         for (int i = 0; i < file->num_dim_vars; i++)
         {
@@ -811,7 +813,7 @@ int PIOc_closefile(int ncid)
         int rearr_type = PIO_REARR_SUBSET;
 #endif
 
-        free(file->filename);
+        if (file->filename) free(file->filename);
 
         if (file->iotype == PIO_IOTYPE_ADIOS)
         {
