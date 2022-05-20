@@ -43,7 +43,6 @@ int main(int argc, char* argv[])
 
   ret = PIOc_openfile(iosysid, &ncid2, &format, filename2, PIO_NOWRITE); ERR
 
-
   varid = 151; /* double budg_fluxG(budg_flux = 30); */
   ret = PIOc_get_var_double(ncid1, varid, buffer); ERR
 
