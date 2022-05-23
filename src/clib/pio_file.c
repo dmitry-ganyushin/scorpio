@@ -292,7 +292,8 @@ static int sync_file(int ncid)
 #ifdef _ADIOS2
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
-        ierr = end_adios2_step(file, ios);
+        /* test no sync to have everething in one adios2 step */
+     /*   ierr = end_adios2_step(file, ios);*/
 
         if (file->mode & PIO_WRITE)
         {
