@@ -119,7 +119,6 @@ int pio_get_file(int ncid, file_desc_t **cfile1)
 
     /* Copy pointer to file info. */
     *cfile1 = cfile;
-    LOG((2, "pio_get_file ncid=%d   fname = (%s) file pointer  %p", ncid, file->fname, cfile1));
     return PIO_NOERR;
 }
 
