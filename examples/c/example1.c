@@ -1,435 +1,471 @@
-/**
- * @file 
- * @brief A simple C example for the ParallelIO Library.
- *
- * This example creates a netCDF output file with one dimension and
- * one variable. It first writes, then reads the sample file using the
- * ParallelIO library. 
- *
- * This example can be run in parallel for 1, 2, 4, 8, or 16
- * processors.
- */
-
-#include <getopt.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
 #include <mpi.h>
 #include <pio.h>
+#include <math.h>
+
 #ifdef TIMING
+
 #include <gptl.h>
+
 #endif
 
-/** The number of possible output netCDF output flavors available to
- * the ParallelIO library. */
-#define NUM_NETCDF_FLAVORS 5
+#define ERR { if (ret != PIO_NOERR) printf("rank = %d, error at line = %d\n", my_rank, __LINE__); }
 
-/** The number of dimensions in the example data. In this simple
-    example, we are using one-dimensional data. */
-#define NDIM 1
+/* Number of elements of the local darray data that
+   will be handled by each processor. */
+#define ELEMENTS_PER_PE 8
 
-/** The length of our sample data. There will be a total of 16
- * integers in our data, and responsibilty for writing and reading
- * them will be spread between all the processors used to run this
- * example. */
-#define DIM_LEN 16
+/* Length of variables to be put/get */
+#define PUT_GET_VAR_LEN 10
 
-/** The name of the dimension in the netCDF output file. */
-#define DIM_NAME "x"
+int main(int argc, char *argv[]) {
+    /* Zero-based rank of processor. */
+    int my_rank;
 
-/** The name of the variable in the netCDF output file. */
-#define VAR_NAME "foo"
+    /* Number of processors involved in current execution. */
+    int ntasks;
 
-/** Return code when netCDF output file does not match
- * expectations. */
-#define ERR_BAD 1001
+    /* This example only tests two formats (IO types): PnetCDF and ADIOS */
+    int formats[2] = {PIO_IOTYPE_PNETCDF, PIO_IOTYPE_ADIOS};
 
-/** The meaning of life, the universe, and everything. */
-#define START_DATA_VAL 42
+    /* Number of processors that will do IO. In this example we
+       will do IO from all processors. */
+    int niotasks;
 
-/** Handle MPI errors. This should only be used with MPI library
- * function calls. */
-#define MPIERR(e) do {                                                  \
-	MPI_Error_string(e, err_buffer, &resultlen);			\
-	printf("MPI error, line %d, file %s: %s\n", __LINE__, __FILE__, err_buffer); \
-	MPI_Finalize();							\
-	return 2;							\
-    } while (0) 
+    /* Stride in the MPI rank between IO tasks. Always 1 in this example. */
+    const int ioproc_stride = 1;
 
-/** Handle non-MPI errors by finalizing the MPI library and exiting
- * with an exit code. */
-#define ERR(e) do {				\
-	MPI_Finalize();				\
-	return e;				\
-    } while (0) 
+    /* Zero based rank of first processor to be used for I/O. */
+    const int ioproc_start = 0;
 
-/** Global err buffer for MPI. When there is an MPI error, this buffer
- * is used to store the error message that is associated with the MPI
- * error. */
-char err_buffer[MPI_MAX_ERROR_STRING];
+    /* The dimension IDs. */
+    int dimid_text_var_len;
+    int dimid_darray_var_len;
+    int dimid_put_get_var_len;
 
-/** This is the length of the most recent MPI error message, stored
- * int the global error string. */
-int resultlen;
+    /* This simple example uses one-dimensional data. */
+    const int NDIMS = 1;
 
-/** @brief Check the output file.
- *
- *  Use netCDF to check that the output is as expected. 
- *
- * @param ntasks The number of processors running the example. 
- * @param filename The name of the example file to check. 
- *
- * @return 0 if example file is correct, non-zero otherwise. */
-int check_file(int ntasks, char *filename) {
-#ifdef _NETCDF
-    int ncid;         /**< File ID from netCDF. */
-    int ndims;        /**< Number of dimensions. */
-    int nvars;        /**< Number of variables. */
-    int ngatts;       /**< Number of global attributes. */
-    int unlimdimid;   /**< ID of unlimited dimension. */
-    size_t dimlen;    /**< Length of the dimension. */
-    int natts;        /**< Number of variable attributes. */
-    nc_type xtype;    /**< NetCDF data type of this variable. */
-    int ret;          /**< Return code for function calls. */
-    int dimids[NDIM]; /**< Dimension ids for this variable. */
-    char dim_name[PIO_MAX_NAME];   /**< Name of the dimension. */
-    char var_name[PIO_MAX_NAME];   /**< Name of the variable. */
-    size_t start[NDIM];           /**< Zero-based index to start read. */
-    size_t count[NDIM];           /**< Number of elements to read. */
-    int buffer[DIM_LEN];          /**< Buffer to read in data. */
-    int expected[DIM_LEN];        /**< Data values we expect to find. */
-    
-    /* Open the file. */
-    if ((ret = nc_open(filename, 0, &ncid)))
-	return ret;
+    /* Lengths of the global dimensions */
+    int gdimlen[NDIMS];
 
-    /* Check the metadata. */
-    if ((ret = nc_inq(ncid, &ndims, &nvars, &ngatts, &unlimdimid)))
-	return ret;
-    if (ndims != NDIM || nvars != 1 || ngatts != 0 || unlimdimid != -1)
-	return ERR_BAD;
-    if ((ret = nc_inq_dim(ncid, 0, dim_name, &dimlen)))
-	return ret;
-    if (dimlen != DIM_LEN || strcmp(dim_name, DIM_NAME))
-	return ERR_BAD;
-    if ((ret = nc_inq_var(ncid, 0, var_name, &xtype, &ndims, dimids, &natts)))
-	return ret;
-    if (xtype != NC_INT || ndims != NDIM || dimids[0] != 0 || natts != 0)
-	return ERR_BAD;
+    /* The ID for the parallel I/O system. It is set by
+       PIOc_Init_Intracomm(). It references an internal structure
+       containing the general IO subsystem data and MPI
+       structure. It is passed to PIOc_finalize() to free
+       associated resources, after all I/O, but before
+       MPI_Finalize is called. */
+    int iosysid;
 
-    /* Use the number of processors to figure out what the data in the
-     * file should look like. */
-    int div = DIM_LEN/ntasks;
-    for (int d = 0; d < DIM_LEN; d++)
-	expected[d] = START_DATA_VAL + d/div;
-    
-    /* Check the data. */
-    start[0] = 0;
-    count[0] = DIM_LEN;
-    if ((ret = nc_get_vara(ncid, 0, start, count, buffer)))
-	return ret;
-    for (int d = 0; d < DIM_LEN; d++)
-	if (buffer[d] != expected[d])
-	    return ERR_BAD;
+    /* The ncid of the netCDF file created and read in this example. */
+    int ncid_write = 0;
+    int ncid_read = 0;
 
-    /* Close the file. */
-    if ((ret = nc_close(ncid)))
-	return ret;
+    /* The IDs of the netCDF variables in the example file. */
+    int varid_dummy_scalar_var_int;
+    int varid_dummy_scalar_var_float;
+
+    int varid_dummy_text_var;
+
+    int varid_dummy_darray_var_int;
+    int varid_dummy_darray_var_float;
+    int varid_dummy_put_get_var_int;
+    int varid_dummy_put_get_var_float;
+
+    /* start/count arrays for get/put var */
+    PIO_Offset start[NDIMS];
+    PIO_Offset count[NDIMS];
+
+    /* The I/O description IDs as passed back by PIOc_InitDecomp()
+       and freed in PIOc_freedecomp(). */
+    int ioid_int;
+    int ioid_double;
+
+    /* Sample data for global attributes. */
+    int put_global_att_int_data = -10;
+    int get_global_att_int_data = 0;
+    float put_global_att_float_data = -9.9;
+    float get_global_att_float_data = 0.0;
+    char put_global_att_text_data[PIO_MAX_NAME] = "Dummy global attribute string";
+    char get_global_att_text_data[PIO_MAX_NAME] = "\0";
+
+    /* Sample data for variable attributes. */
+    int put_att_int_data = -100;
+    int get_att_int_data = 0;
+    float put_att_float_data = -99.99;
+    float get_att_float_data = 0.0;
+    char put_att_text_data[PIO_MAX_NAME] = "Dummy variable attribute string";
+    char get_att_text_data[PIO_MAX_NAME] = "\0";
+
+    /* Sample data for scalar variables. */
+    int put_scalar_int_data = -1000;
+    int get_scalar_int_data = 0;
+    float put_scalar_float_data = -999.999;
+    float get_scalar_float_data = 0.0;
+
+    /* Sample string for text variable. */
+    char put_text_data[PIO_MAX_NAME] = "Dummy text variable string";
+    char get_text_data[PIO_MAX_NAME] = "\0";
+
+    /* Buffers for sample write/read darray data. */
+    int write_darray_buffer_int[ELEMENTS_PER_PE];
+    int read_darray_buffer_int[ELEMENTS_PER_PE];
+    double write_darray_buffer_double[ELEMENTS_PER_PE];
+    double read_darray_buffer_double[ELEMENTS_PER_PE];
+
+    /* Buffers for sample put/get var data. */
+    int put_var_buffer_int[PUT_GET_VAR_LEN];
+    int get_var_buffer_int[PUT_GET_VAR_LEN];
+    double put_var_buffer_double[PUT_GET_VAR_LEN];
+    double get_var_buffer_double[PUT_GET_VAR_LEN];
+
+    /* A 1-D array which holds the decomposition mapping for this example. */
+    PIO_Offset *compmap;
+
+    /* Test filename. */
+    char filename[PIO_MAX_NAME];
+
+    float diff_float;
+    double diff_double;
+
+    int ret = PIO_NOERR;
+
+#ifdef TIMING
+    GPTLinitialize();
 #endif
 
-    /* Everything looks good! */
+    MPI_Init(&argc, &argv);
+
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &ntasks);
+
+    /* Set lengths of the global dimensions (1D in this example). */
+    gdimlen[0] = ELEMENTS_PER_PE * ntasks;
+
+    /* Keep things simple - 1 IO task per MPI process */
+    niotasks = ntasks;
+
+    /* Initialize the PIO IO system. This specifies how
+       many and which processors are involved in I/O. */
+    ret = PIOc_Init_Intracomm(MPI_COMM_WORLD, niotasks, ioproc_stride, ioproc_start,
+                              PIO_REARR_SUBSET, &iosysid);
+    ERR
+
+    /* Describe the decomposition. This is a 1-based array. */
+    compmap = malloc(ELEMENTS_PER_PE * sizeof(PIO_Offset));
+    for (int i = 0; i < ELEMENTS_PER_PE; i++)
+        compmap[i] = my_rank * ELEMENTS_PER_PE + i + 1;
+
+    /* Create the decomposition for this example. */
+    ret = PIOc_InitDecomp(iosysid, PIO_INT, NDIMS, gdimlen, ELEMENTS_PER_PE, compmap, &ioid_int, NULL, NULL, NULL);
+    ERR
+    ret = PIOc_InitDecomp(iosysid, PIO_DOUBLE, NDIMS, gdimlen, ELEMENTS_PER_PE, compmap, &ioid_double, NULL, NULL,
+                          NULL);
+    ERR
+    free(compmap);
+
+    /* Prepare sample data for write buffers and initialize read buffers. */
+    for (int i = 0; i < ELEMENTS_PER_PE; i++) {
+        write_darray_buffer_int[i] = my_rank;
+        write_darray_buffer_double[i] = my_rank * 0.1;
+        read_darray_buffer_int[i] = 0;
+        read_darray_buffer_double[i] = 0.0;
+    }
+
+    for (int i = 0; i < PUT_GET_VAR_LEN; i++) {
+        put_var_buffer_int[i] = i + 1;
+        put_var_buffer_double[i] = (i + 1) * 0.1;
+        get_var_buffer_int[i] = 0;
+        get_var_buffer_double[i] = 0.0;
+    }
+
+    for (int fmt = 0; fmt < 2; fmt++) {
+        /* Create a filename to write. */
+        sprintf(filename, "example1_%d.nc", fmt);
+
+        ret = PIOc_createfile(iosysid, &ncid_write, &(formats[fmt]), filename, PIO_CLOBBER);
+        ERR
+
+        /* Put some global attributes. */
+        ret = PIOc_put_att(ncid_write, PIO_GLOBAL, "dummy_global_att_int", PIO_INT, 1, &put_global_att_int_data);
+        ERR
+        ret = PIOc_put_att(ncid_write, PIO_GLOBAL, "dummy_global_att_float", PIO_FLOAT, 1, &put_global_att_float_data);
+        ERR
+        ret = PIOc_put_att_text(ncid_write, PIO_GLOBAL, "dummy_global_att_text", strlen(put_global_att_text_data),
+                                put_global_att_text_data);
+        ERR
+
+        /* Define some scalar variables. */
+        ret = PIOc_def_var(ncid_write, "dummy_scalar_var_int", PIO_INT, 0, NULL, &varid_dummy_scalar_var_int);
+        ERR
+        ret = PIOc_def_var(ncid_write, "dummy_scalar_var_float", PIO_FLOAT, 0, NULL, &varid_dummy_scalar_var_float);
+        ERR
+
+        /* Define a text variable. */
+        ret = PIOc_def_dim(ncid_write, "text_var_len", PIO_MAX_NAME, &dimid_text_var_len);
+        ERR
+        ret = PIOc_def_var(ncid_write, "dummy_text_var", PIO_CHAR, 1, &dimid_text_var_len, &varid_dummy_text_var);
+        ERR
+
+        /* Define some variables for PIOc_write_darray. */
+        ret = PIOc_def_dim(ncid_write, "darray_var_len", (PIO_Offset) gdimlen[0], &dimid_darray_var_len);
+        ERR
+        ret = PIOc_def_var(ncid_write, "dummy_darray_var_int", PIO_INT, NDIMS, &dimid_darray_var_len,
+                           &varid_dummy_darray_var_int);
+        ERR
+        ret = PIOc_def_var(ncid_write, "dummy_darray_var_float", PIO_FLOAT, NDIMS, &dimid_darray_var_len,
+                           &varid_dummy_darray_var_float);
+        ERR
+
+        /* Put some local attributes for variable dummy_darray_var_int. */
+        ret = PIOc_put_att(ncid_write, varid_dummy_darray_var_int, "dummy_att_float", PIO_FLOAT, 1,
+                           &put_att_float_data);
+        ERR
+        ret = PIOc_put_att(ncid_write, varid_dummy_darray_var_int, "dummy_att_int", PIO_INT, 1, &put_att_int_data);
+        ERR
+        ret = PIOc_put_att_text(ncid_write, varid_dummy_darray_var_int, "dummy_att_text", strlen(put_att_text_data),
+                                put_att_text_data);
+        ERR
+
+        /* Define some variables for PIOc_put_vars. */
+        ret = PIOc_def_dim(ncid_write, "put_get_var_len", PUT_GET_VAR_LEN, &dimid_put_get_var_len);
+        ERR
+        ret = PIOc_def_var(ncid_write, "dummy_put_get_var_int", PIO_INT, NDIMS, &dimid_put_get_var_len,
+                           &varid_dummy_put_get_var_int);
+        ERR
+        ret = PIOc_def_var(ncid_write, "dummy_put_get_var_float", PIO_FLOAT, NDIMS, &dimid_put_get_var_len,
+                           &varid_dummy_put_get_var_float);
+        ERR
+
+        ret = PIOc_enddef(ncid_write);
+        ERR
+
+        /* Put some scalar variables. */
+        ret = PIOc_put_var_int(ncid_write, varid_dummy_scalar_var_int, &put_scalar_int_data);
+        ERR
+        ret = PIOc_put_var_float(ncid_write, varid_dummy_scalar_var_float, &put_scalar_float_data);
+        ERR
+
+        /* Put a text variable. */
+        ret = PIOc_put_var_text(ncid_write, varid_dummy_text_var, put_text_data);
+        ERR
+
+        /* Put int type data to an int type variable, type conversions will not be performed. */
+        /* Put 1st half data first */
+        start[0] = 0;
+        count[0] = PUT_GET_VAR_LEN / 2;
+        ret = PIOc_put_vars_int(ncid_write, varid_dummy_put_get_var_int, start, count, NULL, put_var_buffer_int);
+        ERR
+        /* Put 2nd half data */
+        start[0] = PUT_GET_VAR_LEN / 2;
+        count[0] = PUT_GET_VAR_LEN / 2;
+        ret = PIOc_put_vars_int(ncid_write, varid_dummy_put_get_var_int, start, count, NULL,
+                                put_var_buffer_int + (PUT_GET_VAR_LEN / 2));
+        ERR
+
+        /* Put double type data to a float type variable, type conversions will be performed. */
+        /* Put 2nd half data first */
+        start[0] = PUT_GET_VAR_LEN / 2;
+        count[0] = PUT_GET_VAR_LEN / 2;
+        ret = PIOc_put_vars_double(ncid_write, varid_dummy_put_get_var_float, start, count, NULL,
+                                   put_var_buffer_double + (PUT_GET_VAR_LEN / 2));
+        ERR
+        /* Put 1st half data */
+        start[0] = 0;
+        count[0] = PUT_GET_VAR_LEN / 2;
+        ret = PIOc_put_vars_double(ncid_write, varid_dummy_put_get_var_float, start, count, NULL,
+                                   put_var_buffer_double);
+        ERR
+
+        /* Write to int type variable with int type decomposition, type conversions will not be performed. */
+        ret = PIOc_write_darray(ncid_write, varid_dummy_darray_var_int, ioid_int, ELEMENTS_PER_PE,
+                                write_darray_buffer_int, NULL);
+        ERR
+
+        /* Write to float type variable with double type decomposition, type conversions will be performed. */
+        ret = PIOc_write_darray(ncid_write, varid_dummy_darray_var_float, ioid_double, ELEMENTS_PER_PE,
+                                write_darray_buffer_double, NULL);
+        ERR
+
+        ret = PIOc_closefile(ncid_write);
+        ERR
+    }
+
+    /* Read support is not implemented for ADIOS type yet: change to "fmt < 2" for testing this new feature later.
+       Currently, ADIOS type in SCORPIO simply changes actual type to PnetCDF or NetCDF for reading. */
+    for (int fmt = 0; fmt < 2; fmt++) {
+        /* Note: for ADIOS type, the actual file name on disk is a BP directory named example1_1.nc.bp.dir,
+           client code like E3SM still assumes example1_1.nc as the file name to be read.  */
+        sprintf(filename, "example1_%d.nc", fmt);
+
+        ret = PIOc_openfile(iosysid, &ncid_read, &(formats[fmt]), filename, PIO_NOWRITE);
+        ERR
+
+        /* Get int type global attribute. */
+        ret = PIOc_get_att(ncid_read, PIO_GLOBAL, "dummy_global_att_int", &get_global_att_int_data);
+        ERR
+        if (get_global_att_int_data != put_global_att_int_data) {
+            printf("***rank = %d, read wrong data for dummy_global_att_int\n", my_rank);
+        } else {
+            printf("***rank = %d, read dummy_global_att_int read ... Ok\n", my_rank);
+        }
+
+        /* Get float type global attribute. */
+        ret = PIOc_get_att(ncid_read, PIO_GLOBAL, "dummy_global_att_float", &get_global_att_float_data);
+        ERR
+        diff_float = get_global_att_float_data - put_global_att_float_data;
+        if (fabs(diff_float) > 1E-5) {
+            printf("***rank = %d, read wrong data for dummy_global_att_float\n", my_rank);
+        } else {
+            printf("***rank = %d, read dummy_global_att_float ... Ok\n", my_rank);
+        }
+
+
+        /* Get text type global attribute. */
+        ret = PIOc_get_att_text(ncid_read, PIO_GLOBAL, "dummy_global_att_text", get_global_att_text_data);
+        ERR
+        if (strncmp(get_global_att_text_data, put_global_att_text_data, strlen(put_global_att_text_data))) {
+            printf("rank = %d, read wrong data for dummy_global_att_text\n", my_rank);
+        } else {
+            printf("***rank = %d, read  dummy_global_att_text ... Ok\n", my_rank);
+        }
+
+        /* Get int type scalar variable. */
+        ret = PIOc_inq_varid(ncid_read, "dummy_scalar_var_int", &varid_dummy_scalar_var_int);
+        ERR
+        ret = PIOc_get_var_int(ncid_read, varid_dummy_scalar_var_int, &get_scalar_int_data);
+        ERR
+        if (get_scalar_int_data != put_scalar_int_data) {
+            printf("rank = %d, read wrong data for dummy_scalar_var_int\n", my_rank);
+        } else {
+            printf("***rank = %d, read  dummy_scalar_var_int ... Ok\n", my_rank);
+        }
+        /* Get float type scalar variable. */
+        ret = PIOc_inq_varid(ncid_read, "dummy_scalar_var_float", &varid_dummy_scalar_var_float);
+        ERR
+        ret = PIOc_get_var_float(ncid_read, varid_dummy_scalar_var_float, &get_scalar_float_data);
+        ERR
+        diff_float = get_scalar_float_data - put_scalar_float_data;
+        if (fabs(diff_float) > 1E-5) {
+            printf("***rank = %d, read wrong data for dummy_scalar_var_float\n", my_rank);
+        } else {
+            printf("***rank = %d, read  dummy_scalar_var_float ...Ok\n", my_rank);
+        }
+        /* Get text type variable. */
+        ret = PIOc_inq_varid(ncid_read, "dummy_text_var", &varid_dummy_text_var);
+        ERR
+        ret = PIOc_get_var_text(ncid_read, varid_dummy_text_var, get_text_data);
+        ERR
+        if (strncmp(get_text_data, put_text_data, strlen(put_text_data))) {
+            printf("***rank = %d, read wrong data for dummy_text_var\n", my_rank);
+        } else {
+            printf("***rank = %d, read  dummy_text_var ... Ok\n", my_rank);
+        }
+        /* Read int type variable with int type decomposition, type conversions will not be performed. */
+        ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_int", &varid_dummy_darray_var_int);
+        ERR
+        PIOc_setframe(ncid_read, varid_dummy_darray_var_int, 0);
+        ret = PIOc_read_darray(ncid_read, varid_dummy_darray_var_int, ioid_int, ELEMENTS_PER_PE,
+                               read_darray_buffer_int);
+        ERR
+        int cnt = 0;
+        for (int i = 0; i < ELEMENTS_PER_PE; i++) {
+            if (read_darray_buffer_int[i] != write_darray_buffer_int[i]) {
+                printf("TEST: rank = %d, read wrong data for dummy_darray_var_int at index %d\n", my_rank, i);
+                break;
+            } else {
+                cnt++;
+            }
+        }
+        printf("***rank = %d, number of correct values = %d for read_darray_buffer_int\n", my_rank, cnt);
+        /* Get int type attribute of variable dummy_darray_var_int. */
+        ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_int", &varid_dummy_darray_var_int);
+        ERR
+        ret = PIOc_get_att(ncid_read, varid_dummy_darray_var_int, "dummy_att_int", &get_att_int_data);
+        ERR
+        if (get_att_int_data != put_att_int_data) {
+            printf("rank = %d, read wrong data for dummy_att_int of dummy_darray_var_int\n", my_rank);
+        } else {
+            printf("***rank = %d, read dummy_darray_var_int int attribute ... Ok\n", my_rank);
+        }
+        /* Get float type attribute of variable dummy_darray_var_int. */
+        ret = PIOc_get_att(ncid_read, varid_dummy_darray_var_int, "dummy_att_float", &get_att_float_data);
+        ERR
+        diff_float = get_att_float_data - put_att_float_data;
+        if (fabs(diff_float) > 1E-5)
+            printf("rank = %d, read wrong data for dummy_att_float of dummy_darray_var_int\n", my_rank);
+
+        /* Get text type attribute of variable dummy_darray_var_int. */
+        ret = PIOc_get_att_text(ncid_read, varid_dummy_darray_var_int, "dummy_att_text", get_att_text_data);
+        ERR
+        if (strncmp(get_att_text_data, put_att_text_data, strlen(put_att_text_data))) {
+            printf("rank = %d, read wrong data for dummy_att_text of dummy_darray_var_int\n", my_rank);
+        } else {
+            printf("***rank = %d, read dummy_darray_var_int text attribute ... Ok\n", my_rank);
+        }
+        /* Read float type variable with double type decomposition, type conversions will be performed. */
+        ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_float", &varid_dummy_darray_var_float);
+        ERR
+        ret = PIOc_read_darray(ncid_read, varid_dummy_darray_var_float, ioid_double, ELEMENTS_PER_PE,
+                               read_darray_buffer_double);
+        ERR
+        cnt = 0;
+        for (int i = 0; i < ELEMENTS_PER_PE; i++) {
+            diff_double = read_darray_buffer_double[i] - write_darray_buffer_double[i];
+            if (fabs(diff_double) > 1E-5) {
+                printf("rank = %d, read wrong data for dummy_darray_var_double at index %d\n", my_rank, i);
+                break;
+            } else {
+                cnt++;
+            }
+        }
+        printf("TEST: rank = %d, number of correct values = %d\n", my_rank, cnt);
+        /* Get int type variable with int type decomposition, type conversions will not be performed. */
+        ret = PIOc_inq_varid(ncid_read, "dummy_put_get_var_int", &varid_dummy_put_get_var_int);
+        ERR
+        /* Partial get: excluding the first and the last elements */
+        start[0] = 1;
+        count[0] = PUT_GET_VAR_LEN - 2;
+        ret = PIOc_get_vars_int(ncid_read, varid_dummy_put_get_var_int, start, count, NULL, get_var_buffer_int + 1);
+        ERR
+        for (int i = 1; i < PUT_GET_VAR_LEN - 1; i++) {
+            if (get_var_buffer_int[i] != put_var_buffer_int[i]) {
+                printf("rank = %d, get wrong data for dummy_put_get_var_int at index %d\n", my_rank, i);
+                break;
+            }
+        }
+        /* Get float type variable with double type decomposition, type conversions will be performed. */
+        ret = PIOc_inq_varid(ncid_read, "dummy_put_get_var_float", &varid_dummy_put_get_var_float);
+        ERR
+        /* Partial get: excluding the first and the last elements */
+        start[0] = 1;
+        count[0] = PUT_GET_VAR_LEN - 2;
+        ret = PIOc_get_vars_double(ncid_read, varid_dummy_put_get_var_float, start, count, NULL, get_var_buffer_double + 1);
+        ERR
+        for (int i = 1; i < PUT_GET_VAR_LEN - 1; i++) {
+            diff_double = get_var_buffer_double[i] - put_var_buffer_double[i];
+            if (fabs(diff_double) > 1E-5) {
+                printf("rank = %d, get wrong data for dummy_put_get_var_float at index %d\n", my_rank, i);
+                break;
+            }
+        }
+        ret = PIOc_closefile(ncid_read);
+        ERR
+    }
+
+    ret = PIOc_freedecomp(iosysid, ioid_int);
+    ERR
+    ret = PIOc_freedecomp(iosysid, ioid_double);
+    ERR
+
+    ret = PIOc_finalize(iosysid);
+    ERR
+
+    MPI_Finalize();
+
+#ifdef TIMING
+    GPTLfinalize();
+#endif
+
     return 0;
 }
-
-/** @brief Main execution of code.
-
-    Executes the functions to:
-    - create a new examplePioClass instance
-    - initialize MPI and the ParallelIO libraries
-    - create the decomposition for this example
-    - create the netCDF output file
-    - define the variable in the file
-    - write data to the variable in the file using decomposition
-    - read the data back from the file using decomposition
-    - close the file
-    - clean up resources
-
-    The example can be run from the command line (on system that support it) like this:
-    <pre>
-    mpiexec -n 4 ./examplePio
-    </pre>
-
-    The sample file created by this program is a small netCDF file. It
-    has the following contents (as shown by ncdump) for a 4-processor
-    run:
-
-    <pre>
-    netcdf examplePio_c {
-    dimensions:
-    x = 16 ;
-    variables:
-    int foo(x) ;
-    data:
-
-    foo = 42, 42, 42, 42, 43, 43, 43, 43, 44, 44, 44, 44, 45, 45, 45, 45 ;
-    }
-    </pre>
-    
-    @param [in] argc argument count (should be zero)
-    @param [in] argv argument array (should be NULL)
-    @retval examplePioClass* Pointer to self.
-*/
-    int main(int argc, char* argv[])
-    {
-	/** Set to non-zero to get output to stdout. */
-	int verbose = 0;
-
-	/** Zero-based rank of processor. */
-	int my_rank;
-
-	/** Number of processors involved in current execution. */
-	int ntasks;
-
-	/** Different output flavors. The example file is written (and
-	 * then read) four times. The first two flavors,
-	 * parallel-netcdf, and netCDF serial, both produce a netCDF
-	 * classic format file (but with different libraries). The
-	 * last two produce netCDF4/HDF5 format files, written with
-	 * and without using netCDF-4 parallel I/O. */
-	int format[NUM_NETCDF_FLAVORS];
-
-	/** Number of processors that will do IO. In this example we
-	 * will do IO from all processors. */
-	int niotasks;
-
-	/** Stride in the mpi rank between io tasks. Always 1 in this
-	 * example. */
-	int ioproc_stride = 1;
-
-	/** Zero based rank of first processor to be used for I/O. */
-	int ioproc_start = 0;
-
-	/** The dimension ID. */
-	int dimid;
-
-	/** Array index per processing unit. This is the number of
-	 * elements of the data array that will be handled by each
-	 * processor. In this example there are 16 data elements. If the
-	 * example is run on 4 processors, then arrIdxPerPe will be 4. */
-	PIO_Offset elements_per_pe;
-
-	/* Length of the dimensions in the data. This simple example
-	 * uses one-dimensional data. The lenght along that dimension
-	 * is DIM_LEN (16). */
-	int dim_len[1] = {DIM_LEN};
-
-	/** The ID for the parallel I/O system. It is set by
-	 * PIOc_Init_Intracomm(). It references an internal structure
-	 * containing the general IO subsystem data and MPI
-	 * structure. It is passed to PIOc_finalize() to free
-	 * associated resources, after all I/O, but before
-	 * MPI_Finalize is called. */
-	int iosysid;
-
-	/** The ncid of the netCDF file created in this example. */
-	int ncid;
-
-	/** The ID of the netCDF varable in the example file. */
-	int varid;
-
-	/** The I/O description ID as passed back by PIOc_InitDecomp()
-	 * and freed in PIOc_freedecomp(). */
-	int ioid;
-
-	/** A buffer for sample data.  The size of this array will
-	 * vary depending on how many processors are involved in the
-	 * execution of the example code. It's length will be the same
-	 * as elements_per_pe.*/
-	int *buffer;
-
-	/** A 1-D array which holds the decomposition mapping for this
-	 * example. The size of this array will vary depending on how
-	 * many processors are involved in the execution of the
-	 * example code. It's length will be the same as
-	 * elements_per_pe. */
-	PIO_Offset *compdof;
-
-        /** Test filename. */
-        char filename[PIO_MAX_NAME + 1];
-
-        /** The number of netCDF flavors available in this build. */
-        int num_flavors = 0;
-            
-	/** Used for command line processing. */
-	int c;
-
-	/** Return value. */
-	int ret;
-
-	/* Parse command line. */
-	while ((c = getopt(argc, argv, "v")) != -1)
-	    switch (c)
-	    {
-	    case 'v':
-		verbose++;
-		break;
-	    default:
-		break;
-	    }
-
-#ifdef TIMING    
-#ifndef TIMING_INTERNAL
-	/* Initialize the GPTL timing library. */
-	if ((ret = GPTLinitialize ()))
-	    return ret;
-#endif
-#endif    
-    
-	/* Initialize MPI. */
-	if ((ret = MPI_Init(&argc, &argv)))
-	    MPIERR(ret);
-        /*
-	if ((ret = MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN)))
-	    MPIERR(ret);
-        */
-
-	/* Learn my rank and the total number of processors. */
-	if ((ret = MPI_Comm_rank(MPI_COMM_WORLD, &my_rank)))
-	    MPIERR(ret);
-	if ((ret = MPI_Comm_size(MPI_COMM_WORLD, &ntasks)))
-	    MPIERR(ret);
-
-	/* Check that a valid number of processors was specified. */
-	if (!(ntasks == 1 || ntasks == 2 || ntasks == 4 ||
-	      ntasks == 8 || ntasks == 16))
-	    fprintf(stderr, "Number of processors must be 1, 2, 4, 8, or 16!\n");
-	if (verbose)
-	    printf("%d: ParallelIO Library example1 running on %d processors.\n",
-		   my_rank, ntasks);
-
-	/* keep things simple - 1 iotask per MPI process */    
-	niotasks = ntasks; 
-
-	/* Initialize the PIO IO system. This specifies how
-	 * many and which processors are involved in I/O. */
-	if ((ret = PIOc_Init_Intracomm(MPI_COMM_WORLD, niotasks, ioproc_stride,
-				       ioproc_start, PIO_REARR_SUBSET, &iosysid)))
-	    ERR(ret);
-
-	/* Describe the decomposition. This is a 1-based array, so add 1! */
-	elements_per_pe = DIM_LEN / ntasks;
-	if (!(compdof = malloc(elements_per_pe * sizeof(PIO_Offset))))
-	    return PIO_ENOMEM;
-	for (int i = 0; i < elements_per_pe; i++)
-	    compdof[i] = my_rank * elements_per_pe + i + 1;
-	
-	/* Create the PIO decomposition for this example. */
-	if (verbose)
-	    printf("rank: %d Creating decomposition...\n", my_rank);
-	if ((ret = PIOc_InitDecomp(iosysid, PIO_INT, NDIM, dim_len, (PIO_Offset)elements_per_pe,
-				   compdof, &ioid, NULL, NULL, NULL)))
-	    ERR(ret);
-	free(compdof);
-
-        /* The number of favors may change with the build parameters. */
-#ifdef _PNETCDF
-        format[num_flavors++] = PIO_IOTYPE_PNETCDF;
-#endif
-#ifdef _NETCDF
-        format[num_flavors++] = PIO_IOTYPE_NETCDF;
-#endif
-#ifdef _NETCDF4
-        format[num_flavors++] = PIO_IOTYPE_NETCDF4C;
-        format[num_flavors++] = PIO_IOTYPE_NETCDF4P;
-#endif
-#ifdef _ADIOS2
-        format[num_flavors++] = PIO_IOTYPE_ADIOS;
-#endif
-	
-	/* Use PIO to create the example file in each of the four
-	 * available ways. */
-	for (int fmt = 0; fmt < num_flavors; fmt++) 
-	{
-	    /* Create a filename. */
-	    sprintf(filename, "example1_%d.nc", fmt);
-
-	    /* Create the netCDF output file. */
-	    if (verbose)
-		printf("rank: %d Creating sample file %s with format %d...\n",
-		       my_rank, filename, format[fmt]);
-	    if ((ret = PIOc_createfile(iosysid, &ncid, &(format[fmt]), filename,
-				       PIO_CLOBBER)))
-		ERR(ret);
-	
-	    /* Define netCDF dimension and variable. */
-	    if (verbose)
-		printf("rank: %d Defining netCDF metadata...\n", my_rank);
-	    if ((ret = PIOc_def_dim(ncid, DIM_NAME, (PIO_Offset)dim_len[0], &dimid)))
-		ERR(ret);
-	    if ((ret = PIOc_def_var(ncid, VAR_NAME, PIO_INT, NDIM, &dimid, &varid)))
-		ERR(ret);
-	    if ((ret = PIOc_enddef(ncid)))
-		ERR(ret);
-	
-	    /* Prepare sample data. */
-	    if (!(buffer = malloc(elements_per_pe * sizeof(int))))
-	        return PIO_ENOMEM;
-	    for (int i = 0; i < elements_per_pe; i++)
-	        buffer[i] = START_DATA_VAL + my_rank;
-
-	    /* Write data to the file. */
-	    if (verbose)
-	        printf("rank: %d Writing sample data...\n", my_rank);
-	    if ((ret = PIOc_write_darray(ncid, varid, ioid, (PIO_Offset)elements_per_pe,
-	    			     buffer, NULL)))
-	        ERR(ret);
-	    if ((ret = PIOc_sync(ncid)))
-	        ERR(ret);
-
-	    /* Free buffer space used in this example. */
-	    free(buffer);
-	
-	    /* Close the netCDF file. */
-	    if (verbose)
-		printf("rank: %d Closing the sample data file...\n", my_rank);
-	    if ((ret = PIOc_closefile(ncid)))
-		ERR(ret);
-	}
-	
-	/* Free the PIO decomposition. */
-	if (verbose)
-	    printf("rank: %d Freeing PIO decomposition...\n", my_rank);
-	if ((ret = PIOc_freedecomp(iosysid, ioid)))
-	    ERR(ret);
-	
-	/* Finalize the IO system. */
-	if (verbose)
-	    printf("rank: %d Freeing PIO resources...\n", my_rank);
-	if ((ret = PIOc_finalize(iosysid)))
-	    ERR(ret);
-
-	/* Check the output file. */
-	if (!my_rank)
-	    for (int fmt = 0; fmt < num_flavors; fmt++)
-	    {
-	        sprintf(filename, "example1_%d.nc", fmt);
-	        if (format[fmt] != PIO_IOTYPE_ADIOS &&
-	            (ret = check_file(ntasks, filename)))
-	            ERR(ret);
-	    }
-
-	/* Finalize the MPI library. */
-	MPI_Finalize();
-
-#ifdef TIMING    
-#ifndef TIMING_INTERNAL
-	/* Finalize the GPTL timing library. */
-	if ((ret = GPTLfinalize ()))
-	    return ret;
-#endif
-#endif    
-
-	if (verbose)
-	    printf("rank: %d SUCCESS!\n", my_rank);
-	return 0;
-    }
