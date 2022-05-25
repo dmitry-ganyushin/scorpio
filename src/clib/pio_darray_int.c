@@ -1217,7 +1217,7 @@ bool match_decomp_part(const int64_t *pInt, size_t pos, long long int *pInt1, lo
     from_type tmp_read;\
     to_type* tmp_out = (to_type*)malloc(len * out_type_size);\
 for (int pos = 0; pos < len; pos++) {\
-    memcpy(&tmp_read, &data_buf[(start_idx_in_start_block + pos) * read_type_size], read_type_size);\
+    memcpy(&tmp_read, &data_buf[(start_idx_in_target_block + pos) * read_type_size], read_type_size);\
     tmp_out[pos] = (to_type)tmp_read;\
 };\
 memcpy((char *) (iobuf), tmp_out, out_type_size * len);\
@@ -1354,10 +1354,10 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     MPI_Offset *end_decomp = &(iodesc->map[iodesc->maplen - 1]);
 /************************* end get decomp info *********************************/
 /************************* get decomp info from file *********************************/
-    int start_block = -1;
+    int target_block = -1;
     int end_block = -1;
-    int start_idx_in_start_block = -1;
-    int end_idx_in_end_block = -1;
+    int start_idx_in_target_block = -1;
+    int end_idx_in_target_block = -1;
     bool start_block_found = false;
     /* get attribute mappling from variable name to te id*/
     char prefix_var_name[] = "/__pio__/var/";
@@ -1458,10 +1458,10 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
         /* example: 4 writing processes 16 reading processes   */
         for (size_t pos = 0; pos < block_size; pos++) {
             if (!start_block_found && match_decomp_part(decomp_int64_t, pos, start_decomp, end_decomp)) {
-                start_block = block;
-                start_idx_in_start_block = pos;
+                target_block = block;
+                start_idx_in_target_block = pos;
+                end_idx_in_target_block = pos + (end_decomp - start_decomp);
                 start_block_found = true;
-                end_idx_in_end_block = pos + (end_decomp - start_decomp);
             }
         }
         /* free recourses */
@@ -1586,7 +1586,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
         size_t read_type_size = get_adios2_type_size(read_type, NULL);
         adios2_type out_type = PIOc_get_adios_type(iodesc->piotype);
         int out_type_size = get_adios2_type_size(out_type, NULL);
-        adios2_set_block_selection(data, start_block);
+        adios2_set_block_selection(data, target_block);
         size_t block_size;/* size of the block*/
         adios2_error err_sel = adios2_selection_size(&block_size, data);
         data_buf = (char *) malloc(block_size * read_type_size);
@@ -1596,13 +1596,13 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
                            "adios2_get for file (%s) failed",
                            pio_get_fname_from_file(file));
         }
-        size_t len = end_idx_in_end_block - start_idx_in_start_block + 1;
+        size_t len = end_idx_in_target_block - start_idx_in_target_block + 1;
         /* copy without type conversion byte-by-byte */
         if (read_type == out_type) {
             /*inside one block*/
             /* |000xxx00|  */
-            memcpy((char *) iobuf, &data_buf[start_idx_in_start_block * read_type_size],
-                   (end_idx_in_end_block - start_idx_in_start_block + 1) * out_type_size);
+            memcpy((char *) iobuf, &data_buf[start_idx_in_target_block * read_type_size],
+                   (end_idx_in_target_block - start_idx_in_target_block + 1) * out_type_size);
             /*type conversion*/
         } else if (read_type == adios2_type_double) {
             ADIOS_CONVERT_FROM(double)
