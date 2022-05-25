@@ -169,6 +169,9 @@ int pio_delete_file_from_list(int ncid)
             if (cfile->cache_block_sizes != NULL){
                 cfile->cache_block_sizes->free(cfile->cache_block_sizes);
             }
+            if (cfile->cache_darray_info != NULL){
+                cfile->cache_darray_info->free(cfile->cache_darray_info);
+            }
             free(cfile);
             
             return PIO_NOERR;
