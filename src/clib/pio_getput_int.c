@@ -1338,7 +1338,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             }
         }else if (current_adios_step < required_adios_step) {
             /* traverse  bp file until the required step */
-            for (int step = 0; step < required_adios_step - current_adios_step - 1; step++) {
+            for (int step = 0; step < required_adios_step - current_adios_step; step++) {
                 adios2_error end_step_err = adios2_end_step(file->engineH);
                 if (end_step_err != adios2_error_none) {
                     return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -1416,16 +1416,16 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                 snprintf(vname, PIO_MAX_NAME, "/__pio__/var/%s", av->name);
                 av->adios_varid = adios2_inquire_variable(file->ioH, vname);
                 if (av->adios_varid == NULL) {
-                    GPTLstop("PIO:PIOc_put_vars_tc");
-                    GPTLstop("PIO:write_total");
+                    GPTLstop("PIO:PIOc_get_vars_tc");
+                    GPTLstop("PIO:read_total");
                     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                     spio_ltimer_stop(file->io_fstats->rd_timer_name);
                     spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                    GPTLstop("PIO:PIOc_put_vars_tc_adios");
-                    GPTLstop("PIO:write_total_adios");
+                    GPTLstop("PIO:PIOc_get_vars_tc_adios");
+                    GPTLstop("PIO:read_total_adios");
                     return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                   "Defining (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)",
+                                   "Inquiring (ADIOS) variable (name=%s) failed for file (%s, ncid=%d)",
                                    vname, pio_get_fname_from_file(file), file->pio_ncid);
 
                 } else {
