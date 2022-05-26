@@ -449,6 +449,20 @@ int main(int argc, char* argv[])
       }
     }
 
+      /* Get float type variable with double type decomposition, type conversions will be performed. */
+      ret = PIOc_inq_varid(ncid_read, "dummy_put_get_var_float", &varid_dummy_put_get_var_float); ERR
+      /* Partial get: excluding the first and the last elements */
+      start[0] = 1;
+      count[0] = PUT_GET_VAR_LEN - 2;
+      ret = PIOc_get_vars_double(ncid_read, varid_dummy_put_get_var_float, start, count, NULL, get_var_buffer_double + 1); ERR
+      for (int i = 1; i < PUT_GET_VAR_LEN - 1; i++) {
+          diff_double = get_var_buffer_double[i] - put_var_buffer_double[i];
+          if (fabs(diff_double) > 1E-5) {
+              printf("rank = %d, fmt = %d, get wrong data for dummy_put_get_var_float at index %d\n", my_rank, fmt, i);
+              break;
+          }
+      }
+
     /* Get int type attribute of variable dummy_darray_var_int. */
     ret = PIOc_get_att(ncid_read, varid_dummy_darray_var_int, "dummy_att_int", &get_att_int_data); ERR
     if (get_att_int_data != put_att_int_data)
@@ -503,20 +517,6 @@ int main(int argc, char* argv[])
     for (int i = 1; i < PUT_GET_VAR_LEN - 1; i++) {
       if (get_var_buffer_int[i] != put_var_buffer_int[i]) {
           printf("rank = %d, fmt = %d, get wrong data for dummy_put_get_var_int at index %d\n", my_rank, fmt, i);
-          break;
-      }
-    }
-
-    /* Get float type variable with double type decomposition, type conversions will be performed. */
-    ret = PIOc_inq_varid(ncid_read, "dummy_put_get_var_float", &varid_dummy_put_get_var_float); ERR
-    /* Partial get: excluding the first and the last elements */
-    start[0] = 1;
-    count[0] = PUT_GET_VAR_LEN - 2;
-    ret = PIOc_get_vars_double(ncid_read, varid_dummy_put_get_var_float, start, count, NULL, get_var_buffer_double + 1); ERR
-    for (int i = 1; i < PUT_GET_VAR_LEN - 1; i++) {
-      diff_double = get_var_buffer_double[i] - put_var_buffer_double[i];
-      if (fabs(diff_double) > 1E-5) {
-          printf("rank = %d, fmt = %d, get wrong data for dummy_put_get_var_float at index %d\n", my_rank, fmt, i);
           break;
       }
     }

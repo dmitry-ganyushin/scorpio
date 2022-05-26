@@ -720,6 +720,7 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
             }
             int required_adios_step = 0;
             size_t current_adios_step = 0;
+#if 0
             if (file->engineH != NULL)
             {
                 adios2_current_step(&current_adios_step, file->engineH);
@@ -742,7 +743,7 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
                 adios2_error adiosStepErr = adios2_begin_step(file->engineH, adios2_step_mode_read, 10.0, &step_status);
                 file->begin_step_called = 1;
             }
-
+#endif
             switch(memtype)
             {
                 case NC_DOUBLE: {
@@ -1301,12 +1302,13 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         /* magically obtain the relevant adios step */
         int required_adios_step = get_adios_step(file, varid, frame_id);
         size_t current_adios_step = 0;
+        adios2_step_status status;
         if (file->engineH != NULL)
         {
             LOG((2, "adios2_current_step (%s) io %p engine %p", file->fname, file->ioH, file->engineH));
             adios2_current_step(&current_adios_step, file->engineH);
         }
-        if (current_adios_step != required_adios_step) {
+        if (current_adios_step > required_adios_step) {
             /* close bp file and remove IO object */
             adios2_end_step(file->engineH);
             LOG((2, "adios2_close(%s) io %p engine %p", file->fname, file->ioH, file->engineH));
@@ -1333,6 +1335,26 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                     step++;
                     continue;
                 }
+            }
+        }else if (current_adios_step < required_adios_step) {
+            /* traverse  bp file until the required step */
+            for (int step = 0; step < required_adios_step - current_adios_step - 1; step++) {
+                adios2_error end_step_err = adios2_end_step(file->engineH);
+                if (end_step_err != adios2_error_none) {
+                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "adios2_end_step file (%s) failed",
+                                   pio_get_fname_from_file(file));
+                }
+                file->begin_step_called = 0;
+
+                adios2_error step_err = adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
+                                                          &status);
+                if (step_err != adios2_error_none) {
+                    return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "adios2_begin_step file (%s) failed",
+                                   pio_get_fname_from_file(file));
+                }
+                file->begin_step_called = 1;
             }
         }
         /* First we need to define the variable now that we know it's decomposition */
