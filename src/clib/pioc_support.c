@@ -4045,7 +4045,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             step++;
         }
         for (int i = 0; i < file->num_vars; i++) {
-            LOG((2, "var from file (%s) : name = %s,  varid =  %d", file->fname, file->adios_vars[i].name, i));
+            LOG((1, "var from file (%s) : name = %s,  varid =  %d", file->fname, file->adios_vars[i].name, i));
         }
         /* open file to be ready to use */
         /*close file */
