@@ -1036,6 +1036,7 @@ typedef struct file_desc_t
     /* hash tables to store adios blocks and blocks */
     qhashtbl_t *cache_data_blocks;
     qhashtbl_t *cache_block_sizes;
+    qhashtbl_t *cache_darray_info;
 
 #endif /* _ADIOS2 */
 

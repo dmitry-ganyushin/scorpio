@@ -622,34 +622,65 @@ int PIOc_closefile(int ncid)
                         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                         spio_ltimer_stop(file->io_fstats->tot_timer_name);
                     }
-                    return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                   "Defining (ADIOS) attribute (name=/__pio__/fillmode) failed for file (%s, ncid=%d)",
-                                   pio_get_fname_from_file(file), file->pio_ncid);
+                    return ierr;
                 }
-            }
 
-            /* This is needed to write out the attribute /__pio__/fillmode */
-            {
-                adios2_variable *variableH = adios2_inquire_variable(file->ioH, "/__pio__/info/testing");
-                if (variableH == NULL) {
-                    variableH = adios2_define_variable(file->ioH,
-                                                       "/__pio__/info/testing", adios2_type_int32_t,
-                                                       0, NULL, NULL, NULL,
-                                                       adios2_constant_dims_true);
-                    if (variableH == NULL) {
-                        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                       "Defining (ADIOS) variable (name=/__pio__/info/testing) failed for file (%s)",
-                                       pio_get_fname_from_file(file));
+                adios2_attribute *attributeH = adios2_inquire_attribute(file->ioH, "/__pio__/fillmode");
+                if (attributeH == NULL) {
+                    attributeH = adios2_define_attribute(file->ioH, "/__pio__/fillmode", adios2_type_int32_t,
+                                                         &file->fillmode);
+                    if (attributeH == NULL) {
+                        if (file->iotype == PIO_IOTYPE_ADIOS) {
+                            GPTLstop("PIO:PIOc_closefile_adios");
+                            GPTLstop("PIO:write_total_adios");
+#ifndef _ADIOS_BP2NC_TEST
+                            GPTLstop("PIO:write_total");
+                            spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                            spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+#endif
+                        } else {
+                            GPTLstop("PIO:PIOc_closefile");
+
+                            if (file->mode & PIO_WRITE) {
+                                GPTLstop("PIO:PIOc_closefile_write_mode");
+                                GPTLstop("PIO:write_total");
+                                spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                                spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                            }
+                            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                        }
+                        return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Defining (ADIOS) attribute (name=/__pio__/fillmode) failed for file (%s, ncid=%d)",
+                                       pio_get_fname_from_file(file), file->pio_ncid);
                     }
                 }
 
-                adios2_error adiosErr = adios2_put(file->engineH, variableH, &ios->num_uniontasks, adios2_mode_sync);
-                if (adiosErr != adios2_error_none) {
-                    return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                   "Putting (ADIOS) variable (name=/__pio__/info/testing) failed (adios2_error=%s) for file (%s)",
-                                   convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
+                /* This is needed to write out the attribute /__pio__/fillmode */
+                {
+                    adios2_variable *variableH = adios2_inquire_variable(file->ioH, "/__pio__/info/testing");
+                    if (variableH == NULL) {
+                        variableH = adios2_define_variable(file->ioH,
+                                                           "/__pio__/info/testing", adios2_type_int32_t,
+                                                           0, NULL, NULL, NULL,
+                                                           adios2_constant_dims_true);
+                        if (variableH == NULL) {
+                            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                           "Defining (ADIOS) variable (name=/__pio__/info/testing) failed for file (%s)",
+                                           pio_get_fname_from_file(file));
+                        }
+                    }
+
+                    adios2_error adiosErr = adios2_put(file->engineH, variableH, &ios->num_uniontasks,
+                                                       adios2_mode_sync);
+                    if (adiosErr != adios2_error_none) {
+                        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Putting (ADIOS) variable (name=/__pio__/info/testing) failed (adios2_error=%s) for file (%s)",
+                                       convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
+                    }
                 }
-            }
 
             GPTLstart("end_adios2_step_PIOc_closefile");
             ierr = end_adios2_step(file, ios);
@@ -661,29 +692,32 @@ int PIOc_closefile(int ncid)
                     GPTLstop("PIO:PIOc_closefile_adios");
                     GPTLstop("PIO:write_total_adios");
 #ifndef _ADIOS_BP2NC_TEST
-                    GPTLstop("PIO:write_total");
-                    spio_ltimer_stop(ios->io_fstats->wr_timer_name);
-                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                    spio_ltimer_stop(file->io_fstats->wr_timer_name);
-                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
-#endif
-                } else {
-                    GPTLstop("PIO:PIOc_closefile");
-
-                    if (file->mode & PIO_WRITE) {
-                        GPTLstop("PIO:PIOc_closefile_write_mode");
                         GPTLstop("PIO:write_total");
                         spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                         spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+#endif
+                    } else {
+                        GPTLstop("PIO:PIOc_closefile");
+
+                        if (file->mode & PIO_WRITE) {
+                            GPTLstop("PIO:PIOc_closefile_write_mode");
+                            GPTLstop("PIO:write_total");
+                            spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                            spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                        }
+                        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                        spio_ltimer_stop(file->io_fstats->tot_timer_name);
                     }
-                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    return ierr;
                 }
                 return pio_err(NULL, file, ierr, __FILE__, __LINE__,
                                "adios2_end_step failed for file (%s)", pio_get_fname_from_file(file));
             }
-        }
+            LOG((2, "adios2_close(%s) io %p engine %p", file->fname, file->ioH, file->engineH));
             adios2_error adiosErr = adios2_close(file->engineH);
+            file->begin_step_called = 0;
             if (adiosErr != adios2_error_none)
             {
                 if (file->iotype == PIO_IOTYPE_ADIOS)
@@ -716,15 +750,9 @@ int PIOc_closefile(int ncid)
             }
 
             file->engineH = NULL;
-            /* remove associated  IO object */
-            LOG((2, "adios2_remove_io(%s)", file->fname));
-            adios2_bool status_remove = adios2_false;
-            adios2_error err_remove = adios2_remove_io(&status_remove, ios->adiosH, file->fname);
-            if (status_remove != adios2_true || err_remove != adios2_error_none) {
-                LOG((2, "PIO_closefile: adios2_remove_io(%s)  failed", file->fname));
-            }
-            file->ioH = NULL;
         }
+        adios2_bool result;
+        adios2_remove_io(&result, ios->adiosH, file->fname);
 
         for (int i = 0; i < file->num_dim_vars; i++)
         {
