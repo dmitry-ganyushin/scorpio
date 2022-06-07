@@ -1281,7 +1281,7 @@ int get_adios_step(file_desc_t *file, int var_id, int frame_id)
     }
 }
 
-bool match_decomp_part(const int64_t *pInt, size_t pos, long long int *pInt1, long long int *pInt2);
+bool match_decomp_part(const int64_t *pInt, size_t pos, PIO_Offset *pInt1, PIO_Offset *pInt2);
 
 /**
  * Read an array of data from a ADIOS2 bp file to the (parallel) IO library.
@@ -1416,8 +1416,8 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
 
 
 /************************* get decomp info *********************************/
-    MPI_Offset *start_decomp = &(iodesc->map[0]);
-    MPI_Offset *end_decomp = &(iodesc->map[iodesc->maplen - 1]);
+    PIO_Offset *start_decomp = &(iodesc->map[0]);
+    PIO_Offset *end_decomp = &(iodesc->map[iodesc->maplen - 1]);
 /************************* end get decomp info *********************************/
 /************************* get decomp info from file *********************************/
     int target_block = -1;
@@ -1772,11 +1772,11 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
 /* match first 30 elements*/
 /* TODO: make it with hashing of data */
 #define MAX_LEN_MATCH 30
-bool match_decomp_part(const int64_t *decomp, size_t offset, MPI_Offset *start, MPI_Offset *end)
+bool match_decomp_part(const int64_t *decomp, size_t offset, PIO_Offset *start, PIO_Offset *end)
 {
-    MPI_Offset len = end - start;
+    PIO_Offset len = end - start;
     if (len > MAX_LEN_MATCH ) len = MAX_LEN_MATCH;
-    for (MPI_Offset idx = 0; idx < len; idx++) {
+    for (PIO_Offset idx = 0; idx < len; idx++) {
         if (decomp[offset + idx] != start[idx]) return 0;
     }
     return 1;
