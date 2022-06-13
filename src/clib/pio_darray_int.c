@@ -1327,7 +1327,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
 
 /************************* get decomp info *********************************/
     MPI_Offset *start_decomp = &(iodesc->map[0]);
-    MPI_Offset *end_decomp = &(iodesc->map[iodesc->maplen - 1]);
+    MPI_Offset len_decomp = iodesc->maplen;
 /************************* end get decomp info *********************************/
 /************************* get decomp info from file *********************************/
     int target_block = -1;
@@ -1465,10 +1465,10 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
             /* factor larger than a number of writing processes    */
             /* example: 4 writing processes 16 reading processes   */
             for (size_t pos = 0; pos < block_size; pos++) {
-                if (!start_block_found && match_decomp_part(decomp_int64_t, pos, start_decomp, end_decomp)) {
+                if (!start_block_found && match_decomp_part(decomp_int64_t, pos, start_decomp, &len_decomp)) {
                     target_block = block;
                     start_idx_in_target_block = pos;
-                    end_idx_in_target_block = pos + (end_decomp - start_decomp);
+                    end_idx_in_target_block = (int) (pos + len_decomp -1);
                     start_block_found = true;
                 }
             }
@@ -1682,9 +1682,9 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
 /* match first 30 elements*/
 /* TODO: make it with hashing of data */
 #define MAX_LEN_MATCH 30
-bool match_decomp_part(const int64_t *decomp, size_t offset, MPI_Offset *start, MPI_Offset *end)
+bool match_decomp_part(const int64_t *decomp, size_t offset, MPI_Offset *start, MPI_Offset *len_decomp)
 {
-    MPI_Offset len = end - start;
+    MPI_Offset len = *len_decomp - offset;
     if (len > MAX_LEN_MATCH ) len = MAX_LEN_MATCH;
     for (MPI_Offset idx = 0; idx < len; idx++) {
         if (decomp[offset + idx] != start[idx]) return 0;
