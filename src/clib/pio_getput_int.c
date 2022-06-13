@@ -482,7 +482,7 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
     spio_ltimer_start(ios->io_fstats->rd_timer_name);
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
 
-    LOG((1, "PIOc_get_att_tc  filename %s varid = %d", , file->fname, vid));
+    LOG((1, "PIOc_get_att_tc  filename %s varid = %d", file->fname, varid));
 
     /* User must provide a name and destination pointer. */
     if (!name || !ip || strlen(name) > PIO_MAX_NAME)
@@ -907,7 +907,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
     spio_ltimer_start(ios->io_fstats->rd_timer_name);
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
 
-    LOG((1, "PIOc_get_vars_tc  filename %s varid = %d", , file->fname, varid));
+    LOG((1, "PIOc_get_vars_tc  filename %s varid = %d", file->fname, varid));
     /* User must provide a place to put some data. */
     if (!buf)
     {

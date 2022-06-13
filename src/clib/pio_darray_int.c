@@ -1284,7 +1284,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     int ierr = PIO_NOERR;  /* Return code from netCDF functions. */
     int n_bp_writers;
 
-    LOG((1, "PIOc_read_darray  filename %s varid = %d", , file->fname, vid));
+    LOG((1, "PIOc_read_darray  filename %s varid = %d", file->fname, vid));
 
     /* Check inputs. */
     pioassert(file && (fndims > 0) && file->iosystem && iodesc && vid <= PIO_MAX_VARS, "invalid input",
