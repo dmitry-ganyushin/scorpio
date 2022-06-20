@@ -1387,7 +1387,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     int ierr = PIO_NOERR;  /* Return code from netCDF functions. */
     int n_bp_writers;
 
-    LOG((1, "PIOc_read_darray  filename %s varid = %d", , file->fname, vid));
+    LOG((1, "PIOc_read_darray  filename %s varid = %d", file->fname, vid));
 
     /* Check inputs. */
     pioassert(file && (fndims > 0) && file->iosystem && iodesc && vid <= PIO_MAX_VARS, "invalid input",
@@ -1430,7 +1430,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
 
 /************************* get decomp info *********************************/
     PIO_Offset *start_decomp = &(iodesc->map[0]);
-    PIO_Offset *end_decomp = &(iodesc->map[iodesc->maplen - 1]);
+    PIO_Offset len_decomp = iodesc->maplen;
 /************************* end get decomp info *********************************/
 /************************* get decomp info from file *********************************/
     int target_block = -1;
@@ -1553,6 +1553,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
             adios2_error err_sel = adios2_selection_size(&block_size, decomp_adios_var);
             if (type == adios2_type_int64_t) {
                 decomp_int64_t = (int64_t *) malloc(block_size * sizeof(int64_t));
+                memset(decomp_int64_t, 0, block_size * sizeof(int64_t));
                 adios2_error err = adios2_get(file->engineH, decomp_adios_var, decomp_int64_t, adios2_mode_sync);
                 if (err != adios2_error_none) {
                     return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -1568,10 +1569,10 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
             /* factor larger than a number of writing processes    */
             /* example: 4 writing processes 16 reading processes   */
             for (size_t pos = 0; pos < block_size; pos++) {
-                if (!start_block_found && match_decomp_part(decomp_int64_t, pos, start_decomp, end_decomp)) {
+                if (!start_block_found && match_decomp_part(decomp_int64_t, pos, start_decomp, &len_decomp)) {
                     target_block = block;
                     start_idx_in_target_block = pos;
-                    end_idx_in_target_block = pos + (end_decomp - start_decomp);
+                    end_idx_in_target_block = (int) (pos + len_decomp - 1);
                     start_block_found = true;
                 }
             }
@@ -1785,9 +1786,9 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
 /* match first 30 elements*/
 /* TODO: make it with hashing of data */
 #define MAX_LEN_MATCH 30
-bool match_decomp_part(const int64_t *decomp, size_t offset, PIO_Offset *start, PIO_Offset *end)
+bool match_decomp_part(const int64_t *decomp, size_t offset, PIO_Offset *start, PIO_Offset *len_decomp)
 {
-    PIO_Offset len = end - start;
+    PIO_Offset len = *len_decomp;
     if (len > MAX_LEN_MATCH ) len = MAX_LEN_MATCH;
     for (PIO_Offset idx = 0; idx < len; idx++) {
         if (decomp[offset + idx] != start[idx]) return 0;

@@ -3955,7 +3955,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
     {
         /* trying to open a file with adios */
 #ifdef _ADIOS2
-        if (ios->adiosH == NULL) {
+        if (ios->adiosH != NULL) {
             adios2_error adiosErr = adios2_finalize(ios->adiosH);
             if (adiosErr != adios2_error_none) {
                 GPTLstop("PIO:PIOc_finalize");
