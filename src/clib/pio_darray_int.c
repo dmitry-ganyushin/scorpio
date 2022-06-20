@@ -1450,6 +1450,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
             adios2_error err_sel = adios2_selection_size(&block_size, decomp_adios_var);
             if (type == adios2_type_int64_t) {
                 decomp_int64_t = (int64_t *) malloc(block_size * sizeof(int64_t));
+		memset(decomp_int64_t, 0, block_size * sizeof(int64_t));
                 adios2_error err = adios2_get(file->engineH, decomp_adios_var, decomp_int64_t, adios2_mode_sync);
                 if (err != adios2_error_none) {
                     return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -1684,7 +1685,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
 #define MAX_LEN_MATCH 30
 bool match_decomp_part(const int64_t *decomp, size_t offset, MPI_Offset *start, MPI_Offset *len_decomp)
 {
-    MPI_Offset len = *len_decomp - offset;
+    MPI_Offset len = *len_decomp;
     if (len > MAX_LEN_MATCH ) len = MAX_LEN_MATCH;
     for (MPI_Offset idx = 0; idx < len; idx++) {
         if (decomp[offset + idx] != start[idx]) return 0;
