@@ -271,7 +271,22 @@ static int initialize_adios2_for_block_merging(iosystem_desc_t *ios, file_desc_t
         }
 
         file->block_array_size = BLOCK_MAX_BUFFER;
-
+        /* BP5 */
+        adios2_error adiosErr = adios2_set_parameter(file->ioH, "BufferVType", "chunk");
+        if (adiosErr != adios2_error_none)
+        {
+            return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Setting (ADIOS) parameter (InitialBufferSize) failed (adios2_error=%s) for file (%s)",
+                           convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
+        }
+        adiosErr = adios2_set_parameter(file->ioH, "BufferChunkSize", "1Gb");
+        if (adiosErr != adios2_error_none)
+        {
+            return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "Setting (ADIOS) parameter (InitialBufferSize) failed (adios2_error=%s) for file (%s)",
+                           convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
+        }
+        /* BP5 */
 #ifndef _ADIOS_BP2NC_TEST /* Initializing buffer to 1Gb takes about 1 sec. Don't do it for unit tests */
         adios2_error adiosErr = adios2_set_parameter(file->ioH, "InitialBufferSize", "1Gb");
         if (adiosErr != adios2_error_none)
@@ -2805,13 +2820,13 @@ int PIOc_createfile_int(int iosysid, int *ncidp, int *iotype, const char *filena
                            declare_name, pio_get_fname_from_file(file));
         }
 
-        adios2_error adiosErr = adios2_set_engine(file->ioH, "BP4");
+        adios2_error adiosErr = adios2_set_engine(file->ioH, "BP5");
         if (adiosErr != adios2_error_none)
         {
             spio_ltimer_stop(file->io_fstats->wr_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                           "Setting (ADIOS) engine (type=BP4) failed (adios2_error=%s) for file (%s)",
+                           "Setting (ADIOS) engine (type=BP5) failed (adios2_error=%s) for file (%s)",
                            convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
         }
 
@@ -3721,7 +3736,6 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         struct stat sd;
         if (0 == stat(bpname, &sd)) {
             strncpy(file->fname, bpname, PIO_MAX_NAME);
-            //snprintf(declare_name, PIO_MAX_NAME, "%s%lu", file->fname, get_adios2_io_cnt());
             file->ioH = adios2_at_io(ios->adiosH, file->fname);
             if (file->ioH == NULL){
                 file->ioH = adios2_declare_io(ios->adiosH, file->fname);
