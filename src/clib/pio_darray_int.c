@@ -1436,7 +1436,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
         int32_t decomp_blocks_size = decomp_blocks->nblocks;
         /* free memeory */
         for (size_t i = 0; i < decomp_blocks->nblocks; ++i) {
-            free(decomp_blocks->BlocksInfo[i].Start);
+            //free(decomp_blocks->BlocksInfo[i].Start);
             free(decomp_blocks->BlocksInfo[i].Count);
         }
         free(decomp_blocks->BlocksInfo);
@@ -1609,7 +1609,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
         int32_t data_blocks_size = data_blocks->nblocks;
         /* free memeory */
         for (size_t i = 0; i < data_blocks->nblocks; ++i) {
-            free(data_blocks->BlocksInfo[i].Start);
+            //free(data_blocks->BlocksInfo[i].Start);
             free(data_blocks->BlocksInfo[i].Count);
         }
         free(data_blocks->BlocksInfo);

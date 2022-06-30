@@ -3905,13 +3905,15 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         // get available variables and set structures.
         // restrict to the first step only
         adios2_step_status status;
-        size_t nsteps = 0;
+        size_t nsteps, step = 0;
+        adios2_error err_steps = adios2_steps(&nsteps, file->engineH);
 
-        while (adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
+        while ( step < nsteps && adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
                                  &status) == adios2_error_none) {
             file->begin_step_called = 1;
             if (status == adios2_step_status_end_of_stream) {
-                file->begin_step_called = 0;
+//                adios2_end_step(file->engineH);
+//                file->begin_step_called = 0;
                 break;
             }
 
@@ -3942,59 +3944,59 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                 adios_get_ndims(file, var_id);
                 adios_get_scorpio_type(file, var_id);
                 adios_get_dim_ids(file, var_id);
-                adios_get_step(file, var_id, nsteps);
+                adios_get_step(file, var_id, step);
             }
             adios2_end_step(file->engineH);
             file->begin_step_called = 0;
-            nsteps++;
+            step++;
         }
         /*close file */
-        LOG((2, "adios2_close(%s) io %p engine %p", file->fname, file->ioH, file->engineH));
-        adios2_error err = adios2_close(file->engineH);
-        if (err != adios2_error_none) {
-            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                           "Closing (ADIOS) file (%s) failed",
-                           pio_get_fname_from_file(file));
-        }
-        file->begin_step_called = 0;
-        file->engineH = NULL;
-        //open it again
-        LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
-        file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
-        LOG((2, "adios2_open(%s) io %p engine (%p)", file->fname, file->ioH, file->engineH));
-        if (file->engineH == NULL) {
-            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                           "Opening (ADIOS) file (%s) failed",
-                           pio_get_fname_from_file(file));
-        }
-
-
-        size_t step = 0;
-        /* move to the last step */
-        while(adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
-                                 &status) == adios2_error_none) {
-            file->begin_step_called = 1;
-            if (status == adios2_step_status_end_of_stream) {
-                file->begin_step_called = 0;
-                break;
-            }
-            if (step == nsteps - 2) {
-                adios2_end_step(file->engineH);
-                file->begin_step_called = 0;
-                break;
-            }
-            step++;
-            adios2_end_step(file->engineH);
-            file->begin_step_called = 0;
-        }
+//        LOG((2, "adios2_close(%s) io %p engine %p", file->fname, file->ioH, file->engineH));
+//        adios2_error err = adios2_close(file->engineH);
+//        if (err != adios2_error_none) {
+//            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+//                           "Closing (ADIOS) file (%s) failed",
+//                           pio_get_fname_from_file(file));
+//        }
+//        file->begin_step_called = 0;
+//        file->engineH = NULL;
+//        //open it again
+//        LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
+//        file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
+//        LOG((2, "adios2_open(%s) io %p engine (%p)", file->fname, file->ioH, file->engineH));
+//        if (file->engineH == NULL) {
+//            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+//                           "Opening (ADIOS) file (%s) failed",
+//                           pio_get_fname_from_file(file));
+//        }
+//
+//
+//        size_t step = 0;
+//        /* move to the last step */
+//        while(adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
+//                                 &status) == adios2_error_none) {
+//            file->begin_step_called = 1;
+//            if (status == adios2_step_status_end_of_stream) {
+//                file->begin_step_called = 0;
+//                break;
+//            }
+//            if (step == nsteps - 2) {
+//                adios2_end_step(file->engineH);
+//                file->begin_step_called = 0;
+//                break;
+//            }
+//            step++;
+//            adios2_end_step(file->engineH);
+//            file->begin_step_called = 0;
+//        }
         int attr_id = 0;
-        while (adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
-                                 &status) == adios2_error_none) {
-            file->begin_step_called = 1;
-            if (status == adios2_step_status_end_of_stream) {
-                file->begin_step_called = 0;
-                break;
-            }
+//        while (adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
+//                                 &status) == adios2_error_none) {
+//            file->begin_step_called = 1;
+//            if (status == adios2_step_status_end_of_stream) {
+//                file->begin_step_called = 0;
+//                break;
+//            }
 
             size_t attr_size;
             char **attr_names = adios2_available_attributes(file->ioH, &attr_size);
@@ -4072,17 +4074,17 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             // remove memory
             free(attr_names);
             file->num_attrs += attr_id;
-            adios2_end_step(file->engineH);
-            file->begin_step_called = 0;
-            step++;
-        }
+           // adios2_end_step(file->engineH);
+            //file->begin_step_called = 0;
+            //step++;
+//        }
         for (int i = 0; i < file->num_vars; i++) {
             LOG((1, "var from file (%s) : name = %s,  varid =  %d", file->fname, file->adios_vars[i].name, i));
         }
         /* open file to be ready to use */
         /*close file */
         LOG((2, "adios2_close(%s) io %p engine %p", file->fname, file->ioH, file->engineH));
-        err = adios2_close(file->engineH);
+        adios2_error  err = adios2_close(file->engineH);
         if (err != adios2_error_none) {
             return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                            "Closing (ADIOS) file (%s) failed",

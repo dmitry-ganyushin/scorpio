@@ -1553,7 +1553,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                         int32_t number_of_data_blocks = data_blocks->nblocks;
                         /* free memeory */
                         for (size_t i = 0; i < data_blocks->nblocks; ++i) {
-                            free(data_blocks->BlocksInfo[i].Start);
+                           // free(data_blocks->BlocksInfo[i].Start);
                             free(data_blocks->BlocksInfo[i].Count);
                         }
                         free(data_blocks->BlocksInfo);
