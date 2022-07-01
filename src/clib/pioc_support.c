@@ -3863,7 +3863,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             file->adios_vars[var].fillval_varid = 0;
             file->adios_vars[var].elem_size = 0;
             file->adios_vars[var].gdimids = NULL;
-            for (int i = 0; i < PIO_MAX_DIMS; i++) file->adios_vars[var].interval_map[i] = PIO_DEFAULT;
+            for (int i = 0; i < PIO_MAX_NAME; i++) file->adios_vars[var].interval_map[i] = PIO_DEFAULT;
         }
         file->cache_data_blocks = qhashtbl(10000);
         file->cache_block_sizes = qhashtbl(10000);
