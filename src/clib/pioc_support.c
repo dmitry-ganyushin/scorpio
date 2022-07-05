@@ -288,12 +288,12 @@ static int initialize_adios2_for_block_merging(iosystem_desc_t *ios, file_desc_t
         }
         /* BP5 */
 #ifndef _ADIOS_BP2NC_TEST /* Initializing buffer to 1Gb takes about 1 sec. Don't do it for unit tests */
-        adios2_error adiosErr = adios2_set_parameter(file->ioH, "InitialBufferSize", "1Gb");
-        if (adiosErr != adios2_error_none)
+        adios2_error adiosErrTest = adios2_set_parameter(file->ioH, "InitialBufferSize", "1Gb");
+        if (adiosErrTest != adios2_error_none)
         {
             return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                            "Setting (ADIOS) parameter (InitialBufferSize) failed (adios2_error=%s) for file (%s)",
-                           convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
+                           convert_adios2_error_to_string(adiosErrTest), pio_get_fname_from_file(file));
         }
 #endif
 
