@@ -3490,7 +3490,7 @@ int adios_get_dim_ids(file_desc_t *file, size_t var_id)
 }
 
 int adios_get_scorpio_type(file_desc_t *file, size_t var_id)
-{/*reading dims */
+{/*reading scorpio type */
     {
         char *dims_attr_name = adios_name(adios_pio_var_prefix,
                                           file->adios_vars[var_id].name,
