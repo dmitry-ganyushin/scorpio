@@ -3738,40 +3738,35 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         if (0 == stat(bpname, &sd)) {
             strncpy(file->fname, bpname, PIO_MAX_NAME);
             snprintf(declare_name, PIO_MAX_NAME, "%s%lu", file->fname, get_adios2_io_cnt());
-            file->ioH = adios2_at_io(ios->adiosH, declare_name);
-            if (file->ioH == NULL){
-                file->ioH = adios2_declare_io(ios->adiosH, declare_name);
-                if (file->ioH == NULL) {
-                    return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                   "Declaring (ADIOS) IO (name=%s) failed for file (%s)",
-                                   declare_name, pio_get_fname_from_file(file));
-                }
-                /* BP5 */
-                adios2_error adiosErr = adios2_set_parameter(file->ioH, "BufferVType", "chunk");
-                if (adiosErr != adios2_error_none)
-                {
-                    return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                   "Setting (ADIOS) parameter (InitialBufferSize) failed (adios2_error=%s) for file (%s)",
-                                   convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
-                }
-                adiosErr = adios2_set_parameter(file->ioH, "BufferChunkSize", "1Gb");
-                if (adiosErr != adios2_error_none)
-                {
-                    return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                   "Setting (ADIOS) parameter (InitialBufferSize) failed (adios2_error=%s) for file (%s)",
-                                   convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
-                }
-                /* BP5 */
-
-                adiosErr = adios2_set_parameter(file->ioH, "InitialBufferSize", "1Gb");
-                adiosErr = adios2_set_engine(file->ioH, "BP5");
-                if (adiosErr != adios2_error_none) {
-                    return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                   "Setting (ADIOS) engine (type=FileStream) failed (adios2_error=%s) for file (%s)",
-                                   convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
-                }
-                adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
+            file->ioH = adios2_declare_io(ios->adiosH, declare_name);
+            if (file->ioH == NULL) {
+                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Declaring (ADIOS) IO (name=%s) failed for file (%s)",
+                               declare_name, pio_get_fname_from_file(file));
             }
+            /* BP5 */
+            adios2_error adiosErr = adios2_set_parameter(file->ioH, "BufferVType", "chunk");
+            if (adiosErr != adios2_error_none) {
+                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Setting (ADIOS) parameter (InitialBufferSize) failed (adios2_error=%s) for file (%s)",
+                               convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
+            }
+            adiosErr = adios2_set_parameter(file->ioH, "BufferChunkSize", "1Gb");
+            if (adiosErr != adios2_error_none) {
+                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Setting (ADIOS) parameter (InitialBufferSize) failed (adios2_error=%s) for file (%s)",
+                               convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
+            }
+            /* BP5 */
+
+            adiosErr = adios2_set_parameter(file->ioH, "InitialBufferSize", "1Gb");
+            adiosErr = adios2_set_engine(file->ioH, "BP5");
+            if (adiosErr != adios2_error_none) {
+                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                               "Setting (ADIOS) engine (type=FileStream) failed (adios2_error=%s) for file (%s)",
+                               convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
+            }
+            adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
 
 
             LOG((2, "adios2_open(%s) : fd = %d, ncid = %d", file->fname, file->fh, *ncidp));
