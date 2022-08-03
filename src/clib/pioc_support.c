@@ -3712,24 +3712,6 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
     {
         /* trying to open a file with adios */
 #ifdef _ADIOS2
-        /* do not really need adios2 re-intit */
-        if (false && ios->adiosH != NULL) {
-            adios2_error adiosErr = adios2_finalize(ios->adiosH);
-            if (adiosErr != adios2_error_none) {
-                GPTLstop("PIO:PIOc_finalize");
-                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                               "Finalizing ADIOS failed (adios2_error=%s) on iosystem (%d)",
-                               convert_adios2_error_to_string(adiosErr), iosysid);
-            }
-
-            ios->adiosH = NULL;
-
-            ios->adiosH = adios2_init(ios->union_comm, adios2_debug_mode_on);
-            if (ios->adiosH == NULL) {
-                GPTLstop("PIO:PIOc_Init_Intracomm");
-                return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Initializing ADIOS failed");
-            }
-        }
         char declare_name[PIO_MAX_NAME] = {'\0'};
         char bpname[PIO_MAX_NAME]  = {'\0'};
         strcat(bpname, filename);
