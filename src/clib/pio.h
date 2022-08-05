@@ -845,7 +845,7 @@ typedef struct adios_var_desc_t
      * index is a frame_id and the value is the adios_step */
     int interval_map[PIO_MAX_DIMS];
     /* a parameter to mark a variable as a put_var or darray */
-    char scorpio_var_type[PIO_MAX_NAME];
+    char scorpio_var_type[12];
 } adios_var_desc_t;
 
 /* Track attributes */
