@@ -3783,10 +3783,6 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
 
     file->iosystem = ios;
     file->mode = mode;
-    /*
-    file->num_unlim_dimids = 0;
-    file->unlim_dimids = NULL;
-    */
     file->num_dim_vars = 0;
 
     for (int i = 0; i < PIO_MAX_VARS; i++)
@@ -3891,8 +3887,6 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                  &status) == adios2_error_none) {
             file->begin_step_called = 1;
             if (status == adios2_step_status_end_of_stream) {
-//                adios2_end_step(file->engineH);
-//                file->begin_step_called = 0;
                 break;
             }
 
@@ -3929,134 +3923,83 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             file->begin_step_called = 0;
             step++;
         }
-        /*close file */
-//        LOG((2, "adios2_close(%s) io %p engine %p", file->fname, file->ioH, file->engineH));
-//        adios2_error err = adios2_close(file->engineH);
-//        if (err != adios2_error_none) {
-//            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-//                           "Closing (ADIOS) file (%s) failed",
-//                           pio_get_fname_from_file(file));
-//        }
-//        file->begin_step_called = 0;
-//        file->engineH = NULL;
-//        //open it again
-//        LOG((2, "adios2_open(%s) : fd = %d", file->fname, file->fh));
-//        file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
-//        LOG((2, "adios2_open(%s) io %p engine (%p)", file->fname, file->ioH, file->engineH));
-//        if (file->engineH == NULL) {
-//            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-//                           "Opening (ADIOS) file (%s) failed",
-//                           pio_get_fname_from_file(file));
-//        }
-//
-//
-//        size_t step = 0;
-//        /* move to the last step */
-//        while(adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
-//                                 &status) == adios2_error_none) {
-//            file->begin_step_called = 1;
-//            if (status == adios2_step_status_end_of_stream) {
-//                file->begin_step_called = 0;
-//                break;
-//            }
-//            if (step == nsteps - 2) {
-//                adios2_end_step(file->engineH);
-//                file->begin_step_called = 0;
-//                break;
-//            }
-//            step++;
-//            adios2_end_step(file->engineH);
-//            file->begin_step_called = 0;
-//        }
-        int attr_id = 0;
-//        while (adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
-//                                 &status) == adios2_error_none) {
-//            file->begin_step_called = 1;
-//            if (status == adios2_step_status_end_of_stream) {
-//                file->begin_step_called = 0;
-//                break;
-//            }
 
-            size_t attr_size;
-            char **attr_names = adios2_available_attributes(file->ioH, &attr_size);
-            /** parse global attributes */
-            for (size_t i = 0; i < attr_size; i++) {
-                /*get global attributes*/
-                /* strings that start with /__pio__/var/ are variables */
-                if (strstr(attr_names[i], adios_pio_global_prefix) != NULL) {
-                    //get substring from string for name
-                    int sub_length = strlen(attr_names[i]) - strlen(adios_pio_global_prefix);
+        int attr_id = 0;
+        size_t attr_size;
+        char **attr_names = adios2_available_attributes(file->ioH, &attr_size);
+        /** parse global attributes */
+        for (size_t i = 0; i < attr_size; i++) {
+            /*get global attributes*/
+            /* strings that start with /__pio__/var/ are variables */
+            if (strstr(attr_names[i], adios_pio_global_prefix) != NULL) {
+                //get substring from string for name
+                int sub_length = strlen(attr_names[i]) - strlen(adios_pio_global_prefix);
+                int full_length = strlen(attr_names[i]);
+                int prefix_length = strlen(adios_pio_global_prefix);
+                file->adios_attrs[attr_id].att_name = (char *) malloc(sub_length + 1);
+                if (file->adios_attrs[attr_id].att_name) {
+                    strcpy(file->adios_attrs[attr_id].att_name, &attr_names[i][prefix_length]);
+                    file->adios_attrs[attr_id].att_varid = -1;
+                    file->adios_attrs[attr_id].att_ncid = *ncidp;
+                    adios_get_attrs(file, attr_id, attr_names, i);
+                }
+                attr_id++;
+                assert(attr_id < PIO_MAX_ATTRS);
+            }
+            /* cache decomp attrubutes */
+            if (strstr(attr_names[i], adios_pio_var_prefix) != NULL &&
+                strstr(attr_names[i], adios_def_decomp_suffix) != NULL) {
+                adios2_attribute const *attributeH = adios2_inquire_attribute(file->ioH, attr_names[i]);
+                if (attributeH != NULL) {
+                    size_t size_attr;
+                    char *attr_data = malloc(PIO_MAX_NAME);
+                    memset(attr_data, 0, PIO_MAX_NAME);
+                    adios2_error err = adios2_attribute_data(attr_data, &size_attr, attributeH);
+                    if (err != adios2_error_none) {
+                        return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                       "Reading (ADIOS) attribute %s in file file (%s) failed",
+                                       attr_names[i], pio_get_fname_from_file(file));
+                    }
+                    file->cache_darray_info->put(file->cache_darray_info, attr_names[i], attr_data);
+                }
+            }
+        }
+        file->num_gattrs += attr_id;
+        /* parse variable attributes*/
+        for (size_t i = 0; i < attr_size; i++) {
+            /**************get variable attribute***********/
+            char suffix_att_name[] = "/";
+
+            for (size_t var_cnt = 0; var_cnt < file->num_vars; var_cnt++) {
+                char *attr_full_prefix = adios_name(adios_pio_var_prefix, file->adios_vars[var_cnt].name,
+                                                    suffix_att_name);
+                if (strstr(attr_names[i], attr_full_prefix) != NULL) {
+                    int sub_length = strlen(attr_names[i]) - strlen(attr_full_prefix);
                     int full_length = strlen(attr_names[i]);
-                    int prefix_length = strlen(adios_pio_global_prefix);
+                    int prefix_length = strlen(attr_full_prefix);
+                    if (strrchr(attr_names[i], '/') > &attr_names[i][prefix_length]) {
+                        free(attr_full_prefix);
+                        continue;
+                    }
                     file->adios_attrs[attr_id].att_name = (char *) malloc(sub_length + 1);
                     if (file->adios_attrs[attr_id].att_name) {
                         strcpy(file->adios_attrs[attr_id].att_name, &attr_names[i][prefix_length]);
-                        file->adios_attrs[attr_id].att_varid = -1;
+                        int att_varid = -1;
+                        int ret = PIOc_inq_varid(*ncidp, file->adios_vars[var_cnt].name, &att_varid);
+                        file->adios_attrs[attr_id].att_varid = att_varid;
                         file->adios_attrs[attr_id].att_ncid = *ncidp;
                         adios_get_attrs(file, attr_id, attr_names, i);
                     }
-                    attr_id++;
                     assert(attr_id < PIO_MAX_ATTRS);
+                    attr_id++;
                 }
-                /* cache decomp attrubutes */
-                if (strstr(attr_names[i], adios_pio_var_prefix) != NULL &&
-                    strstr(attr_names[i], adios_def_decomp_suffix) != NULL) {
-                    adios2_attribute const *attributeH = adios2_inquire_attribute(file->ioH, attr_names[i]);
-                    if (attributeH != NULL) {
-                        size_t size_attr;
-                        char *attr_data = malloc(PIO_MAX_NAME);
-                        memset(attr_data, 0, PIO_MAX_NAME);
-                        adios2_error err = adios2_attribute_data(attr_data, &size_attr, attributeH);
-                        if (err != adios2_error_none){
-                            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                                           "Reading (ADIOS) attribute %s in file file (%s) failed",
-                                           attr_names[i], pio_get_fname_from_file(file));
-                        }
-                        file->cache_darray_info->put(file->cache_darray_info, attr_names[i], attr_data);
-                    }
-                }
+                free(attr_full_prefix);
             }
-            file->num_gattrs += attr_id;
-            /* parse variable attributes*/
-            for (size_t i = 0; i < attr_size; i++) {
-                /**************get variable attribute***********/
-                char suffix_att_name[] = "/";
-
-                for (size_t var_cnt = 0; var_cnt < file->num_vars; var_cnt++) {
-                    char *attr_full_prefix = adios_name(adios_pio_var_prefix, file->adios_vars[var_cnt].name,
-                                                        suffix_att_name);
-                    if (strstr(attr_names[i], attr_full_prefix) != NULL) {
-                        int sub_length = strlen(attr_names[i]) - strlen(attr_full_prefix);
-                        int full_length = strlen(attr_names[i]);
-                        int prefix_length = strlen(attr_full_prefix);
-                        if (strrchr(attr_names[i], '/') > &attr_names[i][prefix_length]) {
-                            free(attr_full_prefix);
-                            continue;
-                        }
-                        file->adios_attrs[attr_id].att_name = (char *) malloc(sub_length + 1);
-                        if (file->adios_attrs[attr_id].att_name) {
-                            strcpy(file->adios_attrs[attr_id].att_name, &attr_names[i][prefix_length]);
-                            int att_varid = -1;
-                            int ret = PIOc_inq_varid(*ncidp, file->adios_vars[var_cnt].name, &att_varid);
-                            file->adios_attrs[attr_id].att_varid = att_varid;
-                            file->adios_attrs[attr_id].att_ncid = *ncidp;
-                            adios_get_attrs(file, attr_id, attr_names, i);
-                        }
-                        assert(attr_id < PIO_MAX_ATTRS);
-                        attr_id++;
-                    }
-                    free(attr_full_prefix);
-                }
-                free(attr_names[i]);
-            }
-
-            // remove memory
-            free(attr_names);
-            file->num_attrs += attr_id;
-           // adios2_end_step(file->engineH);
-            //file->begin_step_called = 0;
-            //step++;
-//        }
+            free(attr_names[i]);
+        }
+        // remove memory
+        free(attr_names);
+        file->num_attrs += attr_id;
         for (int i = 0; i < file->num_vars; i++) {
             LOG((1, "var from file (%s) : name = %s,  varid =  %d", file->fname, file->adios_vars[i].name, i));
         }
@@ -4072,6 +4015,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         file->begin_step_called = 0;
         file->engineH = NULL;
         //open it again
+        //TODODG: check the current_step, if current_step is not 0 (not the beginning) close and open again
         LOG((2, "adios2_open(%s)", file->fname));
         file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
         LOG((2, "adios2_open(%s) io %p engine %p", file->fname, file->ioH, file->engineH));
