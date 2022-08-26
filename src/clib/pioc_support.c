@@ -3640,6 +3640,8 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
     int ierr = PIO_NOERR;      /* Return code from function calls. */
     int ierr2 = PIO_NOERR;      /* Return code from function calls. */
 
+    GPTLstart("PIO:read_total");
+    GPTLstart("PIO:PIOc_openfile_retry");
     /* Get the IO system info from the iosysid. */
     if (!(ios = pio_get_iosystem_from_id(iosysid)))
     {
@@ -3712,6 +3714,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
     {
         /* trying to open a file with adios */
 #ifdef _ADIOS2
+        GPTLstart("PIO:PIOc_openfile_retry_adios");
         char declare_name[PIO_MAX_NAME] = {'\0'};
         char bpname[PIO_MAX_NAME]  = {'\0'};
         strcat(bpname, filename);
@@ -4033,6 +4036,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                            pio_get_fname_from_file(file));
         }
         file->begin_step_called = 1;
+        GPTLstop("PIO:PIOc_openfile_retry_adios");
     }
 #endif
 
@@ -4261,6 +4265,8 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         LOG((3, "File has %d unlimited dimensions", file->num_unlim_dimids));
     }
 
+    GPTLstop("PIO:PIOc_openfile_retry");
+    GPTLstop("PIO:read_total");
     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
     spio_ltimer_stop(file->io_fstats->rd_timer_name);

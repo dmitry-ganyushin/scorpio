@@ -465,6 +465,7 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
     int mpierr = MPI_SUCCESS;  /* Return code from MPI function calls. */
     int ierr = PIO_NOERR;               /* Return code from function calls. */
 
+    GPTLstart("PIO:read_total");
     GPTLstart("PIO:PIOc_get_att_tc");
     /* Find the info about this file. */
     if ((ierr = pio_get_file(ncid, &file)))
@@ -484,10 +485,18 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
 
     LOG((1, "PIOc_get_att_tc  filename %s varid = %d", file->fname, varid));
 
+    if (file->iotype == PIO_IOTYPE_ADIOS)
+    {
+        GPTLstart("PIO:PIOc_get_att_tc_adios");
+    }
     /* User must provide a name and destination pointer. */
     if (!name || !ip || strlen(name) > PIO_MAX_NAME)
     {
         GPTLstop("PIO:PIOc_get_att_tc");
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+        {
+            GPTLstop("PIO:PIOc_get_att_tc_adios");
+        }
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -512,6 +521,10 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
         if(ierr != PIO_NOERR){
             LOG((1, "PIOc_inq_att failed, ierr = %d", ierr));
             GPTLstop("PIO:PIOc_get_att_tc");
+            if (file->iotype == PIO_IOTYPE_ADIOS)
+            {
+                GPTLstop("PIO:PIOc_get_att_tc_adios");
+            }
             return ierr;
         }
         LOG((2, "atttype = %d attlen = %d", atttype, attlen));
@@ -521,6 +534,10 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
         if(ierr != PIO_NOERR){
             LOG((1, "PIOc_inq_type failed, ierr=%d", ierr));
             GPTLstop("PIO:PIOc_get_att_tc");
+            if (file->iotype == PIO_IOTYPE_ADIOS)
+            {
+                GPTLstop("PIO:PIOc_get_att_tc_adios");
+            }
             return ierr;
         }
 
@@ -534,6 +551,10 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
             if(ierr != PIO_NOERR){
                 LOG((1, "PIOc_inq_type failed, ierr = %d", ierr));
                 GPTLstop("PIO:PIOc_get_att_tc");
+                if (file->iotype == PIO_IOTYPE_ADIOS)
+                {
+                    GPTLstop("PIO:PIOc_get_att_tc_adios");
+                }
                 return ierr;
             }
         }
@@ -556,6 +577,10 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
         {
             LOG((1, "Error sending async msg for PIO_MSG_GET_ATT"));
             GPTLstop("PIO:PIOc_get_att_tc");
+            if (file->iotype == PIO_IOTYPE_ADIOS)
+            {
+                GPTLstop("PIO:PIOc_get_att_tc_adios");
+            }
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -569,6 +594,10 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
         if ((mpierr = MPI_Bcast(&attlen, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
         {
             GPTLstop("PIO:PIOc_get_att_tc");
+            if (file->iotype == PIO_IOTYPE_ADIOS)
+            {
+                GPTLstop("PIO:PIOc_get_att_tc_adios");
+            }
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -578,6 +607,10 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
         if ((mpierr = MPI_Bcast(&atttype_len, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
         {
             GPTLstop("PIO:PIOc_get_att_tc");
+            if (file->iotype == PIO_IOTYPE_ADIOS)
+            {
+                GPTLstop("PIO:PIOc_get_att_tc_adios");
+            }
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -587,6 +620,10 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
         if ((mpierr = MPI_Bcast(&memtype_len, 1, MPI_OFFSET, ios->comproot, ios->my_comm)))
         {
             GPTLstop("PIO:PIOc_get_att_tc");
+            if (file->iotype == PIO_IOTYPE_ADIOS)
+            {
+                GPTLstop("PIO:PIOc_get_att_tc_adios");
+            }
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -789,6 +826,7 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
 #endif
                 default:
                     GPTLstop("PIO:PIOc_get_att_tc");
+                    GPTLstop("PIO:PIOc_get_att_tc_adios");
                     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                     spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -820,6 +858,10 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
                             ios->my_comm)))
     {
         GPTLstop("PIO:PIOc_get_att_tc");
+        if (file->iotype == PIO_IOTYPE_ADIOS)
+        {
+            GPTLstop("PIO:PIOc_get_att_tc_adios");
+        }
         spio_ltimer_stop(ios->io_fstats->rd_timer_name);
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -828,7 +870,12 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
     }
 
     LOG((2, "get_att_tc data bcast complete"));
+    if (file->iotype == PIO_IOTYPE_ADIOS)
+    {
+        GPTLstop("PIO:PIOc_get_att_tc_adios");
+    }
     GPTLstop("PIO:PIOc_get_att_tc");
+    GPTLstop("PIO:read_total");
     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
     spio_ltimer_stop(file->io_fstats->rd_timer_name);

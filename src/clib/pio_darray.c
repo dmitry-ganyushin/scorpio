@@ -2448,6 +2448,7 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
     int fndims = 0;
 
     adios_var_desc_t *vdesc_adios2; /* Info about the variable from the adios structure */
+    GPTLstart("PIO:read_total");
     GPTLstart("PIO:PIOc_read_darray");
     /* Get the file info. */
     if ((ierr = pio_get_file(ncid, &file)))
@@ -2716,9 +2717,11 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
             break;
 #ifdef _ADIOS2
         case PIO_IOTYPE_ADIOS:
+            GPTLstart("PIO:PIOc_read_darray_adios");
             if ((ierr = pio_read_darray_adios2(file, fndims, iodesc, varid, array)))
             {
                 GPTLstop("PIO:PIOc_read_darray");
+                GPTLstop("PIO:PIOc_read_darray_adios");
                 spio_ltimer_stop(ios->io_fstats->rd_timer_name);
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
@@ -2726,6 +2729,7 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
                 return pio_err(ios, file, ierr, __FILE__, __LINE__,
                                "Reading variable (%s, varid=%d) from file (%s, ncid=%d)failed . Reading variable in parallel (iotype=%s) failed", pio_get_vname_from_file(file, varid), varid, pio_get_fname_from_file(file), file->pio_ncid, pio_iotype_to_string(file->iotype));
             }
+            GPTLstop("PIO:PIOc_read_darray_adios");
             GPTLstop("PIO:PIOc_read_darray");
             spio_ltimer_stop(ios->io_fstats->rd_timer_name);
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
@@ -2774,6 +2778,7 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
     mtimer_stop(file->varlist[varid].rd_mtimer, get_var_desc_str(ncid, varid, NULL));
 #endif
     GPTLstop("PIO:PIOc_read_darray");
+    GPTLstop("PIO:read_total");
     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
     spio_ltimer_stop(ios->io_fstats->tot_timer_name);
     spio_ltimer_stop(file->io_fstats->rd_timer_name);
