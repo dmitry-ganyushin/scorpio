@@ -4041,8 +4041,8 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                            pio_get_fname_from_file(file));
         }
         file->begin_step_called = 1;
-#endif
         GPTLstop("PIO:PIOc_openfile_retry_adios");
+#endif
     }
 #endif
 

@@ -1370,9 +1370,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                pio_get_fname_from_file(file));
             }
             LOG((2, "adios2_open(%s) : fd = %d ncid = %d ", file->fname, file->fh, ncid));
-            GPTLstart("PIO:PIOc_openfile_retry_adios_open");
             file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
-            GPTLstop("PIO:PIOc_openfile_retry_adios_open");
             LOG((2, "adios2_open(%s) io %p  engine (%p)", file->fname, file->ioH, file->engineH));
             adios2_step_status status;
             int step = 0;
