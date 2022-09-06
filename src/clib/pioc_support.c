@@ -4009,40 +4009,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             LOG((1, "var from file (%s) : name = %s,  varid =  %d", file->fname, file->adios_vars[i].name, i));
         }
         /* open file to be ready to use */
-#if 1
-        /*close file */
-        LOG((2, "adios2_close(%s) io %p engine %p", file->fname, file->ioH, file->engineH));
-        adios2_error  err = adios2_close(file->engineH);
-        if (err != adios2_error_none) {
-            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                           "Closing (ADIOS) file (%s) failed",
-                           pio_get_fname_from_file(file));
-        }
-        file->begin_step_called = 0;
-        file->engineH = NULL;
-        //open it again
-        //TODODG: check the current_step, if current_step is not 0 (not the beginning) close and open again
-        LOG((2, "adios2_open(%s)", file->fname));
-        GPTLstart("PIO:PIOc_openfile_retry_adios_open");
-        file->engineH = adios2_open(file->ioH, file->fname, adios2_mode_read);
-        GPTLstop("PIO:PIOc_openfile_retry_adios_open");
-        LOG((2, "adios2_open(%s) io %p engine %p", file->fname, file->ioH, file->engineH));
-        if (file->engineH == NULL) {
-            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                           "Opening (ADIOS) file (%s) failed",
-                           pio_get_fname_from_file(file));
-        }
-        /* make begin_step to be ready to use */
-        err = adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
-                          &status);
-        if (err != adios2_error_none) {
-            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                           "begin_step (ADIOS) file (%s) failed",
-                           pio_get_fname_from_file(file));
-        }
-        file->begin_step_called = 1;
         GPTLstop("PIO:PIOc_openfile_retry_adios");
-#endif
     }
 #endif
 

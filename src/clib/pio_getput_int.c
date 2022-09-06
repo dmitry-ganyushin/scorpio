@@ -1360,7 +1360,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         }
         if (current_adios_step > required_adios_step) {
             /* close bp file and remove IO object */
-            adios2_end_step(file->engineH);
+            if (file->begin_step_called == 1) adios2_end_step(file->engineH);
             LOG((2, "adios2_close(%s) io %p engine %p", file->fname, file->ioH, file->engineH));
             adios2_error err_close = adios2_close(file->engineH);
             file->begin_step_called = 0;
