@@ -59,6 +59,10 @@ int main(int argc, char *argv[]) {
 
         ret = PIOc_closefile(ncid_read1);
         ERR
+
+        ret = PIOc_openfile(iosysid, &ncid_read1, &(formats[fmt]), filename1, PIO_NOWRITE);
+        ret = PIOc_closefile(ncid_read1);
+        ERR
     }
 
     ret = PIOc_finalize(iosysid);

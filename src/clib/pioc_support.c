@@ -3714,6 +3714,18 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
     {
         /* trying to open a file with adios */
 #ifdef _ADIOS2
+        /* Find the info about this file. If file is opened, skip */
+        if (pio_get_file(*ncidp, &file) == 0) {
+            free(file->io_fstats);
+            free(file);
+            GPTLstop("PIO:PIOc_openfile_retry");
+            GPTLstop("PIO:read_total");
+            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->rd_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            return 0;
+        }
         GPTLstart("PIO:PIOc_openfile_retry_adios");
         char declare_name[PIO_MAX_NAME] = {'\0'};
         char bpname[PIO_MAX_NAME]  = {'\0'};
