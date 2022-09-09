@@ -982,6 +982,7 @@ typedef struct file_desc_t
 
     /* File name - cached */
     char fname[PIO_MAX_NAME + 1];
+    char io_name[PIO_MAX_NAME + 1];
 
     /** The ncid that will be returned to the user. */
     int pio_ncid;

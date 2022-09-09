@@ -711,7 +711,7 @@ int PIOc_closefile(int ncid)
             file->engineH = NULL;
         }
         adios2_bool result;
-        adios2_remove_io(&result, ios->adiosH, file->fname);
+        adios2_remove_io(&result, ios->adiosH, file->io_name);
 
         for (int i = 0; i < file->num_dim_vars; i++)
         {
