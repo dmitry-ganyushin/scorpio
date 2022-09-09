@@ -3632,7 +3632,6 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                         int mode, int retry)
 {
     char tname[SPIO_TIMER_MAX_NAME];
-    char declare_name[PIO_MAX_NAME] = {'\0'};
     iosystem_desc_t *ios;      /* Pointer to io system information. */
     file_desc_t *file;         /* Pointer to file information. */
     int imode;                 /* Internal mode val for netcdf4 file open. */
