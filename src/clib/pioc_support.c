@@ -3329,6 +3329,7 @@ int check_unlim_use(int ncid)
 }
 
 #ifdef _ADIOS2
+char str_buf[PIO_MAX_NAME] = {'\0'};
 char const adios_pio_var_prefix[] = "/__pio__/var/";
 char const adios_pio_dim_prefix[] = "/__pio__/dim/";
 char const adios_def_nctype_suffix[] = "/def/nctype";
@@ -3365,7 +3366,7 @@ int adios_read_global_dimensions(iosystem_desc_t *ios, file_desc_t * file, char 
 {
     /* read global dimensions to match them later variables to dimensional ids */
     for (size_t i = 0; i < var_size; i++) {
-        if (strstr(var_names[i], adios_pio_dim_prefix) != NULL) {
+        if (strncmp(var_names[i], adios_pio_dim_prefix, strlen (adios_pio_dim_prefix)) == 0) {
             int sub_length = strlen(var_names[i]) - strlen(adios_pio_dim_prefix);
             int full_length = strlen(var_names[i]);
             int prefix_length = strlen(adios_pio_var_prefix);
@@ -3398,9 +3399,7 @@ int adios_read_global_dimensions(iosystem_desc_t *ios, file_desc_t * file, char 
 
 char* adios_name(const char* prefix, char* root, const char *suffix)
 {
-    char *name = malloc(
-            strlen(prefix) + strlen(root) +
-            strlen(suffix) + 1);
+    char *name = str_buf;
     strcpy(name, prefix);
     strcat(name, root);
     strcat(name, suffix);
@@ -3485,7 +3484,6 @@ int adios_get_dim_ids(file_desc_t *file, size_t var_id)
                 free(attr_data);
             }
         }
-        free(dims_attr_name);
     }
 }
 
@@ -3511,7 +3509,6 @@ int adios_get_scorpio_type(file_desc_t *file, size_t var_id)
                 free(attr_data);
             }
         }
-        free(dims_attr_name);
     }
 }
 
@@ -3528,7 +3525,6 @@ void adios_get_ndims(file_desc_t *file, size_t var_id)
             adios2_error err = adios2_attribute_data(&attr_data, &size_attr, ndims_attr);
             file->adios_vars[var_id].ndims = attr_data;
         }
-        free(ndims_attr_name);
     }
 }
 
@@ -3544,7 +3540,6 @@ void adios_get_adios_type(file_desc_t *file, size_t var_id)
             adios2_error err = adios2_attribute_data(&attr_data, &size_attr, attr);
             file->adios_vars[var_id].adios_type = attr_data;
         }
-        free(attr_name);
     }
 }
 
@@ -3560,7 +3555,6 @@ void adios_get_nc_type(file_desc_t *file, size_t var_id)
             adios2_error err = adios2_attribute_data(&attr_data, &size_attr, attr);
             file->adios_vars[var_id].nc_type = attr_data;
         }
-        free(attr_name);
     }
 }
 
@@ -3570,8 +3564,6 @@ void adios_get_step(file_desc_t *file, size_t var_id, size_t adios_step)
         /* trying to look up the frame_id */
 
         char *frame_id_name = adios_name(adios_pio_track_frame_id_prefix, file->adios_vars[var_id].name, "");
-        char *var_name = adios_name(adios_pio_var_prefix, file->adios_vars[var_id].name,
-                                    "");
         adios2_variable *variableH = adios2_inquire_variable(file->ioH, frame_id_name);
         if (variableH){
             adios2_type type;
@@ -3589,15 +3581,13 @@ void adios_get_step(file_desc_t *file, size_t var_id, size_t adios_step)
                 /*not implemented */
             }
         }else{
+            char *var_name = adios_name(adios_pio_var_prefix, file->adios_vars[var_id].name,
+                                        "");
             variableH = adios2_inquire_variable(file->ioH, var_name);
             if (variableH){
                 file->adios_vars[var_id].interval_map[0] = adios_step;
             }
         }
-
-
-        free(frame_id_name);
-        free(var_name);
         return;
     }
 }
@@ -3936,7 +3926,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         for (size_t i = 0; i < attr_size; i++) {
             /*get global attributes*/
             /* strings that start with /__pio__/var/ are variables */
-            if (strstr(attr_names[i], adios_pio_global_prefix) != NULL) {
+            if (strncmp(attr_names[i], adios_pio_global_prefix, strlen(adios_pio_global_prefix)) == 0) {
                 //get substring from string for name
                 int sub_length = strlen(attr_names[i]) - strlen(adios_pio_global_prefix);
                 int full_length = strlen(attr_names[i]);
@@ -3952,7 +3942,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                 assert(attr_id < PIO_MAX_ATTRS);
             }
             /* cache decomp attrubutes */
-            if (strstr(attr_names[i], adios_pio_var_prefix) != NULL &&
+            if (strncmp(attr_names[i], adios_pio_var_prefix, strlen(adios_pio_var_prefix)) == 0 &&
                 strstr(attr_names[i], adios_def_decomp_suffix) != NULL) {
                 adios2_attribute const *attributeH = adios2_inquire_attribute(file->ioH, attr_names[i]);
                 if (attributeH != NULL) {
@@ -3978,12 +3968,12 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             for (size_t var_cnt = 0; var_cnt < file->num_vars; var_cnt++) {
                 char *attr_full_prefix = adios_name(adios_pio_var_prefix, file->adios_vars[var_cnt].name,
                                                     suffix_att_name);
-                if (strstr(attr_names[i], attr_full_prefix) != NULL) {
+                if (strncmp(attr_names[i], attr_full_prefix, strlen(attr_full_prefix)) == 0) {
                     int sub_length = strlen(attr_names[i]) - strlen(attr_full_prefix);
                     int full_length = strlen(attr_names[i]);
                     int prefix_length = strlen(attr_full_prefix);
                     if (strrchr(attr_names[i], '/') > &attr_names[i][prefix_length]) {
-                        free(attr_full_prefix);
+                       // free(attr_full_prefix);
                         continue;
                     }
                     file->adios_attrs[attr_id].att_name = (char *) malloc(sub_length + 1);
@@ -3998,7 +3988,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                     assert(attr_id < PIO_MAX_ATTRS);
                     attr_id++;
                 }
-                free(attr_full_prefix);
+               // free(attr_full_prefix);
             }
             free(attr_names[i]);
         }
@@ -4251,7 +4241,8 @@ size_t
 adios_read_vars_attr(file_desc_t *file, size_t attr_size, char *const *attr_names) {
     size_t current_var_cnt = 0;
     for (size_t i = 0; i < attr_size; i++){
-        if (strstr(attr_names[i], adios_pio_var_prefix) != NULL && strstr(attr_names[i], adios_def_ndims_suffix)) {
+        if (strncmp(attr_names[i], adios_pio_var_prefix, strlen(adios_pio_var_prefix)) == 0 &&
+            strstr(attr_names[i], adios_def_ndims_suffix)) {
 
             int full_length = strlen(attr_names[i]);
             int prefix_length = strlen(adios_pio_var_prefix);
@@ -4291,7 +4282,7 @@ size_t adios_read_vars_vars(file_desc_t *file, size_t var_size, char *const *var
     size_t current_var_cnt = 0;
     for (size_t i = 0; i < var_size; i++) {
         /* strings that start with /__pio__/var/ are variables */
-        if (strstr(var_names[i], adios_pio_var_prefix) != NULL) {
+        if (strncmp(var_names[i], adios_pio_var_prefix, strlen(adios_pio_var_prefix)) == 0) {
             int sub_length = strlen(var_names[i]) - strlen(adios_pio_var_prefix);
             int full_length = strlen(var_names[i]);
             int prefix_length = strlen(adios_pio_var_prefix);
