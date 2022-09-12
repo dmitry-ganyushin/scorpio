@@ -3330,6 +3330,7 @@ int check_unlim_use(int ncid)
 
 #ifdef _ADIOS2
 char str_buf[PIO_MAX_NAME] = {'\0'};
+char attr_data_buf[64 * PIO_MAX_NAME] = {'\0'};
 char const adios_pio_var_prefix[] = "/__pio__/var/";
 char const adios_pio_dim_prefix[] = "/__pio__/dim/";
 char const adios_def_nctype_suffix[] = "/def/nctype";
@@ -3433,13 +3434,12 @@ int adios_get_attrs(file_desc_t *file, int attr_id, char *const *attr_names, siz
             file->adios_attrs[attr_id].att_type = NC_CHAR;
             file->adios_attrs[attr_id].adios_type = adios2_type_string;
             size_t size_attr;
-            char *attr_data = calloc(sizeof(char), 64 * PIO_MAX_NAME);
+            char *attr_data = attr_data_buf;
             adios2_error attr_err = adios2_attribute_data(attr_data, &size_attr, attr);
             size_t size = strlen(attr_data);
             file->adios_attrs[attr_id].att_len = (PIO_Offset) (
                     size * sizeof(char) +
                     1);
-            free(attr_data);
         }else {
             return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                            "Not implemented");
@@ -3988,7 +3988,6 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                     assert(attr_id < PIO_MAX_ATTRS);
                     attr_id++;
                 }
-               // free(attr_full_prefix);
             }
             free(attr_names[i]);
         }
