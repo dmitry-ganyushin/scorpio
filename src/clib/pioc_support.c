@@ -3398,12 +3398,16 @@ int adios_read_global_dimensions(iosystem_desc_t *ios, file_desc_t * file, char 
     return 0;
 }
 
-char* adios_name(const char* prefix, char* root, const char *suffix)
+char* adios_name(const char* prefix, const char* root, const char *suffix)
 {
     char *name = str_buf;
-    strcpy(name, prefix);
-    strcat(name, root);
-    strcat(name, suffix);
+    size_t len_prefix = strlen (prefix);
+	memcpy (name, prefix, len_prefix);
+	size_t len_root = strlen(root);
+	memcpy (name + len_prefix, root, len_root);
+    size_t len_suffix = strlen(suffix);
+    memcpy (name + len_prefix + len_root, suffix, len_suffix);
+	name[len_prefix + len_root + len_suffix] = '\0';
     return name;
 }
 
@@ -3973,7 +3977,6 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                     int full_length = strlen(attr_names[i]);
                     int prefix_length = strlen(attr_full_prefix);
                     if (strrchr(attr_names[i], '/') > &attr_names[i][prefix_length]) {
-                       // free(attr_full_prefix);
                         continue;
                     }
                     file->adios_attrs[attr_id].att_name = (char *) malloc(sub_length + 1);
