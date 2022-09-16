@@ -559,7 +559,7 @@ int PIOc_closefile(int ncid)
 #ifdef _ADIOS2
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
-        if (file->engineH != NULL && file->filename != NULL) {
+        if (file->engineH != NULL) {
             LOG((2, "ADIOS close file %s", file->filename));
             adios2_mode mode;
             adios2_engine_openmode(&mode, file->engineH);
