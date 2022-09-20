@@ -444,7 +444,7 @@ static int sync_file(int ncid)
  * @returns PIO_NOERR for success, error code otherwise.
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_closefile(int ncid)
+int _PIOc_closefile(int ncid)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file = NULL;     /* Pointer to file information. */
@@ -931,6 +931,19 @@ int PIOc_closefile(int ncid)
     return ierr;
 }
 
+int PIOc_closefile(int ncid)
+{
+    file_desc_t *file = NULL;     /* Pointer to file information. */
+    int ierr = PIO_NOERR;  /* Return code from function calls. */
+    /* Find the info about this file. */
+    if ((ierr = pio_get_file(ncid, &file)))
+    {
+        return pio_err(NULL, NULL, ierr, __FILE__, __LINE__,
+                       "Closing file failed. Invalid file id (ncid=%d) provided", ncid);
+    }
+    if (!file->mode & PIO_WRITE && file->iotype == PIO_IOTYPE_ADIOS) return ierr;
+    else return _PIOc_closefile(ncid);
+}
 /**
  * Delete a file.
  *

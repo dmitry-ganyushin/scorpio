@@ -3657,7 +3657,18 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         return pio_err(ios, NULL, PIO_EBADIOTYPE, __FILE__, __LINE__,
                         "Opening file (%s) failed. Invalid iotype (%s:%d) specified. Available iotypes are : %s", filename, pio_iotype_to_string(*iotype), *iotype, avail_iotypes);
     }
+ /* is such file is opened? */
+ if ( *iotype == PIO_IOTYPE_ADIOS) {
 
+#ifdef _ADIOS2
+     /* Find the info about this file. If file is opened, skip */
+     if (pio_get_file(*ncidp, &file) == 0) {
+         GPTLstop("PIO:PIOc_openfile_retry");
+         GPTLstop("PIO:read_total");
+         return 0;
+     }
+#endif
+ }
     spio_ltimer_start(ios->io_fstats->rd_timer_name);
     spio_ltimer_start(ios->io_fstats->tot_timer_name);
 
