@@ -941,7 +941,7 @@ int PIOc_closefile(int ncid)
         return pio_err(NULL, NULL, ierr, __FILE__, __LINE__,
                        "Closing file failed. Invalid file id (ncid=%d) provided", ncid);
     }
-    if (!file->mode & PIO_WRITE && file->iotype == PIO_IOTYPE_ADIOS) return ierr;
+    if (file->mode == PIO_NOWRITE && file->iotype == PIO_IOTYPE_ADIOS) return ierr;
     else return _PIOc_closefile(ncid);
 }
 /**
