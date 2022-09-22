@@ -129,7 +129,7 @@ int pio_get_file_by_name(const char* fname, file_desc_t **cfile1)
 {
     file_desc_t *cfile = NULL;
 
-    LOG((2, "pio_get_file ncid = %d", ncid));
+    LOG((2, "pio_get_file_by_name file name = %s", fname));
 
     /* Caller must provide this. */
     if (!cfile1)
