@@ -3661,8 +3661,11 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
  if ( *iotype == PIO_IOTYPE_ADIOS) {
 
 #ifdef _ADIOS2
+     char fname[PIO_MAX_NAME];
+     strcpy(fname, filename);
+     strcat(fname, ".bp");
      /* Find the info about this file. If file is opened, skip */
-     if (pio_get_file(*ncidp, &file) == 0) {
+     if (pio_get_file_by_name(fname, &file) == 0) {
          GPTLstop("PIO:PIOc_openfile_retry");
          GPTLstop("PIO:read_total");
          return 0;
