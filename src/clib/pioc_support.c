@@ -3752,9 +3752,11 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                                convert_adios2_error_to_string(adiosErr), pio_get_fname_from_file(file));
             }
             /* BP5 */
-
             adiosErr = adios2_set_parameter(file->ioH, "InitialBufferSize", "1Gb");
-            adiosErr = adios2_set_engine(file->ioH, "BP5");
+            adiosErr = adios2_set_parameter(file->ioH, "StreamReader", "ON");
+            adiosErr = adios2_set_parameter(file->ioH, "OpenTimeoutSecs", "1");
+            adiosErr = adios2_set_parameter(file->ioH, "InitialBufferSize", "1Gb");
+            adiosErr = adios2_set_engine(file->ioH, "FileStream");
             if (adiosErr != adios2_error_none) {
                 return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                "Setting (ADIOS) engine (type=FileStream) failed (adios2_error=%s) for file (%s)",
