@@ -1069,7 +1069,7 @@ int PIOc_inq_var(int ncid, int varid, char *name, int namelen, nc_type *xtypep, 
 #endif
     int mpierr = MPI_SUCCESS;  /* Return code from MPI function codes. */
 
-    LOG((1, "PIOc_inq_var ncid = %d varid = %d", ncid, varid));
+    LOG((1, "PIOc_inq_var ncid = %d varid = %d name = %s", ncid, varid, name));
 
     /* Get the file info, based on the ncid. */
     if ((ierr = pio_get_file(ncid, &file)))
