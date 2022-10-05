@@ -2322,7 +2322,7 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         }
         /* First we need to define the variable now that we know it's decomposition */
         adios_var_desc_t *av = &(file->adios_vars[varid]);
-        LOG((1, "ADIOS: PIOc_put_vars_tc ncid = %d varid = %d name = %s", ncid, varid, av->name));
+        LOG((1, "ADIOS PIOc_put_vars_tc ncid = %d varid = %d name = %s mode=%d begin_step_called=%d", ncid, varid, av->name, file->mode, file->begin_step_called));
         ierr = begin_adios2_step(file, ios);
         if (ierr != PIO_NOERR)
         {
