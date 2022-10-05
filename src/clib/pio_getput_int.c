@@ -2320,6 +2320,9 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                            "Writing variable to file (%s, ncid=%d) failed. Invalid variable id (varid=%d, expected >=0 and < number of variables in the file, %d) provided",
                            pio_get_fname_from_file(file), ncid, varid, file->num_vars);
         }
+        /* First we need to define the variable now that we know it's decomposition */
+        adios_var_desc_t *av = &(file->adios_vars[varid]);
+        LOG((1, "ADIOS: PIOc_put_vars_tc ncid = %d varid = %d name = %s", ncid, varid, av->name));
         ierr = begin_adios2_step(file, ios);
         if (ierr != PIO_NOERR)
         {
@@ -2335,10 +2338,6 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         }
 
         adios2_error adiosErr = adios2_error_none;
-
-        /* First we need to define the variable now that we know it's decomposition */
-        adios_var_desc_t *av = &(file->adios_vars[varid]);
-        LOG((1, "ADIOS PIOc_put_vars_tc ncid = %d varid = %d name = %s", ncid, varid, av->name));
 
         /* Write ADIOS with memory type since ADIOS does not do conversions.
          * Add an attribute describing the target output type (defined type).
