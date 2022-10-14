@@ -17,6 +17,8 @@ int main(int argc, char* argv[])
   const int ioproc_start = 0;
   int iosysid;
   int ncid_read;
+  int ncid_read1;
+  int ncid_read2;
   int ret = PIO_NOERR;
 
 #ifdef TIMING
@@ -39,27 +41,44 @@ int main(int argc, char* argv[])
   char filename_elm_r[] = "F2010_ne4_oQU240_ADIOS.elm.r.0001-01-02-00000.nc";
   char filename_elm_rh0[] = "F2010_ne4_oQU240_ADIOS.elm.rh0.0001-01-02-00000.nc";
 
-  char filename_eam_r[] = "F2010_ne4_oQU240_ADIOS.eam.r.0001-01-02-00000.nc";
+  char filename_eam_r[] = "F2010_ne4_oQU240_ADIOS-gnu.eam.r.0001-01-02-00000.nc";
 
-  char filename_cpl_r[] = "F2010_ne4_oQU240_ADIOS.cpl.r.0001-01-02-00000.nc";
+  char filename_cpl_r[] = "F2010_ne4_oQU240_ADIOS-gnu.cpl.r.0001-01-02-00000.nc";
+
+  char filename_h0[] = "F2010_ne4_oQU240_ADIOS-gnu.eam.h0.0001-01-01-00000.nc";
 
   // Max current_var_cnt = 3242
-  ret = PIOc_openfile(iosysid, &ncid_read, &format, filename_elm_r, PIO_NOWRITE); ERR
-  ret = PIOc_closefile(ncid_read); ERR
+//  ret = PIOc_openfile(iosysid, &ncid_read, &format, filename_elm_r, PIO_NOWRITE); ERR
+//  ret = PIOc_closefile(ncid_read); ERR
 
   // Max current_var_cnt = 1678
   // heap-buffer-overflow: attr_data buffer size (256 bytes) is too small to read this file
   // [Workaround] In pioc_support.c, line 3186: char *attr_data = calloc(sizeof(char), 64 * PIO_MAX_NAME);
-  ret = PIOc_openfile(iosysid, &ncid_read, &format, filename_elm_rh0, PIO_NOWRITE); ERR
-  ret = PIOc_closefile(ncid_read); ERR
+//  ret = PIOc_openfile(iosysid, &ncid_read, &format, filename_elm_rh0, PIO_NOWRITE); ERR
+//  ret = PIOc_closefile(ncid_read); ERR
 
   // Max current_var_cnt = 72
-  ret = PIOc_openfile(iosysid, &ncid_read, &format, filename_eam_r, PIO_NOWRITE); ERR
-  ret = PIOc_closefile(ncid_read); ERR
+//  ret = PIOc_openfile(iosysid, &ncid_read, &format, filename_eam_r, PIO_NOWRITE); ERR
+//  ret = PIOc_closefile(ncid_read); ERR
   // Max current_var_cnt = 18214: larger than 8192 which can corrupt struct file_desc_t
   // [Workaround] In pio.h, line 962: struct adios_att_desc_t adios_attrs[4 * PIO_MAX_ATTRS];
   ret = PIOc_openfile(iosysid, &ncid_read, &format, filename_cpl_r, PIO_NOWRITE); ERR
   ret = PIOc_closefile(ncid_read); ERR
+
+    ret = PIOc_openfile(iosysid, &ncid_read1, &format, filename_h0, PIO_NOWRITE); ERR
+    ret = PIOc_closefile(ncid_read1); ERR
+
+    ret = PIOc_openfile(iosysid, &ncid_read1, &format, filename_h0, PIO_NOWRITE); ERR
+    ret = PIOc_closefile(ncid_read1); ERR
+
+    ret = PIOc_openfile(iosysid, &ncid_read2, &format, filename_eam_r, PIO_NOWRITE); ERR
+    ret = PIOc_closefile(ncid_read2); ERR
+
+    ret = PIOc_openfile(iosysid, &ncid_read, &format, filename_cpl_r, PIO_NOWRITE); ERR
+    ret = PIOc_closefile(ncid_read); ERR
+
+    ret = PIOc_openfile(iosysid, &ncid_read, &format, filename_cpl_r, PIO_NOWRITE); ERR
+    ret = PIOc_closefile(ncid_read); ERR
 
   ret = PIOc_finalize(iosysid); ERR
 

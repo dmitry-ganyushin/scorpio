@@ -170,16 +170,21 @@ int pio_get_file_by_name(const char* fname, file_desc_t **cfile1)
  * @returns number of opened files
  * @author D. Ganyushin
  */
-int pio_get_lsof(int *ncids) {
+int* pio_get_lsof(int *counterp) {
     file_desc_t *cfile = NULL;
 
-    size_t counter = 0;
-    for (cfile = pio_file_list; cfile; cfile = cfile->next) counter++;
-    ncids = malloc( counter * sizeof (int));
+    int counter = 0;
+    for (cfile = pio_file_list; cfile; cfile = cfile->next){
+        counter++;
+    }
+    int *ncids = malloc( counter * sizeof (int));
     counter = 0;
-    for (cfile = pio_file_list; cfile; cfile = cfile->next)
-       ncids[counter++] = cfile->pio_ncid;
-    return counter;
+    for (cfile = pio_file_list; cfile; cfile = cfile->next){
+        ncids[counter++] = cfile->pio_ncid;
+    }
+
+    *counterp = counter;
+    return ncids;
 }
 /*
  *

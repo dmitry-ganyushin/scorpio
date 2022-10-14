@@ -930,7 +930,17 @@ int _PIOc_closefile(int ncid)
     GPTLstop("PIO:PIOc_closefile");
     return ierr;
 }
-
+int PIOc_close_all_files()
+{
+    file_desc_t *file = NULL;
+    int nfiles = 0;
+    int *ncids = pio_get_lsof(&nfiles);
+    /* close all opened non-history files with different name */
+    for (int id = 0; id < nfiles; id++) {
+        int ncid = ncids[id];
+        _PIOc_closefile(ncid);
+    }
+}
 int PIOc_closefile(int ncid)
 {
     file_desc_t *file = NULL;     /* Pointer to file information. */

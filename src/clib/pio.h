@@ -1176,6 +1176,7 @@ extern "C" {
     int PIOc_open(int iosysid, const char *path, int mode, int *ncidp);
     int PIOc_closefile(int ncid);
     int _PIOc_closefile(int ncid);
+    int PIOc_close_all_files();
     int PIOc_inq_format(int ncid, int *formatp);
     int PIOc_inq(int ncid, int *ndimsp, int *nvarsp, int *ngattsp, int *unlimdimidp);
     int PIOc_inq_ndims(int ncid, int *ndimsp);

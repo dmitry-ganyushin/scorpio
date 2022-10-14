@@ -118,7 +118,7 @@ extern "C" {
 
     int pio_get_file(int ncid, file_desc_t **filep);
     int pio_get_file_by_name(const char *fname, file_desc_t **filep);
-    int pio_get_lsof(int *ncids);
+    int *pio_get_lsof(int *);
     int pio_delete_file_from_list(int ncid);
     int pio_add_to_file_list(file_desc_t *file, MPI_Comm comm);
 

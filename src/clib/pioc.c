@@ -1485,6 +1485,7 @@ int PIOc_finalize(int iosysid)
 #endif
 
 #ifdef _ADIOS2
+    PIOc_close_all_files();
     if (ios->adiosH != NULL)
     {
         adios2_error adiosErr = adios2_finalize(ios->adiosH);
