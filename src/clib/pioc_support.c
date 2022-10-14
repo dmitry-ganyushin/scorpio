@@ -3664,13 +3664,45 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
      char fname[PIO_MAX_NAME];
      strcpy(fname, filename);
      strcat(fname, ".bp");
-     /* Find the info about this file. If file is opened, skip */
-     if (pio_get_file_by_name(fname, &file) == 0) {
-         *ncidp = file->pio_ncid;
-         GPTLstop("PIO:PIOc_openfile_retry");
-         GPTLstop("PIO:read_total");
-         return 0;
+     /* find out all non-history opened files. */
+     int *ncids = NULL;
+     int nfiles = pio_get_lsof(ncids);
+     /* close all opened non-history files with different name */
+     for (int id = 0; id < nfiles; id++){
+         int ncid = ncids[id];
+         pio_get_file(ncid, &file);
+         /* filter out all history files */
+         if (strstr(file->fname, "h0") != NULL){
+             /* treat history file */
+             /* Find the info about this file. If file is opened, skip */
+             if (pio_get_file_by_name(fname, &file) == 0) {
+                 *ncidp = file->pio_ncid;
+                 GPTLstop("PIO:PIOc_openfile_retry");
+                 GPTLstop("PIO:read_total");
+                 free(ncids);
+                 ncids = NULL;
+                 return 0;
+             }
+         } else {
+             /* treat all other files */
+             if (pio_get_file(ncid, &file) == 0) {
+                 if (strcmp(file->fname, fname) == 0){
+                     *ncidp = file->pio_ncid;
+                     GPTLstop("PIO:PIOc_openfile_retry");
+                     GPTLstop("PIO:read_total");
+                     free(ncids);
+                     ncids = NULL;
+                     return 0;
+                 }else{
+                     _PIOc_closefile(ncid);
+                     free(ncids);
+                     ncids = NULL;
+                     break;
+                 }
+             }
+         }
      }
+    if (ncids != NULL) free(ncids);
 #endif
  }
     spio_ltimer_start(ios->io_fstats->rd_timer_name);

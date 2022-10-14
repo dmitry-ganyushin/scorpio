@@ -161,6 +161,26 @@ int pio_get_file_by_name(const char* fname, file_desc_t **cfile1)
     *cfile1 = cfile;
     return PIO_NOERR;
 }
+/**
+ * Return all opened files as a list of ncid
+ *
+ * @param ncids pointer for a list of opened files.
+ * will get a copy of the pointer to the file info.
+ *
+ * @returns number of opened files
+ * @author D. Ganyushin
+ */
+int pio_get_lsof(int *ncids) {
+    file_desc_t *cfile = NULL;
+
+    size_t counter = 0;
+    for (cfile = pio_file_list; cfile; cfile = cfile->next) counter++;
+    ncids = malloc( counter * sizeof (int));
+    counter = 0;
+    for (cfile = pio_file_list; cfile; cfile = cfile->next)
+       ncids[counter++] = cfile->pio_ncid;
+    return counter;
+}
 /*
  *
  * Delete a file from the list of open files.

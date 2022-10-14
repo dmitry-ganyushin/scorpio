@@ -936,12 +936,12 @@ int PIOc_closefile(int ncid)
     file_desc_t *file = NULL;     /* Pointer to file information. */
     int ierr = PIO_NOERR;  /* Return code from function calls. */
     /* Find the info about this file. */
-    if ((ierr = pio_get_file(ncid, &file)))
+    if (ierr = pio_get_file(ncid, &file))
     {
         return pio_err(NULL, NULL, ierr, __FILE__, __LINE__,
                        "Closing file failed. Invalid file id (ncid=%d) provided", ncid);
     }
-    /* skip closing if file */
+    /* skip closing if ADIOS file */
     if (file->mode == PIO_NOWRITE && file->iotype == PIO_IOTYPE_ADIOS) return ierr;
     else return _PIOc_closefile(ncid);
 }
