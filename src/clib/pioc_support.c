@@ -3682,6 +3682,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
          for (int id = 0; id < nfiles; id++) {
              int ncid = ncids[id];
              pio_get_file(ncid, &file);
+             if (file->iotype != PIO_IOTYPE_ADIOS) continue;
              if (strstr(file->fname, "h0") == NULL) {
                  /* Find the info about this file. If file is opened, skip */
                  /* treat all other files */
