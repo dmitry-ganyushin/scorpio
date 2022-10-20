@@ -3662,11 +3662,12 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
 
 #ifdef _ADIOS2
      char fname[PIO_MAX_NAME];
+     char mask[] = "h0";
      strcpy(fname, filename);
      strcat(fname, ".bp");
 
      /* fname is a history file history files */
-     if (strstr(fname, "h0") != NULL){
+     if (strstr(fname, mask) != NULL){
          /* treat history file */
          if (pio_get_file_by_name(fname, &file) == 0) {
              *ncidp = file->pio_ncid;
@@ -3683,7 +3684,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
              int ncid = ncids[id];
              pio_get_file(ncid, &file);
              if (file->iotype != PIO_IOTYPE_ADIOS) continue;
-             if (strstr(file->fname, "h0") == NULL) {
+             if (strstr(file->fname, mask) == NULL) {
                  /* Find the info about this file. If file is opened, skip */
                  /* treat all other files */
                  if (pio_get_file(ncid, &file) == 0) {
