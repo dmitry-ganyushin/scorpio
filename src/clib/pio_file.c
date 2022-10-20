@@ -454,7 +454,6 @@ int _PIOc_closefile(int ncid)
     size_t len = 0;
 #endif
 
-    LOG((1, "PIOc_closefile ncid = %d", ncid));
 
     /* Find the info about this file. */
     if ((ierr = pio_get_file(ncid, &file)))
@@ -465,7 +464,7 @@ int _PIOc_closefile(int ncid)
     assert(file);
     ios = file->iosystem;
     assert(ios);
-
+    LOG((1, "PIOc_closefile ncid = %d fname = %s", ncid, file->fname));
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
         GPTLstart("PIO:PIOc_closefile_adios");
