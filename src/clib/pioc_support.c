@@ -3661,6 +3661,8 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
  if ( *iotype == PIO_IOTYPE_ADIOS) {
 
 #ifdef _ADIOS2
+     if (mode == 1) return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                    "Reading and appending with ADIOS2 not implemented");
      char fname[PIO_MAX_NAME];
      char mask[] = "elm.r";
      strcpy(fname, filename);
