@@ -71,7 +71,7 @@ int main(int argc, char* argv[])
     ret = PIOc_openfile(iosysid, &ncid_read1, &format, filename_h0, PIO_NOWRITE); ERR
     ret = PIOc_closefile(ncid_read1); ERR
 
-    ret = PIOc_openfile(iosysid, &ncid_read2, &format, filename_eam_r, PIO_NOWRITE); ERR
+    ret = PIOc_openfile(iosysid, &ncid_read2, &format, filename_eam_r, PIO_WRITE); ERR
     ret = PIOc_closefile(ncid_read2); ERR
 
     ret = PIOc_openfile(iosysid, &ncid_read, &format, filename_cpl_r, PIO_NOWRITE); ERR

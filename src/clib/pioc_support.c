@@ -3661,13 +3661,10 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
  if ( *iotype == PIO_IOTYPE_ADIOS) {
 
 #ifdef _ADIOS2
-     if (mode == 1) return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                    "Reading and appending with ADIOS2 not implemented");
      char fname[PIO_MAX_NAME];
      char mask[] = "elm.r";
      strcpy(fname, filename);
      strcat(fname, ".bp");
-
      /* fname is a history file history files */
      if (strstr(fname, mask) != NULL){
          /* treat history file */
@@ -3686,6 +3683,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
              int ncid = ncids[id];
              pio_get_file(ncid, &file);
              if (file->iotype != PIO_IOTYPE_ADIOS) continue;
+             if (file->mode == PIO_WRITE) continue;
              if (strstr(file->fname, mask) == NULL) {
                  /* Find the info about this file. If file is opened, skip */
                  /* treat all other files */
