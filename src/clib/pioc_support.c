@@ -3662,7 +3662,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
 
 #ifdef _ADIOS2
      char fname[PIO_MAX_NAME];
-     char mask[] = "h0";
+     char mask[] = "elm.r";
      strcpy(fname, filename);
      strcat(fname, ".bp");
 
