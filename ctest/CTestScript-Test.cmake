@@ -26,6 +26,8 @@ ctest_start("${CTEST_SCRIPT_ARG}" APPEND)
 ## -- TEST
 if (DEFINED ENV{ADIOS_CTEST})
 ctest_test(INCLUDE "example1.1|example1.2|example1.3")
+elseif (DEFINED ENV{HDF5_CTEST})
+ctest_test(INCLUDE "test_hdf5")
 else ()
 ctest_test()
 endif ()

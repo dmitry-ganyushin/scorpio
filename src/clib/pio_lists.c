@@ -11,6 +11,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "spio_file_mvcache.h"
+#include "spio_io_summary.h"
 
 static io_desc_t *pio_iodesc_list = NULL;
 static io_desc_t *current_iodesc = NULL;
@@ -119,6 +120,7 @@ int pio_get_file(int ncid, file_desc_t **cfile1)
 
     /* Copy pointer to file info. */
     *cfile1 = cfile;
+
     return PIO_NOERR;
 }
 

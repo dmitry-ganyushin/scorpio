@@ -212,7 +212,8 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             GPTLstop("PIO:PIOc_put_att_tc_adios");
             GPTLstop("PIO:write_total_adios");
-            return ierr;
+            return pio_err(NULL, file, ierr, __FILE__, __LINE__,
+                           "adios2_begin_step failed for file (%s)", pio_get_fname_from_file(file));
         }
 
         adios2_type adios_type = PIOc_get_adios_type(atttype);
@@ -243,7 +244,9 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             GPTLstop("PIO:PIOc_put_att_tc_adios");
             GPTLstop("PIO:write_total_adios");
-            return PIO_EMAXATTS;
+            return pio_err(NULL, file, PIO_EMAXATTS, __FILE__, __LINE__,
+                           "num_attrs (%d) is larger than or equal to pio_max_vars (%d) for file (%s)",
+                           num_attrs, PIO_MAX_VARS, pio_get_fname_from_file(file));
         }
         file->adios_attrs[num_attrs].att_name = strdup(name);
         file->adios_attrs[num_attrs].att_len = len;
@@ -253,37 +256,40 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         file->adios_attrs[num_attrs].adios_type = adios_type;
         file->num_attrs++;
 
-        if (file->myrank == MPI_ROOT)
+        if (file->all_rank == MPI_ROOT)
         {
             ios->io_fstats->wb += len * atttype_len;
             file->io_fstats->wb += len * atttype_len;
         }
 
         char att_name[PIO_MAX_NAME];
-        snprintf(att_name, PIO_MAX_NAME, "%s/%s", path, name);
-        adios2_attribute *attributeH = adios2_inquire_attribute(file->ioH, att_name);
-        if (attributeH == NULL)
+        if (file->adios_io_process == 1)
         {
-            if (NC_CHAR == atttype || adios2_type_string == adios_type)
-                attributeH = adios2_define_attribute(file->ioH, att_name, adios2_type_string, op);
-            else
-                attributeH = adios2_define_attribute(file->ioH, att_name, adios_type, op);
-
+            snprintf(att_name, PIO_MAX_NAME, "%s/%s", path, name);
+            adios2_attribute *attributeH = adios2_inquire_attribute(file->ioH, att_name);
             if (attributeH == NULL)
             {
-                GPTLstop("PIO:PIOc_put_att_tc");
-                GPTLstop("PIO:write_total");
-                spio_ltimer_stop(ios->io_fstats->wr_timer_name);
-                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-                spio_ltimer_stop(file->io_fstats->wr_timer_name);
-                spio_ltimer_stop(file->io_fstats->tot_timer_name);
-                GPTLstop("PIO:PIOc_put_att_tc_adios");
-                GPTLstop("PIO:write_total_adios");
-                return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
-                               "Defining (ADIOS) attribute (name=%s) failed for file (%s, ncid=%d)",
-                                att_name, pio_get_fname_from_file(file), file->pio_ncid);
+                if (NC_CHAR == atttype || adios2_type_string == adios_type)
+                    attributeH = adios2_define_attribute(file->ioH, att_name, adios2_type_string, op);
+                else
+                    attributeH = adios2_define_attribute(file->ioH, att_name, adios_type, op);
+
+                if (attributeH == NULL)
+                {
+                    GPTLstop("PIO:PIOc_put_att_tc");
+                    GPTLstop("PIO:write_total");
+                    spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                    spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                    spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                    spio_ltimer_stop(file->io_fstats->tot_timer_name);
+                    GPTLstop("PIO:PIOc_put_att_tc_adios");
+                    GPTLstop("PIO:write_total_adios");
+                    return pio_err(ios, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                                   "Defining (ADIOS) attribute (name=%s) failed for file (%s, ncid=%d)",
+                                   att_name, pio_get_fname_from_file(file), file->pio_ncid);
+                }
+                file->num_written_blocks += 1;
             }
-            file->num_written_blocks += 1;
         }
 
         GPTLstop("PIO:PIOc_put_att_tc");
@@ -298,6 +304,74 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         return PIO_NOERR;
     }
 #endif
+
+#ifdef _HDF5
+    if (file->iotype == PIO_IOTYPE_HDF5)
+    {
+        if (ios->ioproc)
+        {
+            hid_t attr_id;
+            hid_t space_id;
+            hsize_t asize = len;
+            htri_t att_exists;
+            hid_t loc_id;
+            hid_t h5_xtype;
+
+            if (varid == PIO_GLOBAL)
+                loc_id = file->hdf5_file_id;
+            else
+                loc_id = file->hdf5_vars[varid].hdf5_dataset_id;
+
+            if (atttype == NC_CHAR)
+            {
+                /* String type */
+                space_id = H5Screate(H5S_SCALAR);
+                h5_xtype = H5Tcopy(H5T_C_S1);
+                H5Tset_size(h5_xtype, asize);
+                H5Tset_strpad(h5_xtype, H5T_STR_NULLTERM);
+                H5Tset_cset(h5_xtype, H5T_CSET_ASCII);
+            }
+            else
+            {
+                space_id = H5Screate_simple(1, &asize, &asize);
+                h5_xtype = nc_type_to_hdf5_type(atttype);
+            }
+
+            /* H5Aexists() returns zero (false), a positive (true) or a negative (failure) value */
+            att_exists = H5Aexists(loc_id, name);
+            if (att_exists > 0)
+            {
+                attr_id = H5Aopen(loc_id, name, H5P_DEFAULT);
+            }
+            else if (att_exists == 0)
+            {
+                attr_id = H5Acreate2(loc_id, name, h5_xtype, space_id, H5P_DEFAULT, H5P_DEFAULT);
+            }
+            else
+            {
+                /* Error determining whether an attribute with a given name exists on an object */
+            }
+
+            H5Awrite(attr_id, h5_xtype, op);
+
+            H5Sclose(space_id);
+            H5Aclose(attr_id);
+
+            /* String attribute */
+            if (atttype == NC_CHAR)
+                H5Tclose(h5_xtype);
+        }
+
+        GPTLstop("PIO:PIOc_put_att_tc");
+        GPTLstop("PIO:write_total");
+        spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->wr_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+
+        return PIO_NOERR;
+    }
+#endif /* _HDF5 */
 
     /* If this is an IO task, then call the netCDF function. */
     if (ios->ioproc)
@@ -347,7 +421,7 @@ int PIOc_put_att_tc(int ncid, int varid, const char *name, nc_type atttype,
         }
 #endif /* _PNETCDF */
 
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_HDF5 && file->do_io)
         {
             if (ios->iomaster == MPI_ROOT)
             {
@@ -465,7 +539,6 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
     int mpierr = MPI_SUCCESS;  /* Return code from MPI function calls. */
     int ierr = PIO_NOERR;               /* Return code from function calls. */
 
-    GPTLstart("PIO:read_total");
     GPTLstart("PIO:PIOc_get_att_tc");
     /* Find the info about this file. */
     if ((ierr = pio_get_file(ncid, &file)))
@@ -1413,7 +1486,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         if (av->ndims == 0) {
             /* Only the IO master does the IO, so we are not really
              * getting parallel IO here. */
-            if (file->myrank == 0) {
+            if (file->all_rank == 0) {
                 if (start) {
                     /* Ignore if user specifies start[0] == 0 */
                     if (start[0] != 0) {
@@ -1456,7 +1529,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                    vname, pio_get_fname_from_file(file), file->pio_ncid);
 
                 } else {
-                    if (file->myrank == 0) {
+                    if (file->all_rank == 0) {
                         /* singe value */
                         /* check cache */
                         char varname[16];
@@ -1510,7 +1583,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             }
 
             /* Only the IO master actually does these ADIOS calls. */
-            if (file->myrank == 0) {
+            if (file->all_rank == 0) {
                 /* Write start and count arrays to be able to reconstruct the variable during conversion. */
                 int64_t pio_var_start[PIO_MAX_DIMS];
                 int64_t pio_var_count[PIO_MAX_DIMS];
@@ -1570,14 +1643,13 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
                                    vname, pio_get_fname_from_file(file), file->pio_ncid);
 
                 } else {
-                    if (file->myrank == 0) {
+                    if (file->all_rank == 0) {
                         /*reading adios block */
                         adios2_varinfo *data_blocks = adios2_inquire_blockinfo(file->engineH, av->adios_varid,
                                                                                required_adios_step);
                         int32_t number_of_data_blocks = data_blocks->nblocks;
                         /* free memeory */
                         for (size_t i = 0; i < data_blocks->nblocks; ++i) {
-                           // free(data_blocks->BlocksInfo[i].Start);
                             free(data_blocks->BlocksInfo[i].Count);
                         }
                         free(data_blocks->BlocksInfo);
@@ -2332,7 +2404,8 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
             GPTLstop("PIO:PIOc_put_vars_tc_adios");
             GPTLstop("PIO:write_total_adios");
-            return ierr;
+            return pio_err(NULL, file, ierr, __FILE__, __LINE__,
+                           "adios2_begin_step failed for file (%s)", pio_get_fname_from_file(file));
         }
 
         adios2_error adiosErr = adios2_error_none;
@@ -2367,7 +2440,7 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         {
             /* Only the IO master does the IO, so we are not really
              * getting parallel IO here. */
-            if (file->myrank == 0)
+            if (file->adios_io_process == 1 && file->adios_rank == 0)
             {
                 if (start)
                 {
@@ -2462,7 +2535,7 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
             }
 
             /* Only the IO master actually does these ADIOS calls. */
-            if (file->myrank == 0)
+            if (file->adios_io_process == 1 && file->adios_rank == 0)
             {
                 /* Write start and count arrays to be able to reconstruct the variable during conversion. */
                 int64_t pio_var_start[PIO_MAX_DIMS], pio_var_count[PIO_MAX_DIMS];
@@ -2639,7 +2712,7 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         }
 
         /* Only the IO master actually does these ADIOS calls. */
-        if (file->myrank == 0)
+        if (file->adios_io_process == 1 && file->adios_rank == 0)
         {
             char att_name[PIO_MAX_NAME];
             assert((strlen("/__pio__/var/") + strlen("/def/ndims") + strlen(av->name)) < PIO_MAX_NAME);
@@ -2746,6 +2819,108 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         return PIO_NOERR;
     }
 #endif
+
+#ifdef _HDF5
+    if (file->iotype == PIO_IOTYPE_HDF5)
+    {
+        if (ios->ioproc)
+        {
+            hsize_t dims[H5S_MAX_RANK];
+            hsize_t mdims[H5S_MAX_RANK];
+
+            hid_t file_space_id = H5Dget_space(file->hdf5_vars[varid].hdf5_dataset_id);
+            H5Sget_simple_extent_dims(file_space_id, dims, mdims);
+
+            int ndims = file->hdf5_vars[varid].ndims;
+
+            /* Extend record dimension if needed */
+            if (ndims > 0 && start != NULL && count != NULL && mdims[0] == H5S_UNLIMITED && dims[0] < (hsize_t)(start[0] + count[0]))
+            {
+                dims[0] = (hsize_t) (start[0] + count[0]);
+                H5Sclose(file_space_id);
+                H5Dextend(file->hdf5_vars[varid].hdf5_dataset_id, dims);
+                file_space_id = H5Dget_space(file->hdf5_vars[varid].hdf5_dataset_id);
+            }
+
+            /* Only the IO master does the IO */
+            if (ios->iomaster == MPI_ROOT)
+            {
+                hsize_t hstart[H5S_MAX_RANK];
+                hsize_t hcount[H5S_MAX_RANK];
+                hsize_t hstride[H5S_MAX_RANK];
+
+                if (start)
+                {
+                    for (int i = 0; i < ndims; i++)
+                        hstart[i] = (hsize_t)start[i];
+                }
+                else
+                {
+                    for (int i = 0; i < ndims; i++)
+                        hstart[i] = 0;
+                }
+
+                if (count)
+                {
+                    for (int i = 0; i < ndims; i++)
+                        hcount[i] = (hsize_t)count[i];
+                }
+                else
+                {
+                    for (int i = 0; i < ndims; i++)
+                        hcount[i] = dims[i];
+                }
+
+                if (stride)
+                {
+                    for (int i = 0; i < ndims; i++)
+                        hstride[i] = (hsize_t)stride[i];
+                }
+                else
+                {
+                    for (int i = 0; i < ndims; i++)
+                        hstride[i] = 1;
+                }
+
+                hid_t mem_space_id = H5Screate_simple(ndims, hcount, hcount);
+
+                if (ndims > 0)
+                    H5Sselect_hyperslab(file_space_id, H5S_SELECT_SET, hstart, hstride, hcount, NULL);
+
+
+                hid_t mem_type_id;
+                if (xtype == NC_CHAR)
+                {
+                    /* String type */
+                    mem_type_id = H5Tcopy(H5T_C_S1);
+                    H5Tset_strpad(mem_type_id, H5T_STR_NULLTERM);
+                    H5Tset_cset(mem_type_id, H5T_CSET_ASCII);
+                }
+                else
+                    mem_type_id = nc_type_to_hdf5_type(xtype);
+
+                /* Independent write */
+                H5Dwrite(file->hdf5_vars[varid].hdf5_dataset_id, mem_type_id, mem_space_id, file_space_id, file->dxplid_indep, buf);
+
+                H5Sclose(mem_space_id);
+
+                if (xtype == NC_CHAR)
+                    H5Tclose(mem_type_id);
+            }
+
+            H5Sclose(file_space_id);
+        }
+
+        GPTLstop("PIO:PIOc_put_vars_tc");
+        GPTLstop("PIO:write_total");
+        spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+        spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+        spio_ltimer_stop(file->io_fstats->wr_timer_name);
+        spio_ltimer_stop(file->io_fstats->tot_timer_name);
+
+        return PIO_NOERR;
+    }
+#endif /* _HDF5 */
 
     /* If this is an IO task, then call the netCDF function. */
     if (ios->ioproc)
@@ -2964,7 +3139,7 @@ int PIOc_put_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         }
 #endif /* _PNETCDF */
 
-        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->do_io)
+        if (file->iotype != PIO_IOTYPE_PNETCDF && file->iotype != PIO_IOTYPE_ADIOS && file->iotype != PIO_IOTYPE_HDF5 && file->do_io)
         {
             LOG((2, "PIOc_put_vars_tc calling netcdf function file->iotype = %d",
                  file->iotype));

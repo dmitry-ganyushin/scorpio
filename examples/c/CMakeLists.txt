@@ -87,6 +87,7 @@ add_spio_executable(example_read TRUE "" example_read.c)
 add_spio_executable(darray_no_async TRUE "" darray_no_async.c)
 add_spio_executable(darray_async TRUE "" darray_async.c)
 add_spio_executable(put_var TRUE "" put_var.c)
+add_spio_executable(test_hdf5 TRUE "" test_hdf5.c)
 
 if (PIO_ENABLE_FORTRAN)
   if (MPE_C_FOUND)

@@ -28,6 +28,9 @@
 #if PIO_USE_ADIOS
   #define _ADIOS2 1
 #endif
+#if PIO_USE_HDF5
+  #define _HDF5 1
+#endif
 #if PIO_USE_MICRO_TIMING
   #define PIO_MICRO_TIMING 1
 #endif
@@ -741,6 +744,12 @@ typedef struct iosystem_desc_t
 #ifdef _ADIOS2
     /* ADIOS handle */
     adios2_adios *adiosH;
+    int adios_io_process;
+    MPI_Comm adios_comm;
+    int adios_rank, num_adiostasks;
+    /* Block merging setup */
+    MPI_Comm block_comm;
+    int block_myrank, block_nprocs;
 #endif
 
     /** I/O statistics associated with this I/O system */
@@ -804,7 +813,7 @@ typedef struct adios_var_desc_t
 
     /** Type converted from NC type to adios type */
     adios2_type adios_type;
-    int adios_type_size;
+    size_t adios_type_size;
 
     /** Number of dimensions */
     int ndims;
@@ -839,8 +848,6 @@ typedef struct adios_var_desc_t
     int32_t decomp_cnt, frame_cnt, fillval_cnt, num_wb_cnt;
     int32_t max_buffer_cnt;
 
-    /* for merging blocks */
-    size_t elem_size;
     /* simplified version of an interval map implementation
      * index is a frame_id and the value is the adios_step */
     int interval_map[16];
@@ -870,6 +877,48 @@ typedef struct adios_att_desc_t
     adios2_type adios_type;
 } adios_att_desc_t;
 #endif /* _ADIOS2 */
+
+#ifdef _HDF5
+typedef struct hdf5_dim_desc_t
+{
+    /** Dimension name */
+    char* name;
+
+    /** Dimension length */
+    PIO_Offset len;
+
+    /** True if the dimension has a coordinate variable */
+    bool has_coord_var;
+
+    hid_t hdf5_dataset_id;
+} hdf5_dim_desc_t;
+
+typedef struct hdf5_var_desc_t
+{
+    /** Variable name */
+    char* name;
+
+    /* Alternative name for a non-coordinate variable with the same name as a dimension */
+    char* alt_name;
+
+    /** NC type give at def_var time */
+    int nc_type;
+
+    /** Type converted from NC type to HDF5 type */
+    hid_t hdf5_type;
+
+    /** Number of dimensions */
+    int ndims;
+
+    /** Dimension IDs of the variable */
+    int* hdf5_dimids;
+
+    /** True if the variable is a coordinate variable */
+    bool is_coord_var;
+
+    hid_t hdf5_dataset_id;
+} hdf5_var_desc_t;
+#endif
 
 /**
  * File descriptor structure.
@@ -902,6 +951,7 @@ typedef struct file_desc_t
      * during ADIOS metadata write operation.
      *
      * if num_written_blocks * BLOCK_METADATA_SIZE >= BLOCK_COUNT_THRESHOLD, call adios2_end_step
+     * (Not implemented in this version. adios2_end_step is called if num_step_calls >= max_step_calls (= PIO_MAX_CACHED_STEPS_FOR_ADIOS))
      */
     unsigned int num_written_blocks;
 
@@ -935,18 +985,20 @@ typedef struct file_desc_t
     /** Number of global attributes defined. Needed to support PIOc_inq_nattrs() */
     int num_gattrs;
 
-    /* ADIOS: assume all procs are also IO tasks */
-    int myrank;
-    int num_all_procs;
+    /* all procs rank, etc */
+    MPI_Comm all_comm;
+    int all_rank, num_alltasks;
+
+    /* ADIOS rank, etc */
+    int adios_io_process;
+    MPI_Comm adios_comm;
+    int adios_rank, num_adiostasks;
 
     /* Merging distributed array blocks to reduce I/O overhead */
-    /* ADIOS: grouping of processes for block merging */
-    MPI_Comm node_comm;
-    int node_myrank, node_nprocs;
+    /* Grouping of processes for block merging */
     MPI_Comm block_comm;
     int block_myrank, block_nprocs;
     int *block_list;
-    MPI_Comm all_comm;
 
     /* Buffers for merging distributed array blocks */
     unsigned int *array_counts;
@@ -954,7 +1006,7 @@ typedef struct file_desc_t
     unsigned int *array_disp;
     unsigned int array_disp_size;
     char *block_array;
-    unsigned int block_array_size;
+    size_t block_array_size;
 
     /* Track attributes */
     /** attribute information. Allow PIO_MAX_VARS for now. */
@@ -969,7 +1021,7 @@ typedef struct file_desc_t
 
     /** Array for decompositions that has been written already (must write only once) */
     int n_written_ioids;
-    int written_ioids[ADIOS_PIO_MAX_DECOMPS]; /* written_ioids[N] = ioid if that decomp has been already written, */
+    int written_ioids[PIO_MAX_ADIOS_DECOMPS]; /* written_ioids[N] = ioid if that decomp has been already written, */
 
     /** Store current frameid for end_step in PIO_setframe */
     int current_frame;
@@ -980,8 +1032,30 @@ typedef struct file_desc_t
 
 #endif /* _ADIOS2 */
 
+#ifdef _HDF5
+    hid_t hdf5_file_id;
+
+    /* Collective dataset transfer property list, used by H5Dwrite */
+    hid_t dxplid_coll;
+
+    /* Independent dataset transfer property list, used by H5Dwrite */
+    hid_t dxplid_indep;
+
+    struct hdf5_dim_desc_t hdf5_dims[PIO_MAX_DIMS];
+
+    /** Number of dims defined */
+    int hdf5_num_dims;
+
+    struct hdf5_var_desc_t hdf5_vars[PIO_MAX_VARS];
+
+    /** Number of vars defined */
+    int hdf5_num_vars;
+#endif /* _HDF5 */
+
     /* File name - cached */
     char fname[PIO_MAX_NAME + 1];
+
+    /* Name of io object */
     char io_name[PIO_MAX_NAME + 1];
 
     /** The ncid that will be returned to the user. */
@@ -1027,6 +1101,10 @@ typedef struct file_desc_t
     /** True if this task should participate in IO (only true for one
      * task with netcdf serial files. */
     int do_io;
+
+    /** True if we need reserve some extra space in the header when
+     * creating NetCDF files to accommodate anticipated changes. */
+    bool reserve_extra_header_space;
 } file_desc_t;
 
 /**
@@ -1048,7 +1126,10 @@ enum PIO_IOTYPE
     PIO_IOTYPE_NETCDF4P = 4,
 
     /** ADIOS parallel */
-    PIO_IOTYPE_ADIOS = 5
+    PIO_IOTYPE_ADIOS = 5,
+
+    /** HDF5 parallel */
+    PIO_IOTYPE_HDF5 = 6
 };
 
 /**
@@ -1112,7 +1193,7 @@ extern "C" {
     int PIOc_readmap_from_f90(const char *file,int *ndims, int **gdims, PIO_Offset *maplen,
                               PIO_Offset **map, int f90_comm);
     int PIOc_writemap(const char *file, int ioid, int ndims, const int *gdims, PIO_Offset maplen,
-                      PIO_Offset *map, MPI_Comm comm);
+                      const PIO_Offset *map, MPI_Comm comm);
     int PIOc_writemap_from_f90(const char *file, int ioid, int ndims, const int *gdims,
                                PIO_Offset maplen, const PIO_Offset *map, int f90_comm);
 
@@ -1121,15 +1202,15 @@ extern "C" {
 
     /* Write a decomposition file using netCDF. */
     int PIOc_write_nc_decomp(int iosysid, const char *filename, int cmode, int ioid,
-                             char *title, char *history, int fortran_order);
+                             const char *title, const char *history, int fortran_order);
 
     /* Read a netCDF decomposition file. */
     int PIOc_read_nc_decomp(int iosysid, const char *filename, int *ioid, MPI_Comm comm,
                             int pio_type, char *title, char *history, int *fortran_order);
 
     /* Initializing IO system for async. */
-    int PIOc_init_async(MPI_Comm world, int num_io_procs, int *io_proc_list, int component_count,
-                        int *num_procs_per_comp, int **proc_list, MPI_Comm *io_comm, MPI_Comm *comp_comm,
+    int PIOc_init_async(MPI_Comm world, int num_io_procs, const int *io_proc_list, int component_count,
+                        const int *num_procs_per_comp, const int **proc_list, MPI_Comm *io_comm, MPI_Comm *comp_comm,
                         int rearranger, int *iosysidp);
     
     int PIOc_Init_Intercomm(int component_count, MPI_Comm peer_comm, MPI_Comm *comp_comms,
@@ -1157,10 +1238,10 @@ extern "C" {
     /* Distributed data. */
     int PIOc_advanceframe(int ncid, int varid);
     int PIOc_setframe(int ncid, int varid, int frame);
-    int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *array,
-                          void *fillvalue);
+    int PIOc_write_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, const void *array,
+                          const void *fillvalue);
     int PIOc_write_darray_multi(int ncid, const int *varids, int ioid, int nvars, PIO_Offset arraylen,
-                                void *array, const int *frame, void **fillvalue, bool flushtodisk);
+                                const void *array, const int *frame, const void **fillvalue, bool flushtodisk);
     int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen, void *array);
     int PIOc_get_local_array_size(int ioid);
 
@@ -1169,7 +1250,7 @@ extern "C" {
     int PIOc_enddef(int ncid);
     int PIOc_sync(int ncid);
     int PIOc_deletefile(int iosysid, const char *filename);
-    int PIOc_createfile(int iosysid, int *ncidp,  int *iotype, const char *fname, int mode);
+    int PIOc_createfile(int iosysid, int *ncidp, const int *iotype, const char *fname, int mode);
     int PIOc_create(int iosysid, const char *path, int cmode, int *ncidp);
     int PIOc_openfile(int iosysid, int *ncidp, int *iotype, const char *fname, int mode);
     int PIOc_openfile2(int iosysid, int *ncidp, int *iotype, const char *fname, int mode);
@@ -1540,6 +1621,14 @@ extern "C" {
     unsigned long get_adios2_io_cnt();
     int begin_adios2_step(file_desc_t *file, iosystem_desc_t *ios);
     int end_adios2_step(file_desc_t *file, iosystem_desc_t *ios);
+#ifndef strdup
+    char *strdup(const char *str);
+#endif
+#endif
+
+#ifdef _HDF5
+    hid_t nc_type_to_hdf5_type(nc_type xtype);
+    PIO_Offset hdf5_get_nc_type_size(nc_type xtype);
 #ifndef strdup
     char *strdup(const char *str);
 #endif

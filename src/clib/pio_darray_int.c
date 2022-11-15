@@ -171,6 +171,9 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     var_desc_t *vdesc;     /* Pointer to var info struct. */
     int dsize;             /* Data size (for one region). */
+#ifdef _HDF5
+    hsize_t dsize_all = 0; /* Data size of all regions. */
+#endif
     int ierr = PIO_NOERR;
 
     /* Check inputs. */
@@ -219,7 +222,7 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                 break;
             }
 
-            /* IO tasks will run the netCDF/pnetcdf functions to write the data. */
+            /* IO tasks will run the netCDF/pnetcdf/hdf5 functions to write the data. */
             switch (file->iotype)
             {
 #ifdef _NETCDF4
@@ -409,6 +412,93 @@ int write_darray_multi_par(file_desc_t *file, int nvars, int fndims, const int *
                          * current process, on the current process
                          */
                         vdesc->nreqs++;
+                    }
+
+                    /* Free resources. */
+                    for (int i = 0; i < rrcnt; i++)
+                    {
+                        free(startlist[i]);
+                        free(countlist[i]);
+                    }
+                }
+                break;
+#endif
+#ifdef _HDF5
+            case PIO_IOTYPE_HDF5:
+                /* Get the total number of data elements we are
+                 * writing for this region. */
+                dsize = 1;
+                for (int i = 0; i < fndims; i++)
+                    dsize *= count[i];
+                LOG((3, "dsize = %d", dsize));
+
+                if (dsize > 0)
+                {
+                    dsize_all += dsize;
+
+                    /* Allocate storage for start/count arrays for
+                     * this region. */
+                    if (!(startlist[rrcnt] = calloc(fndims, sizeof(PIO_Offset))))
+                    {
+                        ierr = pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                                          "Writing variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_HDF5 iotype failed. Out of memory allocating buffer (%lld bytes) for array to store starts of I/O regions written out to file", nvars, pio_get_fname_from_file(file), file->pio_ncid, (long long int) (fndims * sizeof(PIO_Offset)));
+                        break;
+                    }
+                    if (!(countlist[rrcnt] = calloc(fndims, sizeof(PIO_Offset))))
+                    {
+                        ierr = pio_err(ios, file, PIO_ENOMEM, __FILE__, __LINE__,
+                                          "Writing variables (number of variables = %d) to file (%s, ncid=%d) using PIO_IOTYPE_HDF5 iotype failed. Out of memory allocating buffer (%lld bytes) for array to store counts of I/O regions written out to file", nvars, pio_get_fname_from_file(file), file->pio_ncid, (long long int) (fndims * sizeof(PIO_Offset)));
+                        break;
+                    }
+
+                    /* Copy the start/count arrays for this region. */
+                    for (int i = 0; i < fndims; i++)
+                    {
+                        startlist[rrcnt][i] = start[i];
+                        countlist[rrcnt][i] = count[i];
+                        LOG((3, "startlist[%d][%d] = %d countlist[%d][%d] = %d", rrcnt, i,
+                             startlist[rrcnt][i], rrcnt, i, countlist[rrcnt][i]));
+                    }
+                    rrcnt++;
+                }
+
+                /* Do this when we reach the last region. */
+                if (regioncnt == num_regions - 1)
+                {
+                    /* For each variable to be written. */
+                    for (int nv = 0; nv < nvars; nv++)
+                    {
+                        /* Get the var info. */
+                        vdesc = file->varlist + varids[nv];
+
+                        /* If this is a record (or quasi-record) var, set the start for
+                         * the record dimension. */
+                        if (vdesc->record >= 0 && fndims > 1)
+                            for (int rc = 0; rc < rrcnt; rc++)
+                                startlist[rc][0] = frame[nv];
+
+                        hid_t file_space_id = H5Dget_space(file->hdf5_vars[varids[nv]].hdf5_dataset_id);
+
+                        H5S_seloper_t op = H5S_SELECT_SET;
+
+                        for (int i = 0; i < rrcnt; i++)
+                        {
+                            /* Union hyperslabs of all regions */
+                            H5Sselect_hyperslab(file_space_id, op, (hsize_t*)startlist[i], NULL, (hsize_t*)countlist[i], NULL);
+                            op = H5S_SELECT_OR;
+                        }
+
+                        hid_t mem_space_id = H5Screate_simple(1, &dsize_all, NULL);
+
+                        /* Get a pointer to the data. */
+                        bufptr = (void *)((char *)iobuf + nv * iodesc->mpitype_size * llen);
+
+                        /* Collective write */
+                        hid_t mem_type_id = nc_type_to_hdf5_type(iodesc->piotype);
+                        H5Dwrite(file->hdf5_vars[varids[nv]].hdf5_dataset_id, mem_type_id, mem_space_id, file_space_id, file->dxplid_coll, bufptr);
+
+                        H5Sclose(file_space_id);
+                        H5Sclose(mem_space_id);
                     }
 
                     /* Free resources. */
@@ -1191,7 +1281,7 @@ int get_adios_step(file_desc_t *file, int var_id, int frame_id)
     }
 }
 
-bool match_decomp_part(const int64_t *pInt, size_t pos, long long int *pInt1, long long int *pInt2);
+bool match_decomp_part(const int64_t *pInt, size_t pos, PIO_Offset *pInt1, PIO_Offset *pInt2);
 
 /**
  * Read an array of data from a ADIOS2 bp file to the (parallel) IO library.
@@ -1326,8 +1416,8 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
 
 
 /************************* get decomp info *********************************/
-    MPI_Offset *start_decomp = &(iodesc->map[0]);
-    MPI_Offset len_decomp = iodesc->maplen;
+    PIO_Offset *start_decomp = &(iodesc->map[0]);
+    PIO_Offset len_decomp = iodesc->maplen;
 /************************* end get decomp info *********************************/
 /************************* get decomp info from file *********************************/
     int target_block = -1;
@@ -1436,7 +1526,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
         int32_t decomp_blocks_size = decomp_blocks->nblocks;
         /* free memeory */
         for (size_t i = 0; i < decomp_blocks->nblocks; ++i) {
-            //free(decomp_blocks->BlocksInfo[i].Start);
+            free(decomp_blocks->BlocksInfo[i].Start);
             free(decomp_blocks->BlocksInfo[i].Count);
         }
         free(decomp_blocks->BlocksInfo);
@@ -1450,7 +1540,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
             adios2_error err_sel = adios2_selection_size(&block_size, decomp_adios_var);
             if (type == adios2_type_int64_t) {
                 decomp_int64_t = (int64_t *) malloc(block_size * sizeof(int64_t));
-		memset(decomp_int64_t, 0, block_size * sizeof(int64_t));
+                memset(decomp_int64_t, 0, block_size * sizeof(int64_t));
                 adios2_error err = adios2_get(file->engineH, decomp_adios_var, decomp_int64_t, adios2_mode_sync);
                 if (err != adios2_error_none) {
                     return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
@@ -1469,7 +1559,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
                 if (!start_block_found && match_decomp_part(decomp_int64_t, pos, start_decomp, &len_decomp)) {
                     target_block = block;
                     start_idx_in_target_block = pos;
-                    end_idx_in_target_block = (int) (pos + len_decomp -1);
+                    end_idx_in_target_block = (int) (pos + len_decomp - 1);
                     start_block_found = true;
                 }
             }
@@ -1609,7 +1699,6 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
         int32_t data_blocks_size = data_blocks->nblocks;
         /* free memeory */
         for (size_t i = 0; i < data_blocks->nblocks; ++i) {
-            //free(data_blocks->BlocksInfo[i].Start);
             free(data_blocks->BlocksInfo[i].Count);
         }
         free(data_blocks->BlocksInfo);
@@ -1683,11 +1772,11 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
 /* match first 30 elements*/
 /* TODO: make it with hashing of data */
 #define MAX_LEN_MATCH 30
-bool match_decomp_part(const int64_t *decomp, size_t offset, MPI_Offset *start, MPI_Offset *len_decomp)
+bool match_decomp_part(const int64_t *decomp, size_t offset, PIO_Offset *start, PIO_Offset *len_decomp)
 {
-    MPI_Offset len = *len_decomp;
+    PIO_Offset len = *len_decomp;
     if (len > MAX_LEN_MATCH ) len = MAX_LEN_MATCH;
-    for (MPI_Offset idx = 0; idx < len; idx++) {
+    for (PIO_Offset idx = 0; idx < len; idx++) {
         if (decomp[offset + idx] != start[idx]) return 0;
     }
     return 1;

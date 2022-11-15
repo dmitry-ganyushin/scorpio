@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <mpi.h>
 #include <pio.h>
-
+#include <math.h>
 #ifdef TIMING
 #include <gptl.h>
 #endif

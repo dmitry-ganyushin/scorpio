@@ -249,34 +249,83 @@ int PIOc_setframe(int ncid, int varid, int frame)
     /* Add end_step here. Check for frame value of the ncid. */
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
-        if (file->current_frame < 0)
+        GPTLstart("PIOc_setframe_adios2");
+        if (file->adios_io_process == 1)
         {
-            file->current_frame = frame;
+            if (file->current_frame < 0)
+            {
+                file->current_frame = frame;
+            }
+            else if (file->current_frame != frame)
+            {
+                if (file->mode & PIO_WRITE)
+                {
+                    spio_ltimer_start(ios->io_fstats->wr_timer_name);
+                    spio_ltimer_start(file->io_fstats->wr_timer_name);
+                    GPTLstart("PIO:write_total");
+                    GPTLstart("PIO:write_total_adios");
+                }
+                spio_ltimer_start(ios->io_fstats->tot_timer_name);
+                spio_ltimer_start(file->io_fstats->tot_timer_name);
+
+                file->num_step_calls = file->num_step_calls + 1;
+                if (file->num_step_calls >= file->max_step_calls)
+                {
+                    GPTLstart("end_adios2_step_PIOc_setframe");
+                    ret = end_adios2_step(file, ios);
+                    GPTLstop("end_adios2_step_PIOc_setframe");
+                    file->num_step_calls = 0;
+                }
+
+                if (file->mode & PIO_WRITE)
+                {
+                    spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                    spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                    GPTLstop("PIO:write_total");
+                    GPTLstop("PIO:write_total_adios");
+                }
+                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+
+                if (ret != PIO_NOERR)
+                {
+                    GPTLstop("PIOc_setframe_adios2");
+                    return pio_err(ios, file, ret, __FILE__, __LINE__,
+                                   "ADIOS end step failed for file (%s) for var (%s). (iosysid=%d)",
+                                   pio_get_fname_from_file(file), pio_get_vname_from_file(file, varid), ios->iosysid);
+                }
+
+                file->current_frame = frame;
+            }
         }
-        else if (file->current_frame != frame)
+        GPTLstop("PIOc_setframe_adios2");
+    }
+#endif
+
+#ifdef _HDF5
+    if (file->iotype == PIO_IOTYPE_HDF5)
+    {
+        if (frame >= 0)
         {
-            if (file->mode & PIO_WRITE)
+            if (ios->ioproc)
             {
-                spio_ltimer_start(ios->io_fstats->wr_timer_name);
-                spio_ltimer_start(file->io_fstats->wr_timer_name);
+                hsize_t dims[H5S_MAX_RANK];
+                hsize_t mdims[H5S_MAX_RANK];
+
+                /* Get current dimension size */
+                hid_t file_space_id = H5Dget_space(file->hdf5_vars[varid].hdf5_dataset_id);
+
+                int ndim = H5Sget_simple_extent_dims(file_space_id, dims, mdims);
+
+                H5Sclose(file_space_id);
+
+                /* Extend record dimension if needed */
+                if (ndim > 0 && mdims[0] == H5S_UNLIMITED && dims[0] < (hsize_t)(frame + 1))
+                {
+                    dims[0] = frame + 1;
+                    H5Dextend(file->hdf5_vars[varid].hdf5_dataset_id, dims);
+                }
             }
-            spio_ltimer_start(ios->io_fstats->tot_timer_name);
-            spio_ltimer_start(file->io_fstats->tot_timer_name);
-
-            ret = end_adios2_step(file, ios);
-
-            if (file->mode & PIO_WRITE)
-            {
-                spio_ltimer_stop(ios->io_fstats->wr_timer_name);
-                spio_ltimer_stop(file->io_fstats->wr_timer_name);
-            }
-            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
-            spio_ltimer_stop(file->io_fstats->tot_timer_name);
-
-            if (ret != PIO_NOERR)
-                return ret;
-
-            file->current_frame = frame;
         }
     }
 #endif
@@ -989,6 +1038,98 @@ unsigned long get_adios2_io_cnt()
 {
     return adios2_io_cnt++;
 }
+
+static int init_adios_comm(iosystem_desc_t *ios)
+{
+    int mpierr = MPI_SUCCESS;
+
+    /**** Group processes for block merging ****/
+    MPI_Info info = MPI_INFO_NULL;
+    mpierr = MPI_Info_create(&info);
+    if (mpierr != MPI_SUCCESS)
+    {
+        return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+    }
+
+    MPI_Comm nodeComm = MPI_COMM_NULL;
+    int nodeNProc, nodeRank;
+    mpierr = MPI_Comm_split_type(ios->union_comm, MPI_COMM_TYPE_SHARED, 0, info, &nodeComm);
+    if (mpierr != MPI_SUCCESS)
+    {
+        return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+    }
+
+    MPI_Comm_rank(nodeComm, &nodeRank);
+    MPI_Comm_size(nodeComm, &nodeNProc);
+
+    /* Compute the io_group_size per node */
+    int io_group_size;
+    if (ios->num_iotasks <= 0 || ios->num_iotasks > ios->num_comptasks)
+    {
+        io_group_size = nodeNProc;
+    }
+    else
+    {
+        io_group_size = ios->num_comptasks / ios->num_iotasks;
+        if ((io_group_size * ios->num_iotasks) != ios->num_comptasks)
+        {
+            io_group_size++;
+        }
+
+        if (io_group_size > nodeNProc)
+        {
+            io_group_size = nodeNProc;
+        }
+    }
+
+    /* Cluster processes on the same node into I/O groups */
+    int io_color = (int)(nodeRank / io_group_size);
+
+    MPI_Comm nodeBlockComm = MPI_COMM_NULL;
+    int nodeBlockNProc, nodeBlockRank;
+    mpierr = MPI_Comm_split(nodeComm, io_color, 0, &nodeBlockComm);
+    if (mpierr != MPI_SUCCESS)
+    {
+        return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+    }
+
+    MPI_Comm_rank(nodeBlockComm, &nodeBlockRank);
+    MPI_Comm_size(nodeBlockComm, &nodeBlockNProc);
+
+    ios->block_comm = nodeBlockComm;
+    ios->block_myrank = nodeBlockRank;
+    ios->block_nprocs = nodeBlockNProc;
+
+    ios->adios_io_process = 0;
+    if (nodeBlockRank == 0)
+    {
+        ios->adios_io_process = 1;
+    }
+
+    ios->adios_comm = MPI_COMM_NULL;
+    mpierr = MPI_Comm_split(ios->union_comm, ios->adios_io_process, 0, &(ios->adios_comm));
+    if (mpierr != MPI_SUCCESS)
+    {
+        return check_mpi(ios, NULL, mpierr, __FILE__, __LINE__);
+    }
+
+    MPI_Comm_rank(ios->adios_comm, &(ios->adios_rank));
+    MPI_Comm_size(ios->adios_comm, &(ios->num_adiostasks));
+
+    if (nodeComm != MPI_COMM_NULL)
+    {
+        MPI_Comm_free(&nodeComm);
+        nodeComm = MPI_COMM_NULL;
+    }
+
+    if (info != MPI_INFO_NULL)
+    {
+        MPI_Info_free(&info);
+        info = MPI_INFO_NULL;
+    }
+
+    return PIO_NOERR;
+}
 #endif
 
 /**
@@ -1128,11 +1269,22 @@ int PIOc_Init_Intracomm(MPI_Comm comp_comm, int num_iotasks, int stride, int bas
 
 #ifdef _ADIOS2
     /* Initialize ADIOS for each io system */
-    ios->adiosH = adios2_init(ios->union_comm, adios2_debug_mode_on);
-    if (ios->adiosH == NULL)
+    ios->adiosH = NULL;
+    ret = init_adios_comm(ios);
+    if (ret != PIO_NOERR)
     {
         GPTLstop("PIO:PIOc_Init_Intracomm");
         return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Initializing ADIOS failed");
+    }
+
+    if (ios->adios_io_process == 1)
+    {
+        ios->adiosH = adios2_init(ios->adios_comm, adios2_debug_mode_on);
+        if (ios->adiosH == NULL)
+        {
+            GPTLstop("PIO:PIOc_Init_Intracomm");
+            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Initializing ADIOS failed");
+        }
     }
 #endif
 
@@ -1485,16 +1637,28 @@ int PIOc_finalize(int iosysid)
 #endif
 
 #ifdef _ADIOS2
-    if (ios->adiosH != NULL)
+    if (ios->adios_io_process == 1 && ios->adiosH != NULL)
     {
         adios2_error adiosErr = adios2_finalize(ios->adiosH);
         if (adiosErr != adios2_error_none)
         {
             GPTLstop("PIO:PIOc_finalize");
-            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Finalizing ADIOS failed (adios2_error=%s) on iosystem (%d)", convert_adios2_error_to_string(adiosErr), iosysid);
+            return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Finalizing ADIOS failed (adios2_error=%s) on iosystem (%d)",
+                           convert_adios2_error_to_string(adiosErr), iosysid);
         }
-
         ios->adiosH = NULL;
+    }
+
+    if (ios->block_comm != MPI_COMM_NULL)
+    {
+        MPI_Comm_free(&(ios->block_comm));
+        ios->block_comm = MPI_COMM_NULL;
+    }
+
+    if (ios->adios_comm != MPI_COMM_NULL)
+    {
+        MPI_Comm_free(&(ios->adios_comm));
+        ios->adios_comm = MPI_COMM_NULL;
     }
 #endif
 
@@ -1694,14 +1858,16 @@ int PIOc_iotype_available(int iotype)
  * @ingroup PIO_init
  * @author Ed Hartnett
  */
-int PIOc_init_async(MPI_Comm world, int num_io_procs, int *io_proc_list,
-                    int component_count, int *num_procs_per_comp, int **proc_list,
+int PIOc_init_async(MPI_Comm world, int num_io_procs, const int *io_proc_list,
+                    int component_count, const int *num_procs_per_comp, const int **proc_list,
                     MPI_Comm *user_io_comm, MPI_Comm *user_comp_comm, int rearranger,
                     int *iosysidp)
 {
     int my_rank;          /* Rank of this task. */
-    int **my_proc_list;   /* Array of arrays of procs for comp components. */
-    int *my_io_proc_list; /* List of processors in IO component. */
+    const int **my_proc_list = NULL;   /* Array of arrays of procs for comp components. */
+    int **proc_list_buf = NULL;        /* A temp buffer to be used in case the user does not provide the proc list. */
+    const int *my_io_proc_list = NULL; /* List of processors in IO component. */
+    int *io_proc_list_buf = NULL;      /* A temp buffer to be used in case the user does not provide the IO proc list. */
     int mpierr;           /* Return code from MPI functions. */
     int ret;              /* Return code. */
 
@@ -1752,7 +1918,7 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, int *io_proc_list,
     if (!io_proc_list)
     {
         LOG((3, "calculating processors for IO component"));
-        if (!(my_io_proc_list = malloc(num_io_procs * sizeof(int))))
+        if (!(io_proc_list_buf = malloc(num_io_procs * sizeof(int))))
         {
             GPTLstop("PIO:PIOc_init_async");
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -1760,9 +1926,10 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, int *io_proc_list,
         }
         for (int p = 0; p < num_io_procs; p++)
         {
-            my_io_proc_list[p] = p;
-            LOG((3, "my_io_proc_list[%d] = %d", p, my_io_proc_list[p]));
+            io_proc_list_buf[p] = p;
+            LOG((3, "io_proc_list_buf[%d] = %d", p, io_proc_list_buf[p]));
         }
+        my_io_proc_list = (const int *)io_proc_list_buf;
     }
     else
         my_io_proc_list = io_proc_list;
@@ -1774,7 +1941,7 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, int *io_proc_list,
         int last_proc = num_io_procs;
 
         /* Allocate space for array of arrays. */
-        if (!(my_proc_list = malloc((component_count) * sizeof(int *))))
+        if (!(proc_list_buf = malloc((component_count) * sizeof(int *))))
         {
             GPTLstop("PIO:PIOc_init_async");
             return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -1787,7 +1954,7 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, int *io_proc_list,
             LOG((3, "calculating processors for component %d num_procs_per_comp[cmp] = %d", cmp, num_procs_per_comp[cmp]));
 
             /* Allocate space for each array. */
-            if (!(my_proc_list[cmp] = malloc(num_procs_per_comp[cmp] * sizeof(int))))
+            if (!(proc_list_buf[cmp] = malloc(num_procs_per_comp[cmp] * sizeof(int))))
             {
                 GPTLstop("PIO:PIOc_init_async");
                 return pio_err(NULL, NULL, PIO_ENOMEM, __FILE__, __LINE__,
@@ -1797,11 +1964,12 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, int *io_proc_list,
             int proc;
             for (proc = last_proc; proc < num_procs_per_comp[cmp] + last_proc; proc++)
             {
-                my_proc_list[cmp][proc - last_proc] = proc;
-                LOG((3, "my_proc_list[%d][%d] = %d", cmp, proc - last_proc, proc));
+                proc_list_buf[cmp][proc - last_proc] = proc;
+                LOG((3, "proc_list_buf[%d][%d] = %d", cmp, proc - last_proc, proc));
             }
             last_proc = proc;
         }
+        my_proc_list = (const int **)proc_list_buf;
     }
     else
         my_proc_list = proc_list;
@@ -2179,7 +2347,7 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, int *io_proc_list,
 
     /* Free resources if needed. */
     if (!io_proc_list)
-        free(my_io_proc_list);
+        free(io_proc_list_buf);
 
     if (in_io)
         if ((mpierr = MPI_Comm_free(&io_comm)))
@@ -2191,8 +2359,8 @@ int PIOc_init_async(MPI_Comm world, int num_io_procs, int *io_proc_list,
     if (!proc_list)
     {
         for (int cmp = 0; cmp < component_count; cmp++)
-            free(my_proc_list[cmp]);
-        free(my_proc_list);
+            free(proc_list_buf[cmp]);
+        free(proc_list_buf);
     }
 
     /* Free MPI groups. */

@@ -52,6 +52,15 @@
 /** Striping unit hint in bytes for a Lustre or GPFS file system. */
 #define PIO_STRIPING_UNIT @PIO_STRIPING_UNIT@
 
+/** Extra bytes reserved in the header when creating NetCDF files. */
+#define PIO_RESERVED_FILE_HEADER_SIZE @PIO_RESERVED_FILE_HEADER_SIZE@
+
+/** Maximum number of I/O decompositions registered with ADIOS type */
+#define PIO_MAX_ADIOS_DECOMPS @PIO_MAX_ADIOS_DECOMPS@
+
+/** Maximum number of cached application steps for ADIOS type */
+#define PIO_MAX_CACHED_STEPS_FOR_ADIOS @PIO_MAX_CACHED_STEPS_FOR_ADIOS@
+
 /** Set to 1 if the library is configured to use the PnetCDF library,
  *  0 otherwise */
 #define PIO_USE_PNETCDF @PIO_USE_PNETCDF@
@@ -67,6 +76,10 @@
 /** Set to 1 if the library is configured to use the ADIOS library,
  *  0 otherwise */
 #define PIO_USE_ADIOS @PIO_USE_ADIOS@
+
+/** Set to 1 if the library is configured to use the HDF5 library,
+ *  0 otherwise */
+#define PIO_USE_HDF5 @PIO_USE_HDF5@
 
 /** Set to 1 if the library is configured to use Micro timing,
  *  0 otherwise */
