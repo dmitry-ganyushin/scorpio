@@ -539,6 +539,7 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
     int mpierr = MPI_SUCCESS;  /* Return code from MPI function calls. */
     int ierr = PIO_NOERR;               /* Return code from function calls. */
 
+    GPTLstart("PIO:read_total");
     GPTLstart("PIO:PIOc_get_att_tc");
     /* Find the info about this file. */
     if ((ierr = pio_get_file(ncid, &file)))

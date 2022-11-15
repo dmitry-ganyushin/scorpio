@@ -1405,7 +1405,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
                        "Expecting file (%s) to be openned",
                        pio_get_fname_from_file(file));
     }
-    /*magically obtain the relevant adios step*/
+    /* magically obtain the relevant adios step*/
     int required_adios_step = get_adios_step(file, vid, frame_id);
     assert(required_adios_step >= 0);
     size_t current_adios_step = 0;
