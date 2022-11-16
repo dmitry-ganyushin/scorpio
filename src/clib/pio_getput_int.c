@@ -1402,6 +1402,7 @@ int PIOc_get_vars_tc(int ncid, int varid, const PIO_Offset *start, const PIO_Off
         int frame_id = file->varlist[varid].record;
         /* magically obtain the relevant adios step */
         int required_adios_step = get_adios_step(file, varid, frame_id);
+        assert(required_adios_step >= 0);
         size_t current_adios_step = 0;
         adios2_step_status status;
         if (file->engineH != NULL)

@@ -2958,9 +2958,6 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
                            "Initializing block merge failed for file (%s)",
                            pio_get_fname_from_file(file));
         }
-//        LOG((2, "adios2_open(%s) : fd = %d ncid = %d ", file->filename, file->fh, ncidp));
-//        file->engineH = adios2_open(file->ioH, file->filename, adios2_mode_write);
-//        LOG((2, "adios2_open(%s) io %p engine (%p)", file->fname, file->ioH, file->engineH));
         if (file->adios_io_process == 1)
         {
             GPTLstart("PIO:adios2_open_call");
@@ -3791,10 +3788,8 @@ void adios_get_nc_type(file_desc_t *file, size_t var_id)
 }
 
 void adios_get_step(file_desc_t *file, size_t var_id, size_t adios_step)
-{/***** get relevant adios step ******/
-    {
+{       /***** get relevant adios step ******/
         /* trying to look up the frame_id */
-
         char *frame_id_name = adios_name(adios_pio_track_frame_id_prefix, file->adios_vars[var_id].name, "");
         adios2_variable *variableH = adios2_inquire_variable(file->ioH, frame_id_name);
         if (variableH){
@@ -3813,15 +3808,14 @@ void adios_get_step(file_desc_t *file, size_t var_id, size_t adios_step)
                 /*not implemented */
             }
         }else{
-            char *var_name = adios_name(adios_pio_var_prefix, file->adios_vars[var_id].name,
+            char const *var_name = adios_name(adios_pio_var_prefix, file->adios_vars[var_id].name,
                                         "");
             variableH = adios2_inquire_variable(file->ioH, var_name);
             if (variableH){
                 file->adios_vars[var_id].interval_map[0] = adios_step;
             }
         }
-        return;
-    }
+    return;
 }
 #endif
 
