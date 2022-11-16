@@ -3790,20 +3790,24 @@ void adios_get_nc_type(file_desc_t *file, size_t var_id)
 void adios_get_step(file_desc_t *file, size_t var_id, size_t adios_step)
 {       /***** get relevant adios step ******/
         /* trying to look up the frame_id */
-        char *frame_id_name = adios_name(adios_pio_track_frame_id_prefix, file->adios_vars[var_id].name, "");
+        char const *frame_id_name = adios_name(adios_pio_track_frame_id_prefix, file->adios_vars[var_id].name, "");
         adios2_variable *variableH = adios2_inquire_variable(file->ioH, frame_id_name);
         if (variableH){
             adios2_type type;
             adios2_variable_type(&type, variableH);
+            size_t block_size;
+            adios2_error err_sel = adios2_selection_size(&block_size, variableH);
             if (type == adios2_type_int32_t) {
-                int32_t frame;
-                adios2_error adiosErr = adios2_get(file->engineH, variableH, &frame, adios2_mode_sync);
-                assert(frame < PIO_MAX_DIMS);
-                if (frame == -1){
+                int32_t *frame = (int32_t *)calloc(block_size, sizeof(int32_t));
+                adios2_error adiosErr = adios2_get(file->engineH, variableH, frame, adios2_mode_sync);
+                assert(frame[block_size - 1] < PIO_MAX_DIMS);
+                if (frame[0] == -1){
                     file->adios_vars[var_id].interval_map[0] = adios_step;
                 }else{
-                    file->adios_vars[var_id].interval_map[frame] = adios_step;
+                    for (int i = 0; i < block_size; i++)
+                        file->adios_vars[var_id].interval_map[frame[i]] = adios_step;
                 }
+                free(frame);
             }else{
                 /*not implemented */
             }

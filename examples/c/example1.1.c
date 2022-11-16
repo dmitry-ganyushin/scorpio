@@ -443,7 +443,7 @@ int main(int argc, char* argv[])
     for (int t = 0; t < 3; t++) {
       for (int i = 0; i < ELEMENTS_PER_PE; i++) {
         if (read_time_var_buffer_int[t][i] != write_time_var_buffer_int[t][i]) {
-          printf("rank = %d, read wrong data for dummy_darray_var_int at time step %d and index %d\n", my_rank, t, i);
+          printf("rank = %d, read wrong data for varid_dummy_time_var_int at time step %d and index %d\n", my_rank, t, i);
           break;
         }
       }
