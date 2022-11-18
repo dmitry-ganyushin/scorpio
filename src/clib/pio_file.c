@@ -735,9 +735,14 @@ int _PIOc_closefile(int ncid)
             }
 
             file->engineH = NULL;
+            /* remove io object in readig mode */
+            if (mode == adios2_mode_read){
+                adios2_bool result;
+                adios2_remove_io(&result, ios->adiosH, file->io_name);
+            }
+
         }
-        adios2_bool result;
-        adios2_remove_io(&result, ios->adiosH, file->io_name);
+
 
         for (int i = 0; i < file->num_dim_vars; i++)
         {

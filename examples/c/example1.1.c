@@ -349,7 +349,6 @@ int main(int argc, char* argv[])
 
     ret = PIOc_closefile(ncid_write); ERR
   }
-
   /* Read support is not implemented for ADIOS type yet: change to "fmt < 2" for testing this new feature later.
      Currently, ADIOS type in SCORPIO simply changes actual type to PnetCDF or NetCDF for reading. */
   for (int fmt = 0; fmt < 2; fmt++) {
