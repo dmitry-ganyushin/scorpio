@@ -1270,6 +1270,7 @@ int PIOc_Init_Intracomm(MPI_Comm comp_comm, int num_iotasks, int stride, int bas
 #ifdef _ADIOS2
     /* Initialize ADIOS for each io system */
     ios->adiosH = NULL;
+    ios->adios_readerH = NULL;
     ret = init_adios_comm(ios);
     if (ret != PIO_NOERR)
     {
@@ -1277,6 +1278,12 @@ int PIOc_Init_Intracomm(MPI_Comm comp_comm, int num_iotasks, int stride, int bas
         return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Initializing ADIOS failed");
     }
 
+    ios->adios_readerH = adios2_init(ios->union_comm, adios2_debug_mode_on);
+    if (ios->adios_readerH == NULL)
+    {
+        GPTLstop("PIO:PIOc_Init_Intracomm");
+        return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Initializing ADIOS failed");
+    }
     if (ios->adios_io_process == 1)
     {
         ios->adiosH = adios2_init(ios->adios_comm, adios2_debug_mode_on);

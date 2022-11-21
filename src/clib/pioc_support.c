@@ -3961,7 +3961,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             strncpy(file->fname, bpname, PIO_MAX_NAME);
             snprintf(declare_name, PIO_MAX_NAME, "%s%lu", file->fname, get_adios2_io_cnt());
             strncpy(file->io_name, declare_name, PIO_MAX_NAME);
-            file->ioH = adios2_declare_io(ios->adiosH, file->io_name);
+            file->ioH = adios2_declare_io(ios->adios_readerH, file->io_name);
             if (file->ioH == NULL) {
                 return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                                "Declaring (ADIOS) IO (name=%s) failed for file (%s)",

@@ -744,6 +744,7 @@ typedef struct iosystem_desc_t
 #ifdef _ADIOS2
     /* ADIOS handle */
     adios2_adios *adiosH;
+    adios2_adios *adios_readerH;
     int adios_io_process;
     MPI_Comm adios_comm;
     int adios_rank, num_adiostasks;
