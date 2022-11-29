@@ -1435,7 +1435,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     size_t size_attr;
     char attr_data[PIO_MAX_NAME] = {'\0'};
     /* get from cache */
-    char *attr_data_buff = NULL;
+    char const *attr_data_buff = NULL;
     attr_data_buff = file->cache_darray_info->get(file->cache_darray_info, att_name);
     free(att_name);
     if (attr_data_buff == NULL) {
@@ -1693,6 +1693,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     free(var_name);
     adios2_variable *data = adios_vdesc->adios_varid;
     adios2_current_step(&current_adios_step, file->engineH);
+    assert (current_adios_step == required_adios_step);
     char *data_buf = NULL;
     if (data) {
         adios2_varinfo *data_blocks = adios2_inquire_blockinfo(file->engineH, data, required_adios_step);
