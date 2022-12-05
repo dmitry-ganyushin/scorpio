@@ -1426,6 +1426,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     bool start_block_found = false;
     /* get attribute mappling from variable name to te id*/
     char prefix_var_name[] = "/__pio__/var/";
+    char prefix_track_frame_id[] = "/__pio__/track/frame_id";
     char suffix_att_name[] = "/def/decomp";
     char *att_name = malloc(strlen(prefix_var_name) + strlen(adios_vdesc->name) + strlen(suffix_att_name) + 1);
     strcpy(att_name, prefix_var_name);
@@ -1680,6 +1681,28 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
         file->begin_step_called = 1;
     }
 /************************* actual reading**********************************/
+    adios2_current_step(&current_adios_step, file->engineH);
+    assert (current_adios_step == required_adios_step);
+    char *var_track_frame_id = malloc(strlen(prefix_track_frame_id) + strlen(adios_vdesc->name) + 1);
+    if (var_track_frame_id == NULL) {
+        return pio_err(NULL, file, ierr, __FILE__, __LINE__,
+                       "Reading variable (%s, varid=%d) from file (%s, ncid=%d) failed with iotype=%s. The underlying memory allocation failed.",
+                       var_track_frame_id, vid, pio_get_fname_from_file(file), file->pio_ncid,
+                       pio_iotype_to_string(file->iotype));
+    }
+    strcpy(var_track_frame_id, prefix_track_frame_id);
+    strcat(var_track_frame_id, adios_vdesc->name);
+    adios2_variable *tracking_data = adios2_inquire_variable(file->ioH, var_track_frame_id);
+    free(var_track_frame_id);
+    int32_t tracking_data_buf;
+    if (tracking_data) {
+        adios2_error err = adios2_get(file->engineH, tracking_data, &tracking_data_buf, adios2_mode_sync);
+        if (err != adios2_error_none) {
+            return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
+                           "adios2_get for file (%s) failed",
+                           pio_get_fname_from_file(file));
+        }
+    }
     char *var_name = malloc(strlen(prefix_var_name) + strlen(adios_vdesc->name) + 1);
     if (var_name == NULL) {
         return pio_err(NULL, file, ierr, __FILE__, __LINE__,
@@ -1692,8 +1715,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     adios_vdesc->adios_varid = adios2_inquire_variable(file->ioH, var_name);
     free(var_name);
     adios2_variable *data = adios_vdesc->adios_varid;
-    adios2_current_step(&current_adios_step, file->engineH);
-    assert (current_adios_step == required_adios_step);
+
     char *data_buf = NULL;
     if (data) {
         adios2_varinfo *data_blocks = adios2_inquire_blockinfo(file->engineH, data, required_adios_step);
