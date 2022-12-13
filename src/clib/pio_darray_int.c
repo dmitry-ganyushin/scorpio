@@ -1426,7 +1426,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     bool start_block_found = false;
     /* get attribute mappling from variable name to te id*/
     char prefix_var_name[] = "/__pio__/var/";
-    char prefix_track_frame_id[] = "/__pio__/track/frame_id";
+    char prefix_track_frame_id[] = "/__pio__/track/frame_id/";
     char suffix_att_name[] = "/def/decomp";
     char *att_name = malloc(strlen(prefix_var_name) + strlen(adios_vdesc->name) + strlen(suffix_att_name) + 1);
     strcpy(att_name, prefix_var_name);
@@ -1694,9 +1694,17 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     strcat(var_track_frame_id, adios_vdesc->name);
     adios2_variable *tracking_data = adios2_inquire_variable(file->ioH, var_track_frame_id);
     free(var_track_frame_id);
-    int32_t tracking_data_buf;
+    int32_t starting_frame;
+    size_t n_frames = 1;/* number of frames in the current adios step*/
     if (tracking_data) {
-        adios2_error err = adios2_get(file->engineH, tracking_data, &tracking_data_buf, adios2_mode_sync);
+        adios2_set_block_selection(tracking_data, 0);
+        adios2_error err_sel = adios2_selection_size(&n_frames, tracking_data);
+
+        char* tracking_data_buf = (char *) malloc(n_frames * sizeof (int32_t));
+
+        adios2_error err = adios2_get(file->engineH, tracking_data, tracking_data_buf, adios2_mode_sync);
+        starting_frame = tracking_data_buf[0];
+        free(tracking_data_buf);
         if (err != adios2_error_none) {
             return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                            "adios2_get for file (%s) failed",
@@ -1731,6 +1739,9 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
         size_t read_type_size = get_adios2_type_size(read_type, NULL);
         adios2_type out_type = PIOc_get_adios_type(iodesc->piotype);
         int out_type_size = get_adios2_type_size(out_type, NULL);
+        if (starting_frame >= 0)
+            target_block =  target_block * n_frames + frame_id + starting_frame;
+        assert(target_block < data_blocks_size);
         adios2_set_block_selection(data, target_block);
         size_t block_size;/* size of the block*/
         adios2_error err_sel = adios2_selection_size(&block_size, data);
