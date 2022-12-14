@@ -1374,7 +1374,6 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     int ierr = PIO_NOERR;  /* Return code from netCDF functions. */
     int n_bp_writers;
 
-    LOG((1, "PIOc_read_darray  filename %s varid = %d", file->fname, vid));
 
     /* Check inputs. */
     pioassert(file && (fndims > 0) && file->iosystem && iodesc && vid <= PIO_MAX_VARS, "invalid input",
@@ -1388,6 +1387,8 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
 
     /* Get the variable info. */
     adios_vdesc = file->adios_vars + vid;
+
+    LOG((1, "PIOc_read_darray  filename %s varid = %d var_name=%s", file->fname, vid, adios_vdesc->name));
 
     /* check darray type */
     if (strcmp(adios_vdesc->scorpio_var_type, "darray") != 0) {
@@ -1587,6 +1588,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
         end_idx_in_target_block = decomp_info_buff[2];
     }
     free(decomp_name);
+    assert(target_block >=0 );
     /************************* end of get decomp from file  ******************************************************/
     /************************* traverse through the steps to the data blocks**************************************/
     adios2_current_step(&current_adios_step, file->engineH);
@@ -1695,7 +1697,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     adios2_variable *tracking_data = adios2_inquire_variable(file->ioH, var_track_frame_id);
     free(var_track_frame_id);
     int32_t starting_frame;
-    size_t n_frames = 1;/* number of frames in the current adios step*/
+    size_t n_frames = 0;/* number of frames in the current adios step*/
     if (tracking_data) {
         adios2_set_block_selection(tracking_data, 0);
         adios2_error err_sel = adios2_selection_size(&n_frames, tracking_data);
@@ -1743,6 +1745,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
         if (starting_frame >= 0 && frame_id >= 0) {
             target_block = target_block * n_frames + frame_id - starting_frame;
         }
+        assert(target_block >= 0);
         assert(target_block < data_blocks_size);
         adios2_set_block_selection(data, target_block);
         size_t block_size;/* size of the block*/
