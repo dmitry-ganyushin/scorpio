@@ -1739,8 +1739,10 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
         size_t read_type_size = get_adios2_type_size(read_type, NULL);
         adios2_type out_type = PIOc_get_adios_type(iodesc->piotype);
         int out_type_size = get_adios2_type_size(out_type, NULL);
-        if (starting_frame >= 0)
-            target_block =  target_block * n_frames + frame_id - starting_frame;
+        /* check that frame_id is not a special case of -1*/
+        if (starting_frame >= 0 && frame_id >= 0) {
+            target_block = target_block * n_frames + frame_id - starting_frame;
+        }
         assert(target_block < data_blocks_size);
         adios2_set_block_selection(data, target_block);
         size_t block_size;/* size of the block*/
