@@ -1388,16 +1388,13 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     /* Get the variable info. */
     adios_vdesc = file->adios_vars + vid;
 
-    LOG((1, "PIOc_read_darray  filename %s varid = %d var_name=%s", file->fname, vid, adios_vdesc->name));
+    LOG((1, "PIOc_read_darray  filename %s varid = %d var_name = %s", file->fname, vid, adios_vdesc->name));
 
     /* check darray type */
     if (strcmp(adios_vdesc->scorpio_var_type, "darray") != 0) {
         return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__,
                        "darray variable is expected");
     }
-
-    /* Get the number of dimensions in the decomposition. */
-    ndims = iodesc->ndims;
 
     /* get frame_id */
     int frame_id = file->varlist[vid].record;
@@ -1724,11 +1721,10 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     strcat(var_name, adios_vdesc->name);
     adios_vdesc->adios_varid = adios2_inquire_variable(file->ioH, var_name);
     free(var_name);
-    adios2_variable *data = adios_vdesc->adios_varid;
 
     char *data_buf = NULL;
-    if (data) {
-        adios2_varinfo *data_blocks = adios2_inquire_blockinfo(file->engineH, data, required_adios_step);
+    if (adios_vdesc->adios_varid) {
+        adios2_varinfo *data_blocks = adios2_inquire_blockinfo(file->engineH, adios_vdesc->adios_varid, required_adios_step);
         int32_t data_blocks_size = data_blocks->nblocks;
         /* free memeory */
         for (size_t i = 0; i < data_blocks->nblocks; ++i) {
@@ -1737,7 +1733,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
         free(data_blocks->BlocksInfo);
         free(data_blocks);
         adios2_type read_type;
-        adios2_variable_type(&read_type, data);
+        adios2_variable_type(&read_type, adios_vdesc->adios_varid);
         size_t read_type_size = get_adios2_type_size(read_type, NULL);
         adios2_type out_type = PIOc_get_adios_type(iodesc->piotype);
         int out_type_size = get_adios2_type_size(out_type, NULL);
@@ -1747,11 +1743,11 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
         }
         assert(target_block >= 0);
         assert(target_block < data_blocks_size);
-        adios2_set_block_selection(data, target_block);
+        adios2_set_block_selection(adios_vdesc->adios_varid, target_block);
         size_t block_size;/* size of the block*/
-        adios2_error err_sel = adios2_selection_size(&block_size, data);
+        adios2_error err_sel = adios2_selection_size(&block_size, adios_vdesc->adios_varid);
         data_buf = (char *) malloc(block_size * read_type_size);
-        adios2_error err = adios2_get(file->engineH, data, data_buf, adios2_mode_sync);
+        adios2_error err = adios2_get(file->engineH, adios_vdesc->adios_varid, data_buf, adios2_mode_sync);
         if (err != adios2_error_none) {
             return pio_err(NULL, file, PIO_EADIOS2ERR, __FILE__, __LINE__,
                            "adios2_get for file (%s) failed",
