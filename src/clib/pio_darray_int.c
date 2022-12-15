@@ -1693,13 +1693,13 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     strcat(var_track_frame_id, adios_vdesc->name);
     adios2_variable *tracking_data = adios2_inquire_variable(file->ioH, var_track_frame_id);
     free(var_track_frame_id);
-    int32_t starting_frame;
+    int32_t starting_frame = 0;
     size_t n_frames = 0;/* number of frames in the current adios step*/
     if (tracking_data) {
         adios2_set_block_selection(tracking_data, 0);
         adios2_error err_sel = adios2_selection_size(&n_frames, tracking_data);
 
-        char* tracking_data_buf = (char *) malloc(n_frames * sizeof (int32_t));
+        char* tracking_data_buf = (char *) calloc(n_frames, sizeof (int32_t));
 
         adios2_error err = adios2_get(file->engineH, tracking_data, tracking_data_buf, adios2_mode_sync);
         starting_frame = tracking_data_buf[0];
