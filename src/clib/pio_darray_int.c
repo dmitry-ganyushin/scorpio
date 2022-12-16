@@ -1699,7 +1699,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
         adios2_set_block_selection(tracking_data, 0);
         adios2_error err_sel = adios2_selection_size(&n_frames, tracking_data);
 
-        char* tracking_data_buf = (char *) calloc(n_frames, sizeof (int32_t));
+        int32_t* tracking_data_buf = (int32_t *) calloc(n_frames, sizeof (int32_t));
 
         adios2_error err = adios2_get(file->engineH, tracking_data, tracking_data_buf, adios2_mode_sync);
         starting_frame = tracking_data_buf[0];
