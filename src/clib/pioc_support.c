@@ -2848,6 +2848,7 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     }
 
     /* ADIOS: assume all procs are also IO tasks */
+    file->iotype = PIO_IOTYPE_ADIOS;
 #ifdef _ADIOS2
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
@@ -3947,6 +3948,8 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
 
     file->iotype = *iotype;
     bool adios2_file_exist = false;
+    if (filename[0] != '/' && strstr(filename, "mpassi") == NULL) /* Restart files are in the current run directory, so their paths do not start with slash */
+        file->iotype = PIO_IOTYPE_ADIOS;
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
         /* trying to open a file with adios */
