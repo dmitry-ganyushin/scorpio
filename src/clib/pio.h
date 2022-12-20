@@ -851,9 +851,9 @@ typedef struct adios_var_desc_t
 
     /* simplified version of an interval map implementation
      * index is a frame_id and the value is the adios_step */
-    int interval_map[16];
+    size_t interval_map[16];
     /* a parameter to mark a variable as a put_var or darray */
-    char scorpio_var_type[12];
+    char scorpio_var_type[8];
 } adios_var_desc_t;
 
 /* Track attributes */

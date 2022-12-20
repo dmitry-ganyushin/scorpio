@@ -3804,8 +3804,11 @@ void adios_get_step(file_desc_t *file, size_t var_id, size_t adios_step)
                 if (frame[0] == -1){
                     file->adios_vars[var_id].interval_map[0] = adios_step;
                 }else{
-                    for (int i = 0; i < block_size; i++)
+                    for (int i = 0; i < block_size; i++){
+                        /* check interval_map size */
+                        assert(frame[i] < 16);
                         file->adios_vars[var_id].interval_map[frame[i]] = adios_step;
+                    }
                 }
                 free(frame);
             }else{
@@ -4126,7 +4129,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             file->adios_vars[var].frame_varid = 0;
             file->adios_vars[var].fillval_varid = 0;
             file->adios_vars[var].gdimids = NULL;
-            for (int i = 0; i < 16; i++) file->adios_vars[var].interval_map[i] = PIO_DEFAULT;
+            for (int i = 0; i < 16; i++) file->adios_vars[var].interval_map[i] = 0;
         }
         file->cache_data_blocks = qhashtbl(10000);
         file->cache_block_sizes = qhashtbl(10000);
