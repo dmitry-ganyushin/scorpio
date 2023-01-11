@@ -55,9 +55,7 @@
 #include <adios2_c.h>
 #include "qhashtbl.h"
 
-#define ADIOS_PIO_MAX_DECOMPS 1024 /* Maximum number of decomps */
-#define MAX_STEP_CALLS 512 /* Maximum number of application steps before adios end step is called */
-#define MAX_ADIOS_BUFFER_COUNT (MAX_STEP_CALLS + 16) /* Maximum buffer size for aggregating decomp_id, frame_id, and fillval_id values */
+#define MAX_ADIOS_BUFFER_COUNT (PIO_MAX_CACHED_STEPS_FOR_ADIOS + 16) /* Maximum buffer size for aggregating decomp_id, frame_id, and fillval_id values */
 #define BLOCK_MAX_BUFFER ((unsigned long)INT_MAX) /* 2GB limit of MPI_Gatherv */
 /* adios end step is called if the number of blocks written out exceeds BLOCK_COUNT_THRESHOLD */
 #define BLOCK_COUNT_THRESHOLD ((unsigned long)(1024 * 1024 * 1024 * 1.9))
@@ -65,6 +63,10 @@
 
 adios2_adios *get_adios2_adios();
 unsigned long get_adios2_io_cnt();
+#endif
+#ifdef _HDF5
+#include <hdf5.h>
+#include <hdf5_hl.h>
 #endif
 
 /* PIO_OFFSET_C_TYPENAME is defined in pio_config.h */
