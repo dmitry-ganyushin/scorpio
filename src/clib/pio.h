@@ -314,6 +314,11 @@ typedef PIO_OFFSET_C_TYPENAME PIO_Offset;
 #define PIO_EADIOS2ERR (-301)
 #endif
 
+#ifdef _HDF5
+/** Define error codes for HDF5. */
+#define PIO_EHDF5ERR (-700)
+#endif
+
 #ifdef PIO_MICRO_TIMING
 /** Some fwd declarations to avoid including internal headers */
 typedef struct mtimer_info *mtimer_t;
