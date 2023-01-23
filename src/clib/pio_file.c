@@ -555,19 +555,37 @@ int _PIOc_closefile(int ncid)
                             "Closing file (%s, ncid=%d) failed. Error sending async msg PIO_MSG_CLOSE_FILE", pio_get_fname_from_file(file), ncid);
         }
     }
+    /* sync by file closing */
+    if (file->iotype != PIO_IOTYPE_ADIOS){
+        for (int rank = 0; rank < ios->num_iotasks; rank++) {
+            if(ios->union_rank == ios->ioranks[rank])
+                MPI_Barrier(ios->io_comm);
+        }
+    }
 
     /* ADIOS: assume all procs are also IO tasks */
 #ifdef _ADIOS2
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
-//        if (ios->io_comm != 0) {
-//        MPI_Barrier(ios->io_comm);
-//    }
+        adios2_mode mode;
+        if(file->adios_io_process == 1)
+            adios2_engine_openmode(&mode, file->engineH);
+
+        /* search if this rank is in the list of io ranks */
+        /* read with all ranks */
+        if (mode == adios2_mode_read) {
+            MPI_Barrier(ios->union_comm);
+        }else{
+            /* write io ranks only */
+            for (int rank = 0; rank < ios->num_iotasks; rank++) {
+                if(ios->union_rank == ios->ioranks[rank])
+                    MPI_Barrier(ios->io_comm);
+            }
+        }
+
         if (file->adios_io_process == 1 && file->engineH != NULL && file->filename != NULL)
         {
             LOG((2, "ADIOS close file %s", file->filename));
-            adios2_mode mode;
-            adios2_engine_openmode(&mode, file->engineH);
             if (mode == adios2_mode_write)
             {
                 ierr = begin_adios2_step(file, NULL);
