@@ -455,7 +455,9 @@ int _PIOc_closefile(int ncid)
     char outfilename[PIO_MAX_NAME + 1];
     size_t len = 0;
 #endif
-
+    if (ios->io_comm != 0) {
+        MPI_Barrier(ios->io_comm);
+    }
     LOG((1, "PIOc_closefile ncid = %d", ncid));
 
     /* Find the info about this file. */

@@ -2729,7 +2729,9 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
     file_desc_t *file;     /* Pointer to file information. */
     int mpierr = MPI_SUCCESS;  /* Return code from MPI function codes. */
     int ierr = PIO_NOERR;              /* Return code from function calls. */
-
+    if (ios->io_comm != 0){
+        MPI_Barrier(ios->adios_comm);
+    }
     /* Get the IO system info from the iosysid. */
     if (!(ios = pio_get_iosystem_from_id(iosysid)))
     {
