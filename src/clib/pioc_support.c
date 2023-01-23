@@ -2722,21 +2722,22 @@ int PIO_get_avail_iotypes(char *buf, size_t sz)
  * @ingroup PIO_createfile
  */
 int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *filename,
-                        int mode)
-{
+                        int mode) {
     char tname[SPIO_TIMER_MAX_NAME];
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     file_desc_t *file;     /* Pointer to file information. */
     int mpierr = MPI_SUCCESS;  /* Return code from MPI function codes. */
     int ierr = PIO_NOERR;              /* Return code from function calls. */
-    if (ios->io_comm != 0){
-        MPI_Barrier(ios->adios_comm);
-    }
     /* Get the IO system info from the iosysid. */
-    if (!(ios = pio_get_iosystem_from_id(iosysid)))
-    {
+    if (!(ios = pio_get_iosystem_from_id(iosysid))) {
         return pio_err(NULL, NULL, PIO_EBADID, __FILE__, __LINE__,
-                        "Creating file (%s) failed. Invalid iosystem id (%d) provided", (filename) ? filename : "UNKNOWN", iosysid);
+                       "Creating file (%s) failed. Invalid iosystem id (%d) provided",
+                       (filename) ? filename : "UNKNOWN", iosysid);
+    }
+    /* search if this rank is in the list of io ranks */
+    for (int rank = 0; rank < ios->num_iotasks; rank++) {
+    if(ios->union_rank == ios->ioranks[rank])
+        MPI_Barrier(ios->io_comm);
     }
 
     /* User must provide valid input for these parameters. */

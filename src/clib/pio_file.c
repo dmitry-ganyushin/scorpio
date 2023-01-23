@@ -455,9 +455,6 @@ int _PIOc_closefile(int ncid)
     char outfilename[PIO_MAX_NAME + 1];
     size_t len = 0;
 #endif
-    if (ios->io_comm != 0) {
-        MPI_Barrier(ios->io_comm);
-    }
     LOG((1, "PIOc_closefile ncid = %d", ncid));
 
     /* Find the info about this file. */
@@ -563,6 +560,9 @@ int _PIOc_closefile(int ncid)
 #ifdef _ADIOS2
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
+//        if (ios->io_comm != 0) {
+//        MPI_Barrier(ios->io_comm);
+//    }
         if (file->adios_io_process == 1 && file->engineH != NULL && file->filename != NULL)
         {
             LOG((2, "ADIOS close file %s", file->filename));
