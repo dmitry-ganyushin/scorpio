@@ -567,27 +567,14 @@ int _PIOc_closefile(int ncid)
 #ifdef _ADIOS2
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
-        adios2_mode mode;
-        if(file->adios_io_process == 1)
-            adios2_engine_openmode(&mode, file->engineH);
-
-        /* search if this rank is in the list of io ranks */
-        /* read with all ranks */
-        if (mode == adios2_mode_read) {
-            MPI_Barrier(ios->union_comm);
-        }else{
-            /* write io ranks only */
-            for (int rank = 0; rank < ios->num_iotasks; rank++) {
-                if(ios->union_rank == ios->ioranks[rank])
-                    MPI_Barrier(ios->io_comm);
-            }
-        }
-
         if (file->adios_io_process == 1 && file->engineH != NULL && file->filename != NULL)
         {
             LOG((2, "ADIOS close file %s", file->filename));
+            adios2_mode mode = adios2_mode_undefined;
+            adios2_engine_openmode(&mode, file->engineH);
             if (mode == adios2_mode_write)
             {
+                MPI_Barrier(ios->io_comm);
                 ierr = begin_adios2_step(file, NULL);
                 if (ierr != PIO_NOERR)
                 {
