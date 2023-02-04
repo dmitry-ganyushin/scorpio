@@ -555,13 +555,6 @@ int _PIOc_closefile(int ncid)
                             "Closing file (%s, ncid=%d) failed. Error sending async msg PIO_MSG_CLOSE_FILE", pio_get_fname_from_file(file), ncid);
         }
     }
-    /* sync by file closing */
-    if (file->iotype != PIO_IOTYPE_ADIOS){
-        for (int rank = 0; rank < ios->num_iotasks; rank++) {
-            if(ios->union_rank == ios->ioranks[rank])
-                MPI_Barrier(ios->io_comm);
-        }
-    }
 
     /* ADIOS: assume all procs are also IO tasks */
 #ifdef _ADIOS2
@@ -574,7 +567,6 @@ int _PIOc_closefile(int ncid)
             adios2_engine_openmode(&mode, file->engineH);
             if (mode == adios2_mode_write)
             {
-                MPI_Barrier(ios->io_comm);
                 ierr = begin_adios2_step(file, NULL);
                 if (ierr != PIO_NOERR)
                 {
