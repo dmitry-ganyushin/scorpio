@@ -3628,6 +3628,10 @@ int adios_read_global_dimensions(iosystem_desc_t *ios, file_desc_t * file, char 
 
 char* adios_name(const char* prefix, const char* root, const char *suffix)
 {
+    assert (prefix != NULL);
+    assert (root != NULL);
+    assert (suffix != NULL);
+
     char *name = str_buf;
     size_t len_prefix = strlen (prefix);
 	memcpy (name, prefix, len_prefix);
