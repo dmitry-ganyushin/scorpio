@@ -807,6 +807,10 @@ typedef struct wmulti_buffer
 } wmulti_buffer;
 
 #ifdef _ADIOS2
+typedef struct adios_interval_map_t{
+    int n_adios_steps;
+    short **map;
+}adios_interval_map_t;
 /** Variable definition information saved at pioc_def_var,
  * so that ADIOS can define the variable at write time when
  * local dimensions and offsets are known.
@@ -858,7 +862,7 @@ typedef struct adios_var_desc_t
 
     /* simplified version of an interval map implementation
      * index is a frame_id and the value is the adios_step */
-    size_t interval_map[16];
+    adios_interval_map_t* interval_map;
     /* a parameter to mark a variable as a put_var or darray */
     char scorpio_var_type[8];
 } adios_var_desc_t;

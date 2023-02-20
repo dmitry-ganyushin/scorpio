@@ -1269,15 +1269,13 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
  *  Map frame id to adios2 step
  *  for future development
  */
-int get_adios_step(file_desc_t *file, int var_id, int frame_id)
-{
-    if (frame_id != -1)
-    {
-        return file->adios_vars[var_id].interval_map[frame_id];
-    }
-    else
-    {
-        return file->adios_vars[var_id].interval_map[0];
+int get_adios_step(file_desc_t *file, int var_id, int frame_id) {
+    for (int step = 0; step < file->adios_vars[var_id].interval_map->n_adios_steps; step++) {
+        if (frame_id >= file->adios_vars[var_id].interval_map->map[step][0] &&
+            frame_id <= file->adios_vars[var_id].interval_map->map[step][1]) {
+            return step;
+        }
+        return -1;
     }
 }
 

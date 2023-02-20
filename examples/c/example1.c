@@ -364,7 +364,6 @@ int main(int argc, char *argv[]) {
         /* Read int type variable with int type decomposition, type conversions will not be performed. */
         ret = PIOc_inq_varid(ncid_read, "dummy_darray_var_int", &varid_dummy_darray_var_int);
         ERR
-        PIOc_setframe(ncid_read, varid_dummy_darray_var_int, 0);
         ret = PIOc_read_darray(ncid_read, varid_dummy_darray_var_int, ioid_int, ELEMENTS_PER_PE,
                                read_darray_buffer_int);
         ERR

@@ -795,6 +795,16 @@ int _PIOc_closefile(int ncid)
                 file->adios_vars[i].num_wb_buffer = NULL;
                 file->adios_vars[i].num_wb_cnt = 0;
             }
+            if (file->adios_vars[i].interval_map != NULL)
+            {
+                for (size_t s = 0; s <  file->adios_vars[i].interval_map->n_adios_steps; s++)
+                {
+                    free(file->adios_vars[i].interval_map->map[s]);
+                }
+                free(file->adios_vars[i].interval_map->map);
+                free(file->adios_vars[i].interval_map);
+                file->adios_vars[i].interval_map = NULL;
+            }
         }
 
         file->num_vars = 0;
