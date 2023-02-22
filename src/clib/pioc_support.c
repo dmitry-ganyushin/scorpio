@@ -3425,12 +3425,14 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 #endif
         spio_ltimer_stop(file->io_fstats->wr_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
+#ifdef _ADIOS2
         file->cache_data_blocks->free(file->cache_data_blocks);
         file->cache_block_sizes->free(file->cache_block_sizes);
         file->cache_darray_info->free(file->cache_darray_info);
         free(file->cache_data_blocks);
         free(file->cache_block_sizes);
         free(file->cache_darray_info);
+#endif
         free(file->io_fstats);
         free(file);
         return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
@@ -3452,12 +3454,14 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 #endif
         spio_ltimer_stop(file->io_fstats->wr_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
+#ifdef _ADIOS2
         file->cache_data_blocks->free(file->cache_data_blocks);
         file->cache_block_sizes->free(file->cache_block_sizes);
         file->cache_darray_info->free(file->cache_darray_info);
         free(file->cache_data_blocks);
         free(file->cache_block_sizes);
         free(file->cache_darray_info);
+#endif
         free(file->io_fstats);
         free(file);
         return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
@@ -4065,7 +4069,9 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
     file->num_unlim_dimids = 0;
     file->unlim_dimids = NULL;
     */
+#ifdef _ADIOS2
     file->num_dim_vars = 0;
+#endif
 
     for (int i = 0; i < PIO_MAX_VARS; i++)
     {
@@ -4087,10 +4093,12 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         file->varlist[i].use_fill = 0;
         file->varlist[i].fillbuf = NULL;
     }
+#ifdef _ADIOS2
     /* Set communicator for all adios processes, process rank, and I/O master node */
     file->all_comm = ios->union_comm;
     file->all_rank = ios->union_rank;
     file->num_alltasks = ios->num_uniontasks;
+#endif
 
     /* Set to true if this task should participate in IO (only true
      * for one task with netcdf serial files. */
@@ -4440,11 +4448,13 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
                 spio_ltimer_stop(file->io_fstats->tot_timer_name);
+#ifdef _ADIOS2
                 file->cache_data_blocks->free(file->cache_data_blocks);
                 file->cache_block_sizes->free(file->cache_block_sizes);
                 free(file->cache_data_blocks);
                 free(file->cache_block_sizes);
                 free(file->cache_darray_info);
+#endif
                 free(file->io_fstats);
                 free(file);
                 PIO_get_avail_iotypes(avail_iotypes, PIO_MAX_NAME);
@@ -4522,11 +4532,13 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->rd_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
+#ifdef _ADIOS2
         file->cache_data_blocks->free(file->cache_data_blocks);
         file->cache_block_sizes->free(file->cache_block_sizes);
         free(file->cache_data_blocks);
         free(file->cache_block_sizes);
         free(file->cache_darray_info);
+#endif
         free(file->io_fstats);
         free(file);
         return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
@@ -4572,12 +4584,14 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->rd_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
+#ifdef _ADIOS2
             file->cache_data_blocks->free(file->cache_data_blocks);
             file->cache_block_sizes->free(file->cache_block_sizes);
             file->cache_darray_info->free(file->cache_darray_info);
             free(file->cache_data_blocks);
             free(file->cache_block_sizes);
             free(file->cache_darray_info);
+#endif
             free(file->io_fstats);
             free(file);
             LOG((1, "PIOc_openfile_retry failed, ierr = %d", ierr));
@@ -4631,6 +4645,7 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
     return ierr;
 }
 
+#ifdef _ADIOS2
 size_t
 adios_read_vars_attr(file_desc_t *file, size_t attr_size, char *const *attr_names) {
     size_t current_var_cnt = 0;
@@ -4709,6 +4724,7 @@ size_t adios_read_vars_vars(file_desc_t *file, size_t var_size, char *const *var
     }
     return current_var_cnt;
 }
+#endif
 
 /**
  * Internal function used when opening an existing file. This function

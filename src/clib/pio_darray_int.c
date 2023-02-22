@@ -1278,6 +1278,7 @@ int pio_read_darray_nc(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid
     return PIO_NOERR;
 }
 
+#ifdef _ADIOS2
 /**
  *  Map frame id to adios2 step
  *  for future development
@@ -1295,6 +1296,7 @@ int get_adios_step(file_desc_t *file, int var_id, int frame_id)
 }
 
 bool match_decomp_part(const int64_t *pInt, size_t pos, PIO_Offset *pInt1, PIO_Offset *pInt2);
+#endif
 
 /**
  * Read an array of data from a ADIOS2 bp file to the (parallel) IO library.
@@ -1380,6 +1382,7 @@ free(tmp_out);
     return pio_err(ios, NULL, PIO_EADIOS2ERR, __FILE__, __LINE__, "Not implemented"); \
 }
 
+#ifdef _ADIOS2
 int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int vid, void *iobuf) {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
     adios_var_desc_t *adios_vdesc;     /* Information about the variable. */
@@ -1783,6 +1786,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
 
     return PIO_NOERR;
 }
+
 /* match first 30 elements*/
 /* TODO: make it with hashing of data */
 #define MAX_LEN_MATCH 30
@@ -1795,6 +1799,7 @@ bool match_decomp_part(const int64_t *decomp, size_t offset, PIO_Offset *start, 
     }
     return 1;
 }
+#endif
 
 /**
  * Read an array of data from a file to the (serial) IO library. This

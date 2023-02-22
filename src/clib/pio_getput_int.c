@@ -885,7 +885,6 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
                     memcpy((char *)ip, &attr_data, strlen(attr_data) * sizeof(char));
                     break;
                 }
-#endif
                 default:
                     GPTLstop("PIO:PIOc_get_att_tc");
                     spio_ltimer_stop(ios->io_fstats->rd_timer_name);
@@ -898,8 +897,8 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
 #if _ADIOS2
             free(full_name);
 #endif
-        }
-
+    }
+#endif
 
     ierr = check_netcdf(NULL, file, ierr, __FILE__, __LINE__);
     if(ierr != PIO_NOERR){
