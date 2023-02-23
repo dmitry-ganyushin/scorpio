@@ -3841,7 +3841,7 @@ void adios_get_step_info(file_desc_t *file, size_t var_id, size_t adios_step, si
                                           "");
         variableH = adios2_inquire_variable(file->ioH, var_name);
         if (variableH) {
-            update_interval_map(file->adios_vars[var_id].interval_map, -1, -1, adios_step);
+            update_interval_map(file->adios_vars[var_id].interval_map, 0, 0, adios_step);
         }
     }
     return;
