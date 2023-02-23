@@ -1404,6 +1404,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
     /* magically obtain the relevant adios step*/
     int required_adios_step = get_adios_step(file, vid, frame_id);
     assert(required_adios_step >= 0);
+    LOG((2, "adios2 required adios step (%s) %d", file->fname, required_adios_step));
     size_t current_adios_step = 0;
     if (file->engineH != NULL) {
         adios2_current_step(&current_adios_step, file->engineH);
@@ -1650,7 +1651,7 @@ int pio_read_darray_adios2(file_desc_t *file, int fndims, io_desc_t *iodesc, int
             }
         }
         adios2_current_step(&current_adios_step, file->engineH);
-
+        LOG((2, "adios2_current_step(%s)  %d", file->fname, current_adios_step));
         for (int step = 0; step < required_adios_step - current_adios_step - 1; step++) {
             adios2_error step_err = adios2_begin_step(file->engineH, adios2_step_mode_read, -1.,
                                                       &status);
