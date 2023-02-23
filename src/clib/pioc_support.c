@@ -3824,7 +3824,14 @@ void adios_get_step_info(file_desc_t *file, size_t var_id, size_t adios_step, si
         if (type == adios2_type_int32_t) {
             int32_t *frame = (int32_t *) calloc(block_size, sizeof(int32_t));
             adios2_error adiosErr = adios2_get(file->engineH, variableH, frame, adios2_mode_sync);
-            update_interval_map(file->adios_vars[var_id].interval_map, frame[0], frame[block_size - 1], adios_step);
+            if ( block_size == 1 && frame[0] == -1)
+            {
+                /* special case */
+                update_interval_map(file->adios_vars[var_id].interval_map, 0, 0, adios_step);
+            }else{
+                update_interval_map(file->adios_vars[var_id].interval_map, frame[0], frame[block_size - 1], adios_step);
+            }
+
             free(frame);
         } else {
             /*not implemented */
