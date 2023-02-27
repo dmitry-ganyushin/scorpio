@@ -2662,7 +2662,7 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
 #ifdef _ADIOS2
             if (vdesc_adios2->adios_type_size == 0)
                 vdesc_adios2->adios_type_size = get_adios2_type_size(vdesc_adios2->adios_type, NULL);
-            assert(vdesc_adios2->adios_type_size > adios2_type_unknown);
+            assert(vdesc_adios2->adios_type_size > 0);
 #endif
         }
         else
