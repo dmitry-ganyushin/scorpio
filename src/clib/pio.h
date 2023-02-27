@@ -76,7 +76,6 @@ extern "C" {
 #define BLOCK_METADATA_SIZE 70 /* Size of adios block metadata */
 
 adios2_adios *get_adios2_adios();
-unsigned long get_adios2_io_cnt();
 #endif
 #ifdef _HDF5
 #include <hdf5.h>
@@ -762,6 +761,7 @@ typedef struct iosystem_desc_t
 #ifdef _ADIOS2
     /* ADIOS handle */
     adios2_adios *adiosH;
+    adios2_adios *adios_readerH;
     int adios_io_process;
     MPI_Comm adios_comm;
     int adios_rank, num_adiostasks;
@@ -817,6 +817,10 @@ typedef struct wmulti_buffer
 } wmulti_buffer;
 
 #ifdef _ADIOS2
+typedef struct adios_interval_map_t{
+    int n_adios_steps;
+    short **map;
+}adios_interval_map_t;
 /** Variable definition information saved at pioc_def_var,
  * so that ADIOS can define the variable at write time when
  * local dimensions and offsets are known.
