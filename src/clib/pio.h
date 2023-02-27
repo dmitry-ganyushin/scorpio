@@ -13,7 +13,20 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h> /* memcpy */
+
+#ifdef MPI_SERIAL
+#if defined(__cplusplus)
+extern "C" {
+#endif
+#endif
+
 #include <mpi.h>
+
+#ifdef MPI_SERIAL
+#if defined(__cplusplus)
+}
+#endif
+#endif
 
 #include "pio_config.h"
 #if PIO_USE_PNETCDF
@@ -47,6 +60,7 @@
 #ifdef _PNETCDF
 #include <pnetcdf.h>
 #endif
+
 #ifdef _ADIOS2
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -199,10 +213,7 @@ typedef PIO_OFFSET_C_TYPENAME PIO_Offset;
 #define PIO_MAX_VAR_DIMS NC_MAX_VAR_DIMS
 #endif
 #define PIO_64BIT_OFFSET NC_64BIT_OFFSET
-
-/** NC_64BIT_DATA This is a problem - need to define directly instead
- * of using include file. */
-#define PIO_64BIT_DATA 0x0010
+#define PIO_64BIT_DATA NC_64BIT_DATA
 
 /** Define the netCDF-based error codes. */
 #define PIO_NOERR  NC_NOERR
@@ -751,7 +762,6 @@ typedef struct iosystem_desc_t
 #ifdef _ADIOS2
     /* ADIOS handle */
     adios2_adios *adiosH;
-    adios2_adios *adios_readerH;
     int adios_io_process;
     MPI_Comm adios_comm;
     int adios_rank, num_adiostasks;
@@ -807,10 +817,6 @@ typedef struct wmulti_buffer
 } wmulti_buffer;
 
 #ifdef _ADIOS2
-typedef struct adios_interval_map_t{
-    int n_adios_steps;
-    short **map;
-}adios_interval_map_t;
 /** Variable definition information saved at pioc_def_var,
  * so that ADIOS can define the variable at write time when
  * local dimensions and offsets are known.
@@ -1062,6 +1068,14 @@ typedef struct file_desc_t
 
     /** Number of vars defined */
     int hdf5_num_vars;
+
+    struct hdf5_att_desc_t hdf5_attrs[PIO_MAX_ATTRS];
+
+    /** Number of attrs defined */
+    int hdf5_num_attrs;
+
+    /** Number of global attrs defined */
+    int hdf5_num_gattrs;
 #endif /* _HDF5 */
 
     /* File name - cached */

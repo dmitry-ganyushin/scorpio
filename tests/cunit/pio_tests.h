@@ -33,7 +33,7 @@
 #define NUM_REARRANGERS 2
 
 /* Number of sample files constructed for these tests. */
-#define NUM_SAMPLES 3
+#define NUM_SAMPLES 5
 
 /** Error code for when things go wrong. */
 #define ERR_CHECK 1109
@@ -66,6 +66,10 @@
         return e;                                                       \
     } while (0)
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 /* Function prototypes. */
 int pio_test_init(int argc, char **argv, int *my_rank, int *ntasks, int target_ntasks, MPI_Comm *test_comm);
 int pio_test_init2(int argc, char **argv, int *my_rank, int *ntasks, int min_ntasks,
@@ -78,6 +82,10 @@ int create_nc_sample_1(int iosysid, int format, char *filename, int my_rank, int
 int check_nc_sample_1(int iosysid, int format, char *filename, int my_rank, int *ncid);
 int create_nc_sample_2(int iosysid, int format, char *filename, int my_rank, int *ncid);
 int check_nc_sample_2(int iosysid, int format, char *filename, int my_rank, int *ncid);
+int create_nc_sample_64bit_offset(int iosysid, int format, char *filename, int my_rank, int *ncid);
+int check_nc_sample_64bit_offset(int iosysid, int format, char *filename, int my_rank, int *ncid);
+int create_nc_sample_64bit_data(int iosysid, int format, char *filename, int my_rank, int *ncid);
+int check_nc_sample_64bit_data(int iosysid, int format, char *filename, int my_rank, int *ncid);
 int get_iotypes(int *num_flavors, int *flavors);
 int get_iotype_name(int iotype, char *name);
 int pio_test_finalize(MPI_Comm *test_comm);
@@ -94,4 +102,9 @@ int run_test_main(int argc, char **argv, int min_ntasks, int max_ntasks,
 /* Create a 2D decomposition used in some tests. */
 int create_decomposition_2d(int ntasks, int my_rank, int iosysid, int *dim_len_2d, int *ioid,
                             int pio_type);
+
+#if defined(__cplusplus)
+}
+#endif
+
 #endif /* _PIO_TESTS_H */

@@ -124,47 +124,7 @@ int pio_get_file(int ncid, file_desc_t **cfile1)
     return PIO_NOERR;
 }
 
-/* version which takes file name as an input parameter
- *
-*/
-int pio_get_file_by_name(const char* fname, file_desc_t **cfile1)
-{
-    file_desc_t *cfile = NULL;
-
-    LOG((2, "pio_get_file_by_name file name = %s", fname));
-
-    /* Caller must provide this. */
-    if (!cfile1)
-        return PIO_EINVAL;
-
-    /* Find the file pointer. */
-    if (current_file && strcmp(current_file->fname, fname) == 0)
-        cfile = current_file;
-    else
-        for (cfile = pio_file_list; cfile; cfile = cfile->next)
-            if (strcmp(cfile->fname, fname) == 0)
-            {
-                current_file = cfile;
-                break;
-            }
-
-    /* If not found, return error. */
-    if (!cfile)
-        return PIO_EBADID;
-
-    /* We depend on every file having a pointer to the iosystem. */
-    if (!cfile->iosystem)
-        return PIO_EINVAL;
-
-    /* Let's just ensure we have a valid IO type. */
-    pioassert(iotype_is_valid(cfile->iotype), "invalid IO type", __FILE__, __LINE__);
-
-    /* Copy pointer to file info. */
-    *cfile1 = cfile;
-    return PIO_NOERR;
-}
-/*
- *
+/** 
  * Delete a file from the list of open files.
  *
  * @param ncid ID of file to delete from list
@@ -205,6 +165,7 @@ int pio_delete_file_from_list(int ncid)
             free(cfile->io_fstats);
             spio_file_mvcache_finalize(cfile);
             /* Free the memory used for this file. */
+#ifdef _ADIOS2
             if (cfile->cache_data_blocks != NULL){
                 cfile->cache_data_blocks->free(cfile->cache_data_blocks);
             }
@@ -214,6 +175,7 @@ int pio_delete_file_from_list(int ncid)
             if (cfile->cache_darray_info != NULL){
                 cfile->cache_darray_info->free(cfile->cache_darray_info);
             }
+#endif
             free(cfile);
             
             return PIO_NOERR;

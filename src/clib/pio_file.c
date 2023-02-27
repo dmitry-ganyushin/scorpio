@@ -127,7 +127,7 @@ int PIOc_open(int iosysid, const char *path, int mode, int *ncidp)
  * @ingroup PIO_createfile
  * @author Jim Edwards, Ed Hartnett
  */
-int PIOc_createfile(int iosysid, int *ncidp,  const int *iotype, const char *filename,
+int PIOc_createfile(int iosysid, int *ncidp, const int *iotype, const char *filename,
                     int mode)
 {
     iosystem_desc_t *ios;  /* Pointer to io system information. */
@@ -455,6 +455,7 @@ int _PIOc_closefile(int ncid)
     char outfilename[PIO_MAX_NAME + 1];
     size_t len = 0;
 #endif
+
     LOG((1, "PIOc_closefile ncid = %d", ncid));
 
     /* Find the info about this file. */
@@ -560,7 +561,7 @@ int _PIOc_closefile(int ncid)
 #ifdef _ADIOS2
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
-        if (file->adios_io_process == 1 && file->engineH != NULL && file->filename != NULL)
+        if (file->adios_io_process == 1 && file->engineH != NULL)
         {
             LOG((2, "ADIOS close file %s", file->filename));
             adios2_mode mode = adios2_mode_undefined;
@@ -742,7 +743,6 @@ int _PIOc_closefile(int ncid)
 
         }
 
-
         for (int i = 0; i < file->num_dim_vars; i++)
         {
             if (file->dim_names[i] != NULL)
@@ -857,8 +857,44 @@ int _PIOc_closefile(int ncid)
 #endif
 
         int rearr_type = PIO_REARR_SUBSET;
-#endif
+#if 0
+        /* add a condition */
+        /* Convert XXXX.nc.bp to XXXX.nc */
+        len = strlen(file->filename);
+        assert(len > 6 && len <= PIO_MAX_NAME);
+        strncpy(outfilename, file->filename, len - 3);
+        outfilename[len - 3] = '\0';
+        LOG((1, "CONVERTING: %s", file->filename));
+        MPI_Barrier(ios->union_comm);
+        ierr = C_API_ConvertBPToNC(file->filename, outfilename, conv_iotype, rearr_type, ios->union_comm);
+        MPI_Barrier(ios->union_comm);
+        LOG((1, "DONE CONVERTING: %s", file->filename));
+        if (ierr != PIO_NOERR)
+        {
+            if (file->iotype == PIO_IOTYPE_ADIOS)
+            {
+                GPTLstop("PIO:PIOc_closefile_adios");
+                GPTLstop("PIO:write_total_adios");
+            }
+            else
+            {
+                GPTLstop("PIO:PIOc_closefile");
 
+                if (file->mode & PIO_WRITE)
+                {
+                    GPTLstop("PIO:PIOc_closefile_write_mode");
+                    GPTLstop("PIO:write_total");
+                    spio_ltimer_stop(ios->io_fstats->wr_timer_name);
+                    spio_ltimer_stop(file->io_fstats->wr_timer_name);
+                }
+                spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+                spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            }
+            return pio_err(ios, file, ierr, __FILE__, __LINE__,
+                            "C_API_ConvertBPToNC(infile = %s, outfile = %s, piotype = %s) failed", file->filename, outfilename, conv_iotype);
+        }
+#endif
+#endif
         if (file->filename != NULL)
         {
             free(file->filename);
@@ -1010,6 +1046,18 @@ int _PIOc_closefile(int ncid)
         }
 
         file->hdf5_num_vars = 0;
+
+        for (int i = 0; i < file->hdf5_num_attrs; i++)
+        {
+            if (file->hdf5_attrs[i].att_name != NULL)
+            {
+                free(file->hdf5_attrs[i].att_name);
+                file->hdf5_attrs[i].att_name = NULL;
+            }
+        }
+
+        file->hdf5_num_attrs = 0;
+        file->hdf5_num_gattrs = 0;
     }
 #endif
 

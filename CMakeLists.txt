@@ -6,8 +6,8 @@ message(STATUS "===== Configuring SCORPIO... =====")
 
 # The project version number.
 set(VERSION_MAJOR   1   CACHE STRING "Project major version number.")
-set(VERSION_MINOR   3   CACHE STRING "Project minor version number.")
-set(VERSION_PATCH   2   CACHE STRING "Project patch version number.")
+set(VERSION_MINOR   4   CACHE STRING "Project minor version number.")
+set(VERSION_PATCH   1   CACHE STRING "Project patch version number.")
 mark_as_advanced(VERSION_MAJOR VERSION_MINOR VERSION_PATCH)
 
 #==============================================================================
@@ -295,8 +295,8 @@ endif()
 
 # Min versions of libraries required
 set (MPE_MIN_VER_REQD "2.4.8")
-set (NETCDF_C_MIN_VER_REQD "4.3.3")
-set (NETCDF_FORTRAN_MIN_VER_REQD "4.3.3")
+set (NETCDF_C_MIN_VER_REQD "4.4.0")
+set (NETCDF_FORTRAN_MIN_VER_REQD "4.4.0")
 set (PNETCDF_MIN_VER_REQD "1.8.1")
 set (ADIOS_MIN_VER_REQD "2.7.0")
 

@@ -8,68 +8,100 @@
 
 #define ERR { if (ret != PIO_NOERR) printf("rank = %d, error at line = %d\n", my_rank, __LINE__); }
 
-int main(int argc, char *argv[]) {
-    int my_rank;
-    int ntasks;
-    int formats[2] = {PIO_IOTYPE_PNETCDF, PIO_IOTYPE_ADIOS};
-    int niotasks;
-    const int ioproc_start = 0;
-    int iosysid;
-    int ncid_write1;
-    int ncid_write2;
-    int ncid_read1;
+int main(int argc, char* argv[])
+{
+  /* Zero-based rank of processor. */
+  int my_rank;
 
-    char filename1[PIO_MAX_NAME];
-    char filename2[PIO_MAX_NAME];
+  /* Number of processors involved in current execution. */
+  int ntasks;
 
-    int ret = PIO_NOERR;
+  /* This example only tests two formats (IO types): PnetCDF and ADIOS */
+  int formats[2] = {PIO_IOTYPE_PNETCDF, PIO_IOTYPE_ADIOS};
 
-#ifdef TIMING
-    GPTLinitialize();
-#endif
+  /* Number of processors that will do IO. In this example we
+     will do IO from all processors. */
+  int niotasks;
 
-    MPI_Init(&argc, &argv);
+  /* Stride in the MPI rank between IO tasks. Always 1 in this example. */
+  const int ioproc_stride = 1;
 
-    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &ntasks);
+  /* Zero based rank of first processor to be used for I/O. */
+  const int ioproc_start = 0;
 
-    int ioproc_stride = 1;
-    niotasks = ntasks;
+  /* The ID for the parallel I/O system. It is set by
+     PIOc_Init_Intracomm(). It references an internal structure
+     containing the general IO subsystem data and MPI
+     structure. It is passed to PIOc_finalize() to free
+     associated resources, after all I/O, but before
+     MPI_Finalize is called. */
+  int iosysid;
 
-    ret = PIOc_Init_Intracomm(MPI_COMM_WORLD, niotasks, ioproc_stride, ioproc_start, PIO_REARR_SUBSET, &iosysid);
-    ERR
+  /* The ncid of the netCDF file created and read in this example. */
+  int ncid_write;
+  int ncid_read;
 
-    for (int fmt = 0; fmt < 2; fmt++) {
-        sprintf(filename1, "testfile1_%d.nc", fmt);
-        ret = PIOc_createfile(iosysid, &ncid_write1, &(formats[fmt]), filename1, PIO_CLOBBER);
-        ERR
+  /* The IDs of the netCDF variables in the example file. */
+  int varid_dummy_scalar_var_int_write = -1;
+  int varid_dummy_scalar_var_int_read = -1;
 
-        sprintf(filename2, "testfile2_%d.nc", fmt);
-        ret = PIOc_createfile(iosysid, &ncid_write2, &(formats[fmt]), filename2, PIO_CLOBBER);
-        ERR
+  /* Test filename. */
+  char filename[PIO_MAX_NAME];
 
-        ret = PIOc_closefile(ncid_write1);
-        ERR
-
-        ret = PIOc_openfile(iosysid, &ncid_read1, &(formats[fmt]), filename1, PIO_NOWRITE);
-        ERR
-
-        ret = PIOc_closefile(ncid_write2);
-        ERR
-
-        ret = PIOc_closefile(ncid_read1);
-        ERR
-    }
-
-    ret = PIOc_finalize(iosysid);
-    ERR
-
-    MPI_Finalize();
+  int ret = PIO_NOERR;
 
 #ifdef TIMING
-    GPTLfinalize();
+  GPTLinitialize();
 #endif
 
-    return 0;
+  MPI_Init(&argc, &argv);
+
+  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &ntasks);
+
+  /* Keep things simple - 1 IO task per MPI process */
+  niotasks = ntasks;
+
+  /* Initialize the PIO IO system. This specifies how
+     many and which processors are involved in I/O. */
+  ret = PIOc_Init_Intracomm(MPI_COMM_WORLD, niotasks, ioproc_stride, ioproc_start,
+                      PIO_REARR_SUBSET, &iosysid); ERR
+
+  for (int fmt = 0; fmt < 2; fmt++) {
+    /* Create a filename to write. */
+    sprintf(filename, "example1_%d.nc", fmt);
+
+    ret = PIOc_createfile(iosysid, &ncid_write, &(formats[fmt]), filename, PIO_CLOBBER); ERR
+
+    /* Define some variables for PIOc_write_darray. */
+    ret = PIOc_def_var(ncid_write, "dummy_scalar_var_int", PIO_INT, 0, NULL, &varid_dummy_scalar_var_int_write); ERR
+    if (my_rank == 0)
+      printf("varid_dummy_scalar_var_int_write = %d\n", varid_dummy_scalar_var_int_write);
+
+    ret = PIOc_enddef(ncid_write); ERR
+
+    ret = PIOc_closefile(ncid_write); ERR
+  }
+
+  for (int fmt = 0; fmt < 2; fmt++) {
+    sprintf(filename, "example1_%d.nc", fmt);
+
+    ret = PIOc_openfile(iosysid, &ncid_read, &(formats[fmt]), filename, PIO_NOWRITE); ERR
+
+    ret = PIOc_inq_varid(ncid_read, "dummy_scalar_var_int", &varid_dummy_scalar_var_int_read); ERR
+    if (my_rank == 0)
+      printf("varid_dummy_scalar_var_int_read = %d\n", varid_dummy_scalar_var_int_read);
+
+    ret = PIOc_closefile(ncid_read); ERR
+  }
+
+  ret = PIOc_finalize(iosysid); ERR
+
+  MPI_Finalize();
+
+#ifdef TIMING
+  GPTLfinalize();
+#endif
+
+  return 0;
 }
-

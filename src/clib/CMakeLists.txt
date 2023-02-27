@@ -215,10 +215,15 @@ target_compile_definitions (pioc
   PRIVATE ${CMAKE_SYSTEM_DIRECTIVE})
 target_compile_definitions (pioc
   PUBLIC ${CMAKE_C_COMPILER_DIRECTIVE})
+# Skip MPI C++ headers/bindings for MPICH lib
 target_compile_definitions (pioc
   PUBLIC MPICH_SKIP_MPICXX)
+# Skip MPI C++ headers/bindings for OpenMPI lib
 target_compile_definitions (pioc
   PUBLIC OMPI_SKIP_MPICXX)
+# Skip MPI C++ headers/bindings for SGI MPT lib
+target_compile_definitions (pioc
+  PUBLIC MPI_NO_CPPBIND)
 
 # Add user-specified include/libs/compiler/link options
 target_include_directories (pioc
@@ -269,7 +274,7 @@ endif ()
 # The MPI library detection was done in the top level
 if (MPISERIAL_C_FOUND)
   target_compile_definitions (pioc
-    PRIVATE MPI_SERIAL)
+    PUBLIC MPI_SERIAL)
   target_include_directories (pioc
     PUBLIC ${MPISERIAL_C_INCLUDE_DIRS})
   target_link_libraries (pioc

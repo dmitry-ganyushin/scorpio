@@ -2577,7 +2577,9 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
     int ierr = PIO_NOERR, mpierr = MPI_SUCCESS;           /* Return code. */
     int fndims = 0;
 
+#ifdef _ADIOS2
     adios_var_desc_t *vdesc_adios2; /* Info about the variable from the adios structure */
+#endif
     GPTLstart("PIO:read_total");
     GPTLstart("PIO:PIOc_read_darray");
     /* Get the file info. */
@@ -2614,7 +2616,11 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
 
     /* Get var description. */
     if (file->iotype == PIO_IOTYPE_ADIOS)
+    {
+#ifdef _ADIOS2
         vdesc_adios2 = &(file->adios_vars[varid]);
+#endif
+    }
     else
         vdesc = &(file->varlist[varid]);
 
@@ -2630,9 +2636,11 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
         /* Find out PIO data type of var. */
         if (file->iotype == PIO_IOTYPE_ADIOS)
         {
+#ifdef _ADIOS2
             assert(vdesc_adios2->nc_type != PIO_NAT);
             vdesc_adios2->adios_type = PIOc_get_adios_type(vdesc_adios2->nc_type);
             assert(vdesc_adios2->adios_type != adios2_type_unknown);
+#endif
         }
         else
         {
@@ -2651,9 +2659,11 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
         /* Find out length of type. */
         if (file->iotype == PIO_IOTYPE_ADIOS)
         {
+#ifdef _ADIOS2
             if (vdesc_adios2->adios_type_size == 0)
                 vdesc_adios2->adios_type_size = get_adios2_type_size(vdesc_adios2->adios_type, NULL);
-            assert(vdesc_adios2->adios_type_size > 0);
+            assert(vdesc_adios2->adios_type_size > adios2_type_unknown);
+#endif
         }
         else
         {
@@ -2678,8 +2688,10 @@ int PIOc_read_darray(int ncid, int varid, int ioid, PIO_Offset arraylen,
 
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
+#ifdef _ADIOS2
         ios->io_fstats->rb += vdesc_adios2->adios_type_size * iodesc->llen;
         file->io_fstats->rb += vdesc_adios2->adios_type_size * iodesc->llen;
+#endif
     }
     else
     {

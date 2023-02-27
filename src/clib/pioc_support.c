@@ -2798,6 +2798,8 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 #ifdef _HDF5
     file->hdf5_num_dims = 0;
     file->hdf5_num_vars = 0;
+    file->hdf5_num_attrs = 0;
+    file->hdf5_num_gattrs = 0;
 #endif
     /*
     file->num_unlim_dimids = 0;
@@ -2961,6 +2963,7 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
                            "Initializing block merge failed for file (%s)",
                            pio_get_fname_from_file(file));
         }
+
         if (file->adios_io_process == 1)
         {
             GPTLstart("PIO:adios2_open_call");
@@ -3414,12 +3417,14 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 #endif
         spio_ltimer_stop(file->io_fstats->wr_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
+#ifdef _ADIOS2
         file->cache_data_blocks->free(file->cache_data_blocks);
         file->cache_block_sizes->free(file->cache_block_sizes);
         file->cache_darray_info->free(file->cache_darray_info);
         free(file->cache_data_blocks);
         free(file->cache_block_sizes);
         free(file->cache_darray_info);
+#endif
         free(file->io_fstats);
         free(file);
         return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
@@ -3441,12 +3446,14 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 #endif
         spio_ltimer_stop(file->io_fstats->wr_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
+#ifdef _ADIOS2
         file->cache_data_blocks->free(file->cache_data_blocks);
         file->cache_block_sizes->free(file->cache_block_sizes);
         file->cache_darray_info->free(file->cache_darray_info);
         free(file->cache_data_blocks);
         free(file->cache_block_sizes);
         free(file->cache_darray_info);
+#endif
         free(file->io_fstats);
         free(file);
         return pio_err(ios, NULL, ierr, __FILE__, __LINE__,
@@ -4054,10 +4061,11 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
 #endif
     }
 #endif
-
     file->iosystem = ios;
     file->mode = mode;
+#ifdef _ADIOS2
     file->num_dim_vars = 0;
+#endif
 
     for (int i = 0; i < PIO_MAX_VARS; i++)
     {
@@ -4079,10 +4087,12 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         file->varlist[i].use_fill = 0;
         file->varlist[i].fillbuf = NULL;
     }
+#ifdef _ADIOS2
     /* Set communicator for all adios processes, process rank, and I/O master node */
     file->all_comm = ios->union_comm;
     file->all_rank = ios->union_rank;
     file->num_alltasks = ios->num_uniontasks;
+#endif
 
     /* Set to true if this task should participate in IO (only true
      * for one task with netcdf serial files. */
@@ -4351,11 +4361,13 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                 spio_ltimer_stop(ios->io_fstats->tot_timer_name);
                 spio_ltimer_stop(file->io_fstats->rd_timer_name);
                 spio_ltimer_stop(file->io_fstats->tot_timer_name);
+#ifdef _ADIOS2
                 file->cache_data_blocks->free(file->cache_data_blocks);
                 file->cache_block_sizes->free(file->cache_block_sizes);
                 free(file->cache_data_blocks);
                 free(file->cache_block_sizes);
                 free(file->cache_darray_info);
+#endif
                 free(file->io_fstats);
                 free(file);
                 PIO_get_avail_iotypes(avail_iotypes, PIO_MAX_NAME);
@@ -4385,6 +4397,8 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
                 /* reset file markers for NETCDF on all tasks */
                 file->iotype = PIO_IOTYPE_NETCDF;
 
+                /* FIXME: The changes below to modify the user-specified
+                 * iotype needs to be propogated to all tasks. */
                 /* modify the user-specified iotype on all tasks */
                 /* Modifying the user-specified iotype unfortunately
                  * causes some E3SM model components to reset the iotype
@@ -4431,14 +4445,31 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
         spio_ltimer_stop(ios->io_fstats->tot_timer_name);
         spio_ltimer_stop(file->io_fstats->rd_timer_name);
         spio_ltimer_stop(file->io_fstats->tot_timer_name);
+#ifdef _ADIOS2
         file->cache_data_blocks->free(file->cache_data_blocks);
         file->cache_block_sizes->free(file->cache_block_sizes);
         free(file->cache_data_blocks);
         free(file->cache_block_sizes);
         free(file->cache_darray_info);
+#endif
         free(file->io_fstats);
         free(file);
         return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+    }
+
+    if (retry)
+    {
+        /* Broadcast IO type (might be switched on IO tasks) to all tasks. */
+        if ((mpierr = MPI_Bcast(&file->iotype, 1, MPI_INT, ios->ioroot, ios->my_comm)))
+        {
+            spio_ltimer_stop(ios->io_fstats->rd_timer_name);
+            spio_ltimer_stop(ios->io_fstats->tot_timer_name);
+            spio_ltimer_stop(file->io_fstats->rd_timer_name);
+            spio_ltimer_stop(file->io_fstats->tot_timer_name);
+            free(file->io_fstats);
+            free(file);
+            return check_mpi(NULL, file, mpierr, __FILE__, __LINE__);
+        }
     }
 
     if (file->iotype != PIO_IOTYPE_ADIOS)
@@ -4512,12 +4543,12 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
     return ierr;
 }
 
+#ifdef _ADIOS2
 size_t
 adios_read_vars_attr(file_desc_t *file, size_t attr_size, char *const *attr_names) {
     size_t current_var_cnt = 0;
     for (size_t i = 0; i < attr_size; i++){
-        if (strncmp(attr_names[i], adios_pio_var_prefix, strlen(adios_pio_var_prefix)) == 0 &&
-            strstr(attr_names[i], adios_def_ndims_suffix)) {
+        if (strstr(attr_names[i], adios_pio_var_prefix) != NULL && strstr(attr_names[i], adios_def_ndims_suffix)) {
 
             int full_length = strlen(attr_names[i]);
             int prefix_length = strlen(adios_pio_var_prefix);
@@ -4557,7 +4588,7 @@ size_t adios_read_vars_vars(file_desc_t *file, size_t var_size, char *const *var
     size_t current_var_cnt = 0;
     for (size_t i = 0; i < var_size; i++) {
         /* strings that start with /__pio__/var/ are variables */
-        if (strncmp(var_names[i], adios_pio_var_prefix, strlen(adios_pio_var_prefix)) == 0) {
+        if (strstr(var_names[i], adios_pio_var_prefix) != NULL) {
             int sub_length = strlen(var_names[i]) - strlen(adios_pio_var_prefix);
             int full_length = strlen(var_names[i]);
             int prefix_length = strlen(adios_pio_var_prefix);
@@ -4591,6 +4622,7 @@ size_t adios_read_vars_vars(file_desc_t *file, size_t var_size, char *const *var
     }
     return current_var_cnt;
 }
+#endif
 
 /**
  * Internal function used when opening an existing file. This function
@@ -4842,7 +4874,10 @@ int pioc_change_def(int ncid, int is_enddef)
                         hsize_t dims[1], max_dims[1], chunk_dims[1] = {1};
 
                         dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
-                        H5Pset_attr_creation_order(dcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED);
+                        /* H5DSattach_scale calls (even with MPI_Barrier) might fail or hang if attribute creation
+                         * order is tracked or indexed. Before we have a better workaround, temporarily disable
+                         * tracking and indexing of attribute creation order. */
+                        /* H5Pset_attr_creation_order(dcpl_id, H5P_CRT_ORDER_TRACKED | H5P_CRT_ORDER_INDEXED); */
 
                         /* Set size of dataset to size of dimension. */
                         max_dims[0] = dims[0] = file->hdf5_dims[i].len;
@@ -4947,6 +4982,13 @@ int pioc_change_def(int ncid, int is_enddef)
                             for (int j = 0; j < ndims; j++)
                             {
                                 H5DSattach_scale(file->hdf5_vars[i].hdf5_dataset_id, file->hdf5_dims[dimids[j]].hdf5_dataset_id, j);
+
+                                /* According to HDF5 developers, the H5DS routines are not parallel, so all the ranks are going to be
+                                 * doing the same operations. At some point, with enough iterations of the loop, HDF5 might get out of
+                                 * step between the ranks.
+                                 * Workaround: place a barrier to sync H5DSattach_scale calls.
+                                 */
+                                MPI_Barrier(ios->io_comm);
                             }
                         }
                     }
