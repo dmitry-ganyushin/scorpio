@@ -308,16 +308,6 @@ int main(int argc, char* argv[])
     count[0] = PUT_GET_VAR_LEN / 2;
     ret = PIOc_put_vars_double(ncid_write, varid_dummy_put_get_var_float, start, count, NULL, put_var_buffer_double); ERR
     ret = PIOc_put_vars_double(ncid_write, varid_dummy_put_get_var_double, start, count, NULL, put_var_buffer_double); ERR
-#if 0
-    /* 2D in array */
-      start2D[0] = 0;
-      count2D[0] = PUT_GET_VAR_LEN_X;
-      start2D[1] = 0;
-      count2D[1] = PUT_GET_VAR_LEN_Y;
-      ret = PIOc_put_vars_int(ncid_write, varid_dummy_put_get_var_int_2D, start, count, NULL,
-                              (const int *) put_var_buffer_int_2D); ERR
-      /* end */
-#endif
 
     ret = PIOc_put_var_int(ncid_write, varid_dummy_put_get_var_int_2D, (const int *) put_var_buffer_int_2D); ERR
     ret = PIOc_put_var_int(ncid_write, varid_dummy_put_get_var_int_3D, (const int *) put_var_buffer_int_3D); ERR

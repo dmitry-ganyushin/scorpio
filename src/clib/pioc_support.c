@@ -3916,15 +3916,6 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
      char fname[PIO_MAX_NAME];
      strcpy(fname, filename);
      strcat(fname, ".bp");
-#if 0
-     /* Find the info about this file. If file is opened, skip */
-     if (pio_get_file_by_name(fname, &file) == 0) {
-         *ncidp = file->pio_ncid;
-         GPTLstop("PIO:PIOc_openfile_retry");
-         GPTLstop("PIO:read_total");
-         return 0;
-     }
-#endif
 #endif
  }
     spio_ltimer_start(ios->io_fstats->rd_timer_name);
