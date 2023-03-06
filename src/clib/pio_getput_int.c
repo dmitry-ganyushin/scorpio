@@ -874,7 +874,6 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
                     memcpy((char *)ip, &attr_data, strlen(attr_data) * sizeof(char));
                     break;
                 }
-#endif
                 default:
                     GPTLstop("PIO:PIOc_get_att_tc");
                     GPTLstop("PIO:PIOc_get_att_tc_adios");
@@ -885,7 +884,6 @@ int PIOc_get_att_tc(int ncid, int varid, const char *name, nc_type memtype, void
                     return pio_err(ios, file, PIO_EBADTYPE, __FILE__, __LINE__,
                                    "Reading variable (%s, varid=%d) attribute (%s) failed. Unsupported attribute type (type = %x)", (varid != PIO_GLOBAL) ? file->varlist[varid].vname : "PIO_GLOBAL", varid, name, memtype);
             }
-#if _ADIOS2
             free(full_name);
 #endif
         }

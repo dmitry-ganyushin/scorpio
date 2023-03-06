@@ -4482,12 +4482,14 @@ int PIOc_openfile_retry(int iosysid, int *ncidp, int *iotype, const char *filena
             spio_ltimer_stop(ios->io_fstats->tot_timer_name);
             spio_ltimer_stop(file->io_fstats->rd_timer_name);
             spio_ltimer_stop(file->io_fstats->tot_timer_name);
+#ifdef _ADIOS2
             file->cache_data_blocks->free(file->cache_data_blocks);
             file->cache_block_sizes->free(file->cache_block_sizes);
             file->cache_darray_info->free(file->cache_darray_info);
             free(file->cache_data_blocks);
             free(file->cache_block_sizes);
             free(file->cache_darray_info);
+#endif
             free(file->io_fstats);
             free(file);
             LOG((1, "PIOc_openfile_retry failed, ierr = %d", ierr));
