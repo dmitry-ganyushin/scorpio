@@ -2854,7 +2854,8 @@ int PIOc_createfile_int(int iosysid, int *ncidp, const int *iotype, const char *
 
     /* ADIOS: assume all procs are also IO tasks */
 #ifdef _ADIOS2
-    file->iotype = PIO_IOTYPE_ADIOS; /* Hack: Always write files with ADIOS type */
+    if (strstr(filename, "mpassi") == NULL)
+        file->iotype = PIO_IOTYPE_ADIOS; /* Hack: Always write files with ADIOS type */
     if (file->iotype == PIO_IOTYPE_ADIOS)
     {
         LOG((2, "Calling adios_open mode = %d", file->mode));
